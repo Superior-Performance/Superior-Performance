@@ -1,0 +1,52 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: is the requester signed in?
+    function isAuth() { return request.auth != null; }
+
+    // Helper: read the requester's role from their user doc
+    function role() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    function isAdmin() { return isAuth() && role() == 'admin'; }
+    function isAthlete() { return isAuth() && role() == 'athlete'; }
+
+    // Users: admins can read/write all; athletes can read only their own doc.
+    // Writes are admin-only — the app never has athletes edit their own user doc,
+    // and role/programId living on this doc make self-writes a privilege escalation risk.
+    match /users/{uid} {
+      allow read:  if isAdmin() || (isAuth() && request.auth.uid == uid);
+      allow write: if isAdmin();
+    }
+
+    // Programs: admins full access; athletes can only read their own
+    match /programs/{programId} {
+      allow read:  if isAdmin() || (isAthlete() && resource.data.athleteId == request.auth.uid);
+      allow write: if isAdmin();
+    }
+
+    // Data logs: admins read all; athletes read/write their own
+    match /dataLogs/{uid}/entries/{entryId} {
+      allow read:  if isAdmin() || (isAuth() && request.auth.uid == uid);
+      allow write: if isAuth() && request.auth.uid == uid;
+    }
+
+    // Assessments: admins full access; athletes read-only their own
+    match /assessments/{uid} {
+      allow read:  if isAdmin() || (isAuth() && request.auth.uid == uid);
+      allow write: if isAdmin();
+    }
+
+    // Completions: athletes write their own; admins read all
+    match /completions/{uid}/weeks/{key} {
+      allow read:  if isAdmin() || (isAuth() && request.auth.uid == uid);
+      allow write: if isAuth() && request.auth.uid == uid;
+    }
+
+    // App settings: admins only
+    match /settings/{docId} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

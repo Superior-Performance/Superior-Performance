@@ -4,6 +4,7 @@ import { getAllAthletes, createUser } from '../../firebase/firestore'
 import { createAthleteAuth } from '../../firebase/adminAuth'
 import { Users, Plus, Search, ChevronRight, X } from 'lucide-react'
 import toast from 'react-hot-toast'
+import EmptyState from '../../components/EmptyState'
 
 export default function AdminAthletesPage() {
   const navigate = useNavigate()
@@ -64,7 +65,7 @@ export default function AdminAthletesPage() {
         </div>
         <button
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-brand-500 text-white text-sm font-semibold rounded-xl hover:bg-brand-600 transition"
+          className="btn-brand flex items-center gap-2 px-4 py-2 text-sm rounded-xl"
         >
           <Plus size={16} />
           Add Athlete
@@ -87,11 +88,7 @@ export default function AdminAthletesPage() {
       {loading ? (
         <div className="flex justify-center py-16"><Spinner /></div>
       ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center py-16 text-center">
-          <Users size={48} className="text-gray-200 mb-3" />
-          <p className="text-gray-500 font-medium">No athletes found</p>
-          <p className="text-gray-400 text-sm">Add your first athlete to get started.</p>
-        </div>
+        <EmptyState icon={Users} title="No athletes found" subtitle="Add your first athlete to get started." compact />
       ) : (
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
           <table className="w-full text-sm">
@@ -166,7 +163,7 @@ export default function AdminAthletesPage() {
             <Field label="Temporary Password" type="password" value={password} onChange={setPassword} placeholder="Min 6 characters" required minLength={6} />
             <div className="flex gap-3 pt-2">
               <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
-              <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-brand-500 text-white rounded-xl text-sm font-semibold disabled:opacity-60 flex items-center justify-center gap-2 transition">
+              <button type="submit" disabled={saving} className="btn-brand flex-1 py-2.5 rounded-xl text-sm flex items-center justify-center gap-2">
                 {saving && <Spinner sm />} {saving ? 'Creating…' : `Create ${role === 'admin' ? 'Admin' : 'Athlete'}`}
               </button>
             </div>

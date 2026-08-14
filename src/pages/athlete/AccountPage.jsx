@@ -86,7 +86,7 @@ export default function AccountPage() {
           <button
             type="submit"
             disabled={saving}
-            className="w-full py-3 bg-brand-500 text-white font-semibold rounded-xl hover:bg-brand-600 disabled:opacity-60 transition flex items-center justify-center gap-2"
+            className="btn-brand w-full py-3 rounded-xl flex items-center justify-center gap-2"
           >
             {saving
               ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Updating…</>

@@ -4,6 +4,7 @@ import { addDataLog, subscribeDataLogs } from '../../firebase/firestore'
 import { Zap, Dumbbell, Plus, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
+import Sparkline from '../../components/Sparkline'
 
 const TYPES = [
   { key: 'velo',   label: 'Velocity',  unit: 'mph',  Icon: Zap,      color: 'bg-yellow-50 text-yellow-600', dot: 'bg-yellow-400' },
@@ -56,18 +57,20 @@ export default function DataPage() {
 
   const filtered = filter === 'all' ? logs : logs.filter(l => l.type === filter)
 
-  // Best velo + latest weight
+  // Best velo + latest weight (logs come back newest-first; reverse for chronological trend lines)
   const veloEntries   = logs.filter(l => l.type === 'velo')
   const weightEntries = logs.filter(l => l.type === 'weight')
   const bestVelo   = veloEntries.length   ? Math.max(...veloEntries.map(l => l.value))   : null
   const latestWeight = weightEntries.length ? weightEntries[0]?.value : null
+  const veloTrend   = veloEntries.slice(0, 10).map(l => l.value).reverse()
+  const weightTrend = weightEntries.slice(0, 10).map(l => l.value).reverse()
 
   return (
     <div className="px-4 py-5 pb-6">
-      {/* Quick stats */}
+      {/* Quick stats + trend */}
       <div className="grid grid-cols-2 gap-3 mb-5">
-        <StatCard label="Best Velo" value={bestVelo} unit="mph" color="bg-yellow-50 text-yellow-600" />
-        <StatCard label="Latest Weight" value={latestWeight} unit="lbs" color="bg-blue-50 text-blue-600" />
+        <StatCard label="Best Velo" value={bestVelo} unit="mph" color="bg-yellow-50 text-yellow-600" trend={veloTrend} trendColor="#d97706" />
+        <StatCard label="Latest Weight" value={latestWeight} unit="lbs" color="bg-blue-50 text-blue-600" trend={weightTrend} trendColor="#2563eb" />
       </div>
 
       {/* Filter tabs */}
@@ -116,7 +119,7 @@ export default function DataPage() {
       {/* FAB */}
       <button
         onClick={() => setShowForm(true)}
-        className="fixed bottom-20 right-5 w-14 h-14 bg-brand-500 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-brand-600 transition active:scale-95 z-40"
+        className="btn-brand fixed bottom-20 right-5 w-14 h-14 rounded-full flex items-center justify-center active:scale-95 z-40"
       >
         <Plus size={24} />
       </button>
@@ -194,7 +197,7 @@ export default function DataPage() {
               <button
                 type="submit"
                 disabled={saving}
-                className="w-full py-3.5 bg-brand-500 text-white font-semibold rounded-xl disabled:opacity-60 flex items-center justify-center gap-2 transition"
+                className="btn-brand w-full py-3.5 rounded-xl flex items-center justify-center gap-2"
               >
                 {saving && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
                 {saving ? 'Saving…' : 'Save Entry'}
@@ -207,14 +210,19 @@ export default function DataPage() {
   )
 }
 
-function StatCard({ label, value, unit, color }) {
+function StatCard({ label, value, unit, color, trend, trendColor }) {
   return (
     <div className={`${color} rounded-2xl p-4`}>
       <p className="text-xs font-medium opacity-70 mb-1">{label}</p>
-      <p className="text-2xl font-bold">
-        {value != null ? value : '—'}
-        {value != null && <span className="text-sm font-medium ml-1 opacity-70">{unit}</span>}
-      </p>
+      <div className="flex items-end justify-between gap-2">
+        <p className="text-2xl font-bold">
+          {value != null ? value : '—'}
+          {value != null && <span className="text-sm font-medium ml-1 opacity-70">{unit}</span>}
+        </p>
+        {trend?.length >= 2 && (
+          <Sparkline values={trend} width={56} height={26} stroke={trendColor} />
+        )}
+      </div>
     </div>
   )
 }

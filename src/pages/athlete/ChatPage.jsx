@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import { subscribeChat, sendMessage, markChatRead } from '../../firebase/realtime'
 import { Send } from 'lucide-react'
 import { format, isToday, isYesterday } from 'date-fns'
+import EmptyState from '../../components/EmptyState'
 
 export default function ChatPage() {
   const { currentUser, userProfile } = useAuth()
@@ -48,12 +49,13 @@ export default function ChatPage() {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center">
-            <div className="w-14 h-14 bg-brand-50 rounded-full flex items-center justify-center mb-3">
-              <Send size={22} className="text-brand-500" />
-            </div>
-            <p className="text-gray-500 font-medium">Chat with your coach</p>
-            <p className="text-gray-400 text-sm mt-1">Ask questions about your program, workouts, or anything else.</p>
+          <div className="h-full flex items-center justify-center">
+            <EmptyState
+              icon={Send}
+              title="Chat with your coach"
+              subtitle="Ask questions about your program, workouts, or anything else."
+              compact
+            />
           </div>
         )}
 
@@ -112,7 +114,7 @@ export default function ChatPage() {
         <button
           type="submit"
           disabled={!text.trim() || sending}
-          className="w-10 h-10 bg-brand-500 disabled:bg-gray-200 text-white rounded-full flex items-center justify-center flex-shrink-0 transition active:scale-95"
+          className="btn-brand w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 active:scale-95"
         >
           <Send size={16} />
         </button>

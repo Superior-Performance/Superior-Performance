@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef } from 'react'
 import { getAllPrograms, createProgram, updateProgram } from '../../firebase/firestore'
-import { Plus, ChevronDown, ChevronUp, Upload, Trash2, X, Save, FileSpreadsheet } from 'lucide-react'
+import { Plus, ChevronDown, ChevronUp, Upload, Trash2, X, Save, FileSpreadsheet, LayoutList } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Papa from 'papaparse'
+import EmptyState from '../../components/EmptyState'
 
 /**
  * Google Sheets CSV format expected:
@@ -121,7 +122,7 @@ export default function AdminProgramsPage() {
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-brand-500 text-white text-sm font-semibold rounded-xl hover:bg-brand-600 transition"
+          className="btn-brand flex items-center gap-2 px-4 py-2 text-sm rounded-xl"
         >
           <Plus size={16} />
           New Program
@@ -141,7 +142,7 @@ export default function AdminProgramsPage() {
       {loading ? (
         <div className="flex justify-center py-16"><Spinner /></div>
       ) : programs.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">No programs yet. Create your first one.</div>
+        <EmptyState icon={LayoutList} title="No programs yet" subtitle="Create your first one to get started." compact />
       ) : (
         <div className="space-y-3">
           {programs.map((prog) => (
@@ -242,7 +243,7 @@ export default function AdminProgramsPage() {
 
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => { setShowForm(false); setCsvWeeks(null) }} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
-                <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-brand-500 text-white rounded-xl text-sm font-semibold disabled:opacity-60 flex items-center justify-center gap-2 transition">
+                <button type="submit" disabled={saving} className="btn-brand flex-1 py-2.5 rounded-xl text-sm flex items-center justify-center gap-2">
                   {saving && <Spinner sm />}
                   {saving ? 'Creating…' : 'Create Program'}
                 </button>

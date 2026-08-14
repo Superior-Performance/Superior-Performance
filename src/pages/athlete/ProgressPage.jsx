@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import { getProgramForAthlete } from '../../firebase/firestore'
 import { subscribeCompletions } from '../../firebase/firestore'
 import { TrendingUp, CheckCircle2, Lock } from 'lucide-react'
+import EmptyState from '../../components/EmptyState'
 
 export default function ProgressPage() {
   const { currentUser } = useAuth()
@@ -29,11 +30,11 @@ export default function ProgressPage() {
 
   if (loading) return <PageLoader />
   if (!program) return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center">
-      <TrendingUp size={48} className="text-gray-300 mb-4" />
-      <h2 className="text-lg font-semibold text-gray-700">No program yet</h2>
-      <p className="text-gray-400 text-sm mt-1">Progress will appear once your coach assigns a program.</p>
-    </div>
+    <EmptyState
+      icon={TrendingUp}
+      title="No program yet"
+      subtitle="Progress will appear once your coach assigns a program."
+    />
   )
 
   const weeks = program.weeks || []
@@ -50,9 +51,13 @@ export default function ProgressPage() {
   return (
     <div className="px-4 py-5 space-y-5">
       {/* Overall ring */}
-      <div className="bg-brand-900 text-white rounded-2xl p-5 flex items-center gap-5">
+      <div className="surface-brand relative overflow-hidden text-white rounded-2xl p-5 flex items-center gap-5">
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ background: 'radial-gradient(circle at 90% 100%, rgba(107,140,255,0.3), transparent 60%)' }}
+        />
         <Ring pct={overallPct} />
-        <div>
+        <div className="relative">
           <p className="text-xs text-white/60">Overall Progress</p>
           <p className="text-2xl font-bold">{overallPct}%</p>
           <p className="text-xs text-white/60 mt-0.5">{completedDays} of {totalDays} sessions done</p>

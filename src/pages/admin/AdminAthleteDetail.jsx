@@ -377,7 +377,7 @@ export default function AdminAthleteDetail() {
               <button
                 onClick={generateFromSheet}
                 disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 bg-brand-500 text-white text-sm font-semibold rounded-xl hover:bg-brand-600 disabled:opacity-60 transition"
+                className="btn-brand flex items-center gap-2 px-4 py-2 text-sm rounded-xl"
               >
                 <Sparkles size={14} />
                 {saving ? 'Generating…' : 'Generate Program from Sheet'}
@@ -509,7 +509,7 @@ export default function AdminAthleteDetail() {
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowEdit(false)} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
-                <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-brand-500 text-white rounded-xl text-sm font-semibold disabled:opacity-60 transition">
+                <button type="submit" disabled={saving} className="btn-brand flex-1 py-2.5 rounded-xl text-sm">
                   {saving ? 'Saving…' : 'Save Changes'}
                 </button>
               </div>

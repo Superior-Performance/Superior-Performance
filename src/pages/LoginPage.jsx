@@ -47,10 +47,19 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-brand-900 flex flex-col items-center justify-center px-4">
+    <div className="min-h-screen bg-[#080c14] flex flex-col items-center justify-center px-4 relative overflow-hidden">
+      {/* Glow orb, matching the landing page */}
+      <div
+        className="fixed top-[-200px] left-1/2 -translate-x-1/2 w-[800px] h-[800px] rounded-full pointer-events-none"
+        style={{ background: 'radial-gradient(circle, rgba(59,91,219,0.15) 0%, transparent 70%)' }}
+      />
+
       {/* Logo / Title */}
-      <div className="mb-10 text-center">
-        <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+      <div className="relative z-10 mb-10 text-center">
+        <div
+          className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+          style={{ background: 'linear-gradient(135deg, #3b5bdb, #2541b0)' }}
+        >
           <svg viewBox="0 0 24 24" className="w-9 h-9 text-white" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="12" cy="12" r="10"/>
             <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
@@ -62,7 +71,7 @@ export default function LoginPage() {
       </div>
 
       {/* Card */}
-      <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-8">
+      <div className="relative z-10 w-full max-w-sm bg-white rounded-2xl shadow-xl p-8">
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
@@ -92,7 +101,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-xl transition disabled:opacity-60 flex items-center justify-center gap-2"
+            className="btn-brand w-full py-3 rounded-xl flex items-center justify-center gap-2"
           >
             {loading ? (
               <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -110,7 +119,7 @@ export default function LoginPage() {
         </form>
       </div>
 
-      <p className="mt-6 text-white/40 text-xs text-center">
+      <p className="relative z-10 mt-6 text-white/40 text-xs text-center">
         Contact your coach if you need access.
       </p>
 
@@ -131,7 +140,7 @@ export default function LoginPage() {
               />
               <div className="flex gap-3">
                 <button type="button" onClick={() => setShowReset(false)} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
-                <button type="submit" disabled={resetSending} className="flex-1 py-2.5 bg-brand-500 text-white rounded-xl text-sm font-semibold disabled:opacity-60 transition">
+                <button type="submit" disabled={resetSending} className="btn-brand flex-1 py-2.5 rounded-xl text-sm">
                   {resetSending ? 'Sending…' : 'Send Link'}
                 </button>
               </div>

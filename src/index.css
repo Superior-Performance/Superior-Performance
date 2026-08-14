@@ -21,6 +21,35 @@
   }
 }
 
+@layer components {
+  /* Primary CTA — the brand gradient used on the landing page, everywhere a
+     primary action button appears. Centralizing it here means every "Save",
+     "Add", "Sign in" etc. shares one look instead of N slightly different ones. */
+  .btn-brand {
+    color: #fff;
+    font-weight: 600;
+    background: linear-gradient(135deg, #3b5bdb, #2541b0);
+    box-shadow: 0 4px 14px rgba(59, 91, 219, 0.35);
+    transition: box-shadow 0.15s ease, transform 0.1s ease, opacity 0.15s ease;
+  }
+  .btn-brand:hover:not(:disabled) {
+    box-shadow: 0 6px 20px rgba(59, 91, 219, 0.5);
+  }
+  .btn-brand:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+  .btn-brand:disabled {
+    opacity: 0.6;
+    box-shadow: none;
+  }
+
+  /* Dark hero surface — the navy gradient + glow from the landing page,
+     reused for headers/sidebars/hero cards throughout the logged-in app. */
+  .surface-brand {
+    background: linear-gradient(135deg, #1a2d7a 0%, #0f1442 100%);
+  }
+}
+
 /* Smooth scrolling for mobile */
 .scroll-smooth {
   -webkit-overflow-scrolling: touch;

@@ -5,6 +5,7 @@ import { subscribeCompletions, markWorkoutComplete } from '../../firebase/firest
 import { CheckCircle2, Circle, ChevronDown, ChevronUp, Dumbbell, Zap } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format, startOfWeek, addDays } from 'date-fns'
+import EmptyState from '../../components/EmptyState'
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
@@ -51,11 +52,11 @@ export default function SchedulePage() {
 
   if (!program) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center">
-        <Dumbbell size={48} className="text-gray-300 mb-4" />
-        <h2 className="text-lg font-semibold text-gray-700">No program assigned yet</h2>
-        <p className="text-gray-400 text-sm mt-1">Your coach will assign a program soon.</p>
-      </div>
+      <EmptyState
+        icon={Dumbbell}
+        title="No program assigned yet"
+        subtitle="Your coach will assign a program soon."
+      />
     )
   }
 
@@ -66,19 +67,25 @@ export default function SchedulePage() {
   return (
     <div className="px-4 py-5">
       {/* Program header */}
-      <div className="bg-brand-900 text-white rounded-2xl p-4 mb-5">
-        <p className="text-xs text-white/60 mb-0.5">Active Program</p>
-        <h1 className="font-bold text-lg leading-tight">{program.name}</h1>
-        <div className="flex items-center gap-3 mt-3">
-          <div className="flex-1 bg-white/10 rounded-full h-2">
-            <div
-              className="bg-green-400 h-2 rounded-full transition-all"
-              style={{ width: `${Math.round((currentWeek / totalWeeks) * 100)}%` }}
-            />
+      <div className="surface-brand relative overflow-hidden text-white rounded-2xl p-4 mb-5">
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ background: 'radial-gradient(circle at 90% 0%, rgba(107,140,255,0.3), transparent 60%)' }}
+        />
+        <div className="relative">
+          <p className="text-xs text-white/60 mb-0.5">Active Program</p>
+          <h1 className="font-bold text-lg leading-tight">{program.name}</h1>
+          <div className="flex items-center gap-3 mt-3">
+            <div className="flex-1 bg-white/10 rounded-full h-2">
+              <div
+                className="bg-green-400 h-2 rounded-full transition-all"
+                style={{ width: `${Math.round((currentWeek / totalWeeks) * 100)}%` }}
+              />
+            </div>
+            <span className="text-xs font-medium text-white/70">
+              Week {currentWeek + 1}/{totalWeeks}
+            </span>
           </div>
-          <span className="text-xs font-medium text-white/70">
-            Week {currentWeek + 1}/{totalWeeks}
-          </span>
         </div>
       </div>
 

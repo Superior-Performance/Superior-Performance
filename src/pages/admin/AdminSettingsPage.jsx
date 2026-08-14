@@ -109,7 +109,7 @@ export default function AdminSettingsPage() {
           <button
             type="submit"
             disabled={saving || loading}
-            className="flex items-center gap-2 px-4 py-2.5 bg-brand-500 text-white text-sm font-semibold rounded-xl hover:bg-brand-600 disabled:opacity-60 transition"
+            className="btn-brand flex items-center gap-2 px-4 py-2.5 text-sm rounded-xl"
           >
             <Save size={14} />
             {saving ? 'Saving…' : 'Save'}
@@ -174,7 +174,7 @@ export default function AdminSettingsPage() {
           <button
             type="submit"
             disabled={pwSaving}
-            className="flex items-center gap-2 px-4 py-2.5 bg-brand-500 text-white text-sm font-semibold rounded-xl hover:bg-brand-600 disabled:opacity-60 transition"
+            className="btn-brand flex items-center gap-2 px-4 py-2.5 text-sm rounded-xl"
           >
             <Lock size={14} />
             {pwSaving ? 'Updating…' : 'Update Password'}

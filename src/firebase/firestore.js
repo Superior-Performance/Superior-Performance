@@ -79,7 +79,7 @@ export const saveAssessment = (uid, data) =>
   setDoc(doc(db, 'assessments', uid), { ...data, updatedAt: serverTimestamp() }, { merge: true })
 
 // ── App Settings ─────────────────────────────────────────────────────────────
-// settings/global — { sheetsScriptUrl: string }
+// settings/global — { sheetsScriptUrl: string, assessmentSheetScriptUrl: string }
 export const getSettings = () =>
   getDoc(doc(db, 'settings', 'global'))
 

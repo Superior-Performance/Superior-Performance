@@ -6,7 +6,7 @@ import {
   createProgram, getSettings,
 } from '../../firebase/firestore'
 import { getDataLogs } from '../../firebase/firestore'
-import { ArrowLeft, Save, Zap, Dumbbell, MessageCircle, Pencil, Trash2, X, Sparkles, KeyRound, XCircle } from 'lucide-react'
+import { ArrowLeft, Save, Zap, Dumbbell, MessageCircle, Pencil, Trash2, X, Sparkles, KeyRound, XCircle, FileSpreadsheet } from 'lucide-react'
 import { sendPasswordResetEmail } from 'firebase/auth'
 import { auth } from '../../firebase/config'
 import toast from 'react-hot-toast'
@@ -110,6 +110,7 @@ export default function AdminAthleteDetail() {
   const [loading, setLoading]       = useState(true)
   const [loadError, setLoadError]   = useState(null)
   const [saving, setSaving]         = useState(false)
+  const [sendingToSheet, setSendingToSheet] = useState(false)
   const [tab, setTab]               = useState('assessment')
   const [showEdit, setShowEdit]     = useState(false)
   const [showDelete, setShowDelete] = useState(false)
@@ -191,6 +192,35 @@ export default function AdminAthleteDetail() {
     } catch {
       toast.error('Delete failed.')
       setSaving(false)
+    }
+  }
+
+  async function sendToIntakeSheet() {
+    setSendingToSheet(true)
+    try {
+      const settingsSnap = await getSettings()
+      const scriptUrl = settingsSnap.exists() ? settingsSnap.data().assessmentSheetScriptUrl : ''
+      if (!scriptUrl) {
+        toast.error('No Assessment Intake script URL set. Go to Settings first.')
+        return
+      }
+
+      const params = new URLSearchParams()
+      Object.entries(assessment).forEach(([k, v]) => { if (v) params.set(k, v) })
+      params.set('athleteName', athlete.name)
+
+      const res = await fetch(`${scriptUrl}?${params.toString()}`)
+      const json = await res.json()
+
+      if (!json.success) {
+        toast.error(json.error || 'Sheet did not accept the row.')
+        return
+      }
+      toast.success('Logged to the Assessment Intake sheet!')
+    } catch (err) {
+      toast.error('Could not reach the sheet: ' + (err.message || 'Unknown error'))
+    } finally {
+      setSendingToSheet(false)
     }
   }
 
@@ -419,7 +449,7 @@ export default function AdminAthleteDetail() {
               <h2 className="font-semibold text-gray-900">Assessment Intake</h2>
               <p className="text-xs text-gray-400 mt-0.5">Matches the Assessment Intake Google Sheet field-for-field.</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap justify-end">
               <button
                 onClick={saveAssessmentScores}
                 disabled={saving}
@@ -427,6 +457,14 @@ export default function AdminAthleteDetail() {
               >
                 <Save size={14} />
                 {saving ? 'Saving…' : 'Save'}
+              </button>
+              <button
+                onClick={sendToIntakeSheet}
+                disabled={sendingToSheet}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-200 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-50 disabled:opacity-60 transition"
+              >
+                <FileSpreadsheet size={14} />
+                {sendingToSheet ? 'Logging…' : 'Log to Intake Sheet'}
               </button>
               <button
                 onClick={generateFromSheet}

@@ -40,8 +40,10 @@ export const getProgramForAthlete = (athleteId) =>
     where('active', '==', true),
   ))
 
+// Pass `active: false` to create a draft — tied to an athlete (athleteId) but
+// not yet visible to them, since getProgramForAthlete only returns active ones.
 export const createProgram = (data) =>
-  addDoc(collection(db, 'programs'), { ...data, createdAt: serverTimestamp(), active: true })
+  addDoc(collection(db, 'programs'), { ...data, createdAt: serverTimestamp(), active: data.active ?? true })
 
 export const updateProgram = (programId, data) =>
   updateDoc(doc(db, 'programs', programId), data)

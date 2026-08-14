@@ -20,9 +20,11 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Programs: admins full access; athletes can only read their own
+    // Programs: admins full access; athletes can only read their own, and only
+    // once it's active — draft programs awaiting coach review stay admin-only
+    // even for the athlete they're assigned to.
     match /programs/{programId} {
-      allow read:  if isAdmin() || (isAthlete() && resource.data.athleteId == request.auth.uid);
+      allow read:  if isAdmin() || (isAthlete() && resource.data.athleteId == request.auth.uid && resource.data.active == true);
       allow write: if isAdmin();
     }
 

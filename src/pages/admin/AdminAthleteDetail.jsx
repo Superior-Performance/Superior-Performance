@@ -11,6 +11,7 @@ import { sendPasswordResetEmail } from 'firebase/auth'
 import { auth } from '../../firebase/config'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
+import ProgramEditorModal from '../../components/ProgramEditorModal'
 
 // Mirrors the "Assessment Intake" Google Sheet column-for-column (minus
 // Athlete Name, which the app already tracks) so the saved doc can be handed
@@ -112,6 +113,7 @@ export default function AdminAthleteDetail() {
   const [saving, setSaving]         = useState(false)
   const [sendingToSheet, setSendingToSheet] = useState(false)
   const [pullingProgram, setPullingProgram] = useState(false)
+  const [editingDraft, setEditingDraft]     = useState(null)
   const [tab, setTab]               = useState('assessment')
   const [showEdit, setShowEdit]     = useState(false)
   const [showDelete, setShowDelete] = useState(false)
@@ -226,9 +228,11 @@ export default function AdminAthleteDetail() {
   }
 
   // Shared by generateFromSheet and pullProgramFromSheet — both end up with the
-  // same flat row shape (Week, Day, Category, Exercise, Sets, Reps, Intensity, Notes)
-  // and need it turned into a nested weeks/days program and assigned to this athlete.
-  async function assignProgramFromRows(rows, programName) {
+  // same flat row shape (Week, Day, Category, Exercise, Sets, Reps, Intensity, Notes).
+  // Creates a DRAFT (active: false) rather than publishing straight to the
+  // athlete, so it can be reviewed and edited first — see the Drafts Awaiting
+  // Review section on the Program tab.
+  async function createDraftFromRows(rows, programName) {
     const weeksMap = {}
     rows.forEach(row => {
       const wk  = Number(row['Week'])  || 1
@@ -257,18 +261,16 @@ export default function AdminAthleteDetail() {
         days: Object.values(w.days).sort((a, b) => a.dayNum - b.dayNum),
       }))
 
-    if (program) await updateProgram(program.id, { active: false })
-
-    const programRef = await createProgram({
+    await createProgram({
       name:       programName,
       athleteId:  uid,
       totalWeeks: weeks.length,
       weeks,
+      active:     false,
     })
-    await updateUser(uid, { programId: programRef.id })
 
-    const snap = await getProgramForAthlete(uid)
-    setProgram(!snap.empty ? { id: snap.docs[0].id, ...snap.docs[0].data() } : null)
+    const allProgs = await getAllPrograms()
+    setPrograms(allProgs.docs.map(d => ({ id: d.id, ...d.data() })))
   }
 
   async function generateFromSheet() {
@@ -296,8 +298,8 @@ export default function AdminAthleteDetail() {
         return
       }
 
-      await assignProgramFromRows(json.program, `${athlete.name} — Generated Program`)
-      toast.success('Program generated and assigned!')
+      await createDraftFromRows(json.program, `${athlete.name} — Generated Program`)
+      toast.success('Draft created — review it below before publishing.')
     } catch (err) {
       console.error(err)
       toast.error('Generation failed: ' + (err.message || 'Unknown error'))
@@ -331,8 +333,8 @@ export default function AdminAthleteDetail() {
         return
       }
 
-      await assignProgramFromRows(json.program, `${athlete.name} — Program`)
-      toast.success('Program pulled from the sheet and assigned!')
+      await createDraftFromRows(json.program, `${athlete.name} — Program`)
+      toast.success('Draft pulled from the sheet — review it below before publishing.')
     } catch (err) {
       console.error(err)
       toast.error('Could not reach the sheet: ' + (err.message || 'Unknown error'))
@@ -374,12 +376,20 @@ export default function AdminAthleteDetail() {
       await updateUser(uid, { programId })
       const snap = await getProgramForAthlete(uid)
       setProgram(!snap.empty ? { id: snap.docs[0].id, ...snap.docs[0].data() } : null)
+      const allProgs = await getAllPrograms()
+      setPrograms(allProgs.docs.map(d => ({ id: d.id, ...d.data() })))
       toast.success('Program assigned!')
     } catch {
       toast.error('Assignment failed.')
     } finally {
       setSaving(false)
     }
+  }
+
+  async function saveDraftWeeks(programId, weeks) {
+    await updateProgram(programId, { weeks, totalWeeks: weeks.length })
+    const allProgs = await getAllPrograms()
+    setPrograms(allProgs.docs.map(d => ({ id: d.id, ...d.data() })))
   }
 
   if (loading) return <div className="flex justify-center py-20"><div className="w-8 h-8 border-2 border-sp-green-500 border-t-transparent rounded-full animate-spin" /></div>
@@ -569,11 +579,35 @@ export default function AdminAthleteDetail() {
             )}
           </div>
 
+          {/* Drafts awaiting review — created by Generate/Pull Program from Sheet,
+              not visible to the athlete until published from the editor below */}
+          {programs.filter(p => p.athleteId === uid && p.active === false).length > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
+              <h2 className="font-semibold text-amber-900 mb-3">Drafts Awaiting Review</h2>
+              <div className="space-y-2">
+                {programs.filter(p => p.athleteId === uid && p.active === false).map((p) => (
+                  <div key={p.id} className="flex items-center justify-between py-2 border-b border-amber-100 last:border-0">
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">{p.name}</p>
+                      <p className="text-xs text-gray-500">{p.weeks?.length || 0} weeks · not visible to the athlete yet</p>
+                    </div>
+                    <button
+                      onClick={() => setEditingDraft(p)}
+                      className="text-xs px-3 py-1.5 bg-amber-100 text-amber-800 font-medium rounded-lg hover:bg-amber-200 transition"
+                    >
+                      Review
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Assign from existing */}
           <div className="bg-white rounded-2xl border border-gray-200 p-5">
             <h2 className="font-semibold text-gray-900 mb-3">Assign Program</h2>
             <div className="space-y-2">
-              {programs.filter(p => p.id !== program?.id).map((p) => (
+              {programs.filter(p => p.id !== program?.id && !(p.active === false && p.athleteId)).map((p) => (
                 <div key={p.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
                   <div>
                     <p className="text-sm font-medium text-gray-800">{p.name}</p>
@@ -594,6 +628,15 @@ export default function AdminAthleteDetail() {
             </div>
           </div>
         </div>
+      )}
+
+      {editingDraft && (
+        <ProgramEditorModal
+          program={editingDraft}
+          onClose={() => setEditingDraft(null)}
+          onSave={(weeks) => saveDraftWeeks(editingDraft.id, weeks)}
+          onPublish={() => assignProgram(editingDraft.id)}
+        />
       )}
 
       {/* Edit modal */}

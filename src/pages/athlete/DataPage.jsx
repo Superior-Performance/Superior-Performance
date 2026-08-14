@@ -69,8 +69,8 @@ export default function DataPage() {
     <div className="px-4 py-5 pb-6">
       {/* Quick stats + trend */}
       <div className="grid grid-cols-2 gap-3 mb-5">
-        <StatCard label="Best Velo" value={bestVelo} unit="mph" color="bg-yellow-50 text-yellow-600" trend={veloTrend} trendColor="#d97706" />
-        <StatCard label="Latest Weight" value={latestWeight} unit="lbs" color="bg-blue-50 text-blue-600" trend={weightTrend} trendColor="#2563eb" />
+        <StatCard label="Best Velo" value={bestVelo} unit="mph" color="bg-yellow-50 text-yellow-600" trend={veloTrend} trendColor="#2E9E63" />
+        <StatCard label="Latest Weight" value={latestWeight} unit="lbs" color="bg-blue-50 text-blue-600" trend={weightTrend} trendColor="#278052" />
       </div>
 
       {/* Filter tabs */}
@@ -80,7 +80,7 @@ export default function DataPage() {
             key={k}
             onClick={() => setFilter(k)}
             className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
-              filter === k ? 'bg-brand-500 text-white' : 'bg-white border border-gray-200 text-gray-600'
+              filter === k ? 'bg-sp-green-500 text-white' : 'bg-white border border-gray-200 text-gray-600'
             }`}
           >
             {l}
@@ -146,7 +146,7 @@ export default function DataPage() {
                     type="button"
                     onClick={() => setType(t.key)}
                     className={`flex-1 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition ${
-                      type === t.key ? 'bg-brand-500 text-white' : 'bg-gray-100 text-gray-600'
+                      type === t.key ? 'bg-sp-green-500 text-white' : 'bg-gray-100 text-gray-600'
                     }`}
                   >
                     <t.Icon size={15} />
@@ -166,7 +166,7 @@ export default function DataPage() {
                   value={value}
                   onChange={(e) => setValue(e.target.value)}
                   placeholder={type === 'velo' ? 'e.g. 87.5' : 'e.g. 185'}
-                  className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
                 />
               </div>
 
@@ -178,7 +178,7 @@ export default function DataPage() {
                     value={exercise}
                     onChange={(e) => setExercise(e.target.value)}
                     placeholder="e.g. Squat, Bench"
-                    className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
                   />
                 </div>
               )}
@@ -190,7 +190,7 @@ export default function DataPage() {
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="How did it feel?"
-                  className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
                 />
               </div>
 

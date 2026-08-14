@@ -28,12 +28,12 @@
   .btn-brand {
     color: #fff;
     font-weight: 600;
-    background: linear-gradient(135deg, #3b5bdb, #2541b0);
-    box-shadow: 0 4px 14px rgba(59, 91, 219, 0.35);
+    background: linear-gradient(135deg, #2E9E63, #216341);
+    box-shadow: 0 4px 14px rgba(46, 158, 99, 0.35);
     transition: box-shadow 0.15s ease, transform 0.1s ease, opacity 0.15s ease;
   }
   .btn-brand:hover:not(:disabled) {
-    box-shadow: 0 6px 20px rgba(59, 91, 219, 0.5);
+    box-shadow: 0 6px 20px rgba(46, 158, 99, 0.5);
   }
   .btn-brand:active:not(:disabled) {
     transform: scale(0.98);
@@ -43,10 +43,10 @@
     box-shadow: none;
   }
 
-  /* Dark hero surface — the navy gradient + glow from the landing page,
+  /* Dark hero surface — the charcoal gradient + glow from the landing page,
      reused for headers/sidebars/hero cards throughout the logged-in app. */
   .surface-brand {
-    background: linear-gradient(135deg, #1a2d7a 0%, #0f1442 100%);
+    background: linear-gradient(135deg, #0E1113 0%, #14432E 100%);
   }
 }
 

@@ -54,7 +54,7 @@ export default function ProgressPage() {
       <div className="surface-brand relative overflow-hidden text-white rounded-2xl p-5 flex items-center gap-5">
         <div
           className="absolute inset-0 pointer-events-none"
-          style={{ background: 'radial-gradient(circle at 90% 100%, rgba(107,140,255,0.3), transparent 60%)' }}
+          style={{ background: 'radial-gradient(circle at 90% 100%, rgba(46,158,99,0.3), transparent 60%)' }}
         />
         <Ring pct={overallPct} />
         <div className="relative">
@@ -79,7 +79,7 @@ export default function ProgressPage() {
                 const done = !!completions[`${currentWeekIdx}_${di}`]?.completed
                 return (
                   <div key={di} className="flex-1 flex flex-col items-center gap-1">
-                    <div className={`w-full h-2 rounded-full ${done ? 'bg-green-400' : 'bg-gray-100'}`} />
+                    <div className={`w-full h-2 rounded-full ${done ? 'bg-sp-green-400' : 'bg-gray-100'}`} />
                     <span className="text-[9px] font-medium text-gray-400">
                       {['M','T','W','T','F','S','S'][di]}
                     </span>
@@ -103,24 +103,24 @@ export default function ProgressPage() {
             const isCurrentWeek = wi === currentWeekIdx
             const isPast = wi < currentWeekIdx
             return (
-              <div key={wi} className={`bg-white rounded-xl px-4 py-3 border ${isCurrentWeek ? 'border-brand-200' : 'border-gray-100'} shadow-sm`}>
+              <div key={wi} className={`bg-white rounded-xl px-4 py-3 border ${isCurrentWeek ? 'border-sp-green-200' : 'border-gray-100'} shadow-sm`}>
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     {isPast
-                      ? <CheckCircle2 size={15} className="text-green-400" />
+                      ? <CheckCircle2 size={15} className="text-sp-green-400" />
                       : isCurrentWeek
-                        ? <div className="w-2 h-2 rounded-full bg-brand-500" />
+                        ? <div className="w-2 h-2 rounded-full bg-sp-green-500" />
                         : <Lock size={13} className="text-gray-300" />
                     }
-                    <span className={`text-sm font-medium ${isCurrentWeek ? 'text-brand-600' : 'text-gray-700'}`}>
+                    <span className={`text-sm font-medium ${isCurrentWeek ? 'text-sp-green-600' : 'text-gray-700'}`}>
                       Week {wi + 1}
-                      {isCurrentWeek && <span className="ml-1.5 text-[10px] bg-brand-100 text-brand-600 px-1.5 py-0.5 rounded-full">Current</span>}
+                      {isCurrentWeek && <span className="ml-1.5 text-[10px] bg-sp-green-100 text-sp-green-600 px-1.5 py-0.5 rounded-full">Current</span>}
                     </span>
                   </div>
                   <span className="text-xs text-gray-400">{done}/{total}</span>
                 </div>
                 <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-brand-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                  <div className="h-full bg-sp-green-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
                 </div>
               </div>
             )
@@ -140,7 +140,7 @@ function Ring({ pct }) {
       <circle cx="40" cy="40" r={r} fill="none" stroke="rgba(255,255,255,.15)" strokeWidth="8" />
       <circle
         cx="40" cy="40" r={r} fill="none"
-        stroke="#4ade80" strokeWidth="8"
+        stroke="#2E9E63" strokeWidth="8"
         strokeLinecap="round"
         strokeDasharray={`${dash} ${c - dash}`}
         strokeDashoffset={c / 4}
@@ -154,6 +154,6 @@ function Ring({ pct }) {
 
 function PageLoader() {
   return <div className="flex justify-center items-center min-h-[60vh]">
-    <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+    <div className="w-8 h-8 border-2 border-sp-green-500 border-t-transparent rounded-full animate-spin" />
   </div>
 }

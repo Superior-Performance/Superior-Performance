@@ -5,23 +5,9 @@ export default {
     extend: {
       colors: {
         // ---------------------------------------------------------------
-        // CURRENT app palette (blue). Being retired — see `sp` below.
-        // Left in place so nothing breaks mid-migration.
-        // ---------------------------------------------------------------
-        brand: {
-          50:  '#f0f4ff',
-          100: '#e0e9ff',
-          500: '#3b5bdb',
-          600: '#2f4ccc',
-          700: '#2541b0',
-          900: '#1a2d7a',
-        },
-
-        // ---------------------------------------------------------------
         // Superior Performance brand palette. Matches the logo exactly.
         // `sp-green-500` is the primary accent; `sp-ink-*` are the dark
-        // surfaces. To finish the rebrand, swap `brand-*` -> `sp-green-*`
-        // and delete the `brand` scale above.
+        // surfaces.
         // ---------------------------------------------------------------
         sp: {
           green: {

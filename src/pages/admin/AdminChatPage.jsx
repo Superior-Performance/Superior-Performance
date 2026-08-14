@@ -75,14 +75,14 @@ export default function AdminChatPage() {
               key={a.id}
               onClick={() => { setSelected(a.id); navigate(`/admin/chat/${a.id}`) }}
               className={`w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition border-b border-gray-50 ${
-                selected === a.id ? 'bg-brand-50 border-l-2 border-l-brand-500' : ''
+                selected === a.id ? 'bg-sp-green-50 border-l-2 border-l-sp-green-500' : ''
               }`}
             >
-              <div className="w-9 h-9 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center font-bold text-sm flex-shrink-0">
+              <div className="w-9 h-9 rounded-full bg-sp-green-100 text-sp-green-600 flex items-center justify-center font-bold text-sm flex-shrink-0">
                 {a.name?.charAt(0)}
               </div>
               <div className="min-w-0">
-                <p className={`text-sm font-medium truncate ${selected === a.id ? 'text-brand-600' : 'text-gray-900'}`}>{a.name}</p>
+                <p className={`text-sm font-medium truncate ${selected === a.id ? 'text-sp-green-600' : 'text-gray-900'}`}>{a.name}</p>
                 <p className="text-xs text-gray-400 truncate">{a.email}</p>
               </div>
             </button>
@@ -99,7 +99,7 @@ export default function AdminChatPage() {
         <div className="px-5 py-3.5 bg-white border-b border-gray-200 flex items-center gap-3">
           {selectedAthlete ? (
             <>
-              <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center font-bold text-sm">
+              <div className="w-8 h-8 rounded-full bg-sp-green-100 text-sp-green-600 flex items-center justify-center font-bold text-sm">
                 {selectedAthlete.name?.charAt(0)}
               </div>
               <div>
@@ -144,7 +144,7 @@ export default function AdminChatPage() {
                         {!isAdmin && <span className="text-[10px] text-gray-400 ml-1 mb-0.5">{msg.senderName}</span>}
                         <div className={`px-4 py-2.5 rounded-2xl text-sm ${
                           isAdmin
-                            ? 'bg-brand-500 text-white rounded-br-sm'
+                            ? 'bg-sp-green-500 text-white rounded-br-sm'
                             : 'bg-white border border-gray-100 text-gray-900 rounded-bl-sm shadow-sm'
                         }`}>
                           {msg.text}
@@ -165,7 +165,7 @@ export default function AdminChatPage() {
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 placeholder="Message athlete…"
-                className="flex-1 bg-gray-100 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                className="flex-1 bg-gray-100 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
               />
               <button
                 type="submit"

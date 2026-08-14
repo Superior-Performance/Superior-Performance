@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import {
   CalendarDays, MessageCircle, TrendingUp, BarChart2, Activity, LogOut, UserCircle, ExternalLink,
 } from 'lucide-react'
+import Logo from '../../components/Logo'
 
 const NAV = [
   { to: 'schedule', label: 'Schedule',  Icon: CalendarDays },
@@ -24,20 +25,11 @@ export default function AthleteLayout() {
       <header className="surface-brand relative overflow-hidden text-white px-4 pt-safe-top">
         <div
           className="absolute inset-0 pointer-events-none"
-          style={{ background: 'radial-gradient(circle at 15% 0%, rgba(107,140,255,0.25), transparent 60%)' }}
+          style={{ background: 'radial-gradient(circle at 15% 0%, rgba(46,158,99,0.25), transparent 60%)' }}
         />
         <div className="relative flex items-center justify-between h-14">
           <div className="flex items-center gap-2.5">
-            <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #3b5bdb, #2541b0)' }}
-            >
-              <svg viewBox="0 0 24 24" className="w-4.5 h-4.5 text-white" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-                <path d="M2 12h20" />
-              </svg>
-            </div>
+            <Logo variant="icon" className="h-8 w-8 flex-shrink-0" />
             <div>
               <p className="text-xs text-white/60 leading-none">Welcome back</p>
               <p className="font-bold leading-tight">{userProfile?.name || 'Athlete'}</p>
@@ -95,7 +87,7 @@ export default function AthleteLayout() {
               to={to}
               className={({ isActive }) =>
                 `flex-1 flex flex-col items-center justify-center py-1.5 gap-0.5 rounded-xl mx-0.5 transition-colors ${
-                  isActive ? 'bg-brand-50 text-brand-600' : 'text-gray-400 hover:text-gray-600'
+                  isActive ? 'bg-sp-green-50 text-sp-green-600' : 'text-gray-400 hover:text-gray-600'
                 }`
               }
             >

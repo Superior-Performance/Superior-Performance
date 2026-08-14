@@ -81,7 +81,7 @@ export default function ChatPage() {
                   )}
                   <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
                     isMe
-                      ? 'bg-brand-500 text-white rounded-br-sm'
+                      ? 'bg-sp-green-500 text-white rounded-br-sm'
                       : 'bg-white border border-gray-100 text-gray-900 rounded-bl-sm shadow-sm'
                   }`}>
                     {msg.text}
@@ -109,7 +109,7 @@ export default function ChatPage() {
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Ask your coach…"
-          className="flex-1 bg-gray-100 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
+          className="flex-1 bg-gray-100 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500 resize-none"
         />
         <button
           type="submit"

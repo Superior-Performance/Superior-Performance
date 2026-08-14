@@ -155,7 +155,7 @@ export default function AdminProgramsPage() {
                   <p className="font-semibold text-gray-900">{prog.name}</p>
                   <p className="text-xs text-gray-400 mt-0.5">
                     {prog.weeks?.length || 0} weeks · {prog.active ? 'Active' : 'Inactive'}
-                    {prog.athleteId && <span className="ml-1.5 text-brand-500">· Assigned</span>}
+                    {prog.athleteId && <span className="ml-1.5 text-sp-green-500">· Assigned</span>}
                   </p>
                 </div>
                 {expanded === prog.id ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
@@ -204,7 +204,7 @@ export default function AdminProgramsPage() {
                   value={programName}
                   onChange={(e) => setProgramName(e.target.value)}
                   placeholder="e.g. 8-Week Velocity Builder"
-                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
                 />
               </div>
 
@@ -217,7 +217,7 @@ export default function AdminProgramsPage() {
                     max={52}
                     value={totalWeeks}
                     onChange={(e) => setTotalWeeks(parseInt(e.target.value))}
-                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
                   />
                 </div>
               )}
@@ -225,14 +225,14 @@ export default function AdminProgramsPage() {
               {/* CSV import */}
               <div
                 className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer hover:bg-gray-50 transition ${
-                  csvWeeks ? 'border-green-300 bg-green-50' : 'border-gray-200'
+                  csvWeeks ? 'border-sp-green-300 bg-sp-green-50' : 'border-gray-200'
                 }`}
                 onClick={() => fileRef.current?.click()}
               >
                 <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleCsvImport} />
-                <Upload size={20} className={`mx-auto mb-2 ${csvWeeks ? 'text-green-500' : 'text-gray-400'}`} />
+                <Upload size={20} className={`mx-auto mb-2 ${csvWeeks ? 'text-sp-green-500' : 'text-gray-400'}`} />
                 {csvWeeks ? (
-                  <p className="text-sm font-medium text-green-700">CSV loaded — {csvWeeks.length} weeks parsed</p>
+                  <p className="text-sm font-medium text-sp-green-800">CSV loaded — {csvWeeks.length} weeks parsed</p>
                 ) : (
                   <>
                     <p className="text-sm font-medium text-gray-600">Import from Google Sheets CSV</p>

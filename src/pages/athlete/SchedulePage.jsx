@@ -70,7 +70,7 @@ export default function SchedulePage() {
       <div className="surface-brand relative overflow-hidden text-white rounded-2xl p-4 mb-5">
         <div
           className="absolute inset-0 pointer-events-none"
-          style={{ background: 'radial-gradient(circle at 90% 0%, rgba(107,140,255,0.3), transparent 60%)' }}
+          style={{ background: 'radial-gradient(circle at 90% 0%, rgba(46,158,99,0.3), transparent 60%)' }}
         />
         <div className="relative">
           <p className="text-xs text-white/60 mb-0.5">Active Program</p>
@@ -78,7 +78,7 @@ export default function SchedulePage() {
           <div className="flex items-center gap-3 mt-3">
             <div className="flex-1 bg-white/10 rounded-full h-2">
               <div
-                className="bg-green-400 h-2 rounded-full transition-all"
+                className="bg-sp-green-400 h-2 rounded-full transition-all"
                 style={{ width: `${Math.round((currentWeek / totalWeeks) * 100)}%` }}
               />
             </div>
@@ -97,7 +97,7 @@ export default function SchedulePage() {
             onClick={() => setCurrentWeek(i)}
             className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition ${
               currentWeek === i
-                ? 'bg-brand-500 text-white'
+                ? 'bg-sp-green-500 text-white'
                 : 'bg-white border border-gray-200 text-gray-600'
             }`}
           >
@@ -118,7 +118,7 @@ export default function SchedulePage() {
             <div
               key={dayIdx}
               className={`bg-white rounded-2xl overflow-hidden shadow-sm border transition ${
-                done ? 'border-green-200' : 'border-gray-100'
+                done ? 'border-sp-green-200' : 'border-gray-100'
               }`}
             >
               {/* Day header */}
@@ -127,10 +127,10 @@ export default function SchedulePage() {
                 onClick={() => setExpanded(isExpanded ? null : key)}
               >
                 <div className={`w-9 h-9 rounded-full flex items-center justify-center mr-3 flex-shrink-0 ${
-                  done ? 'bg-green-100' : 'bg-gray-100'
+                  done ? 'bg-sp-green-100' : 'bg-gray-100'
                 }`}>
                   {done
-                    ? <CheckCircle2 size={20} className="text-green-500" />
+                    ? <CheckCircle2 size={20} className="text-sp-green-500" />
                     : <span className="text-xs font-bold text-gray-500">{DAYS[dayIdx]}</span>
                   }
                 </div>
@@ -142,7 +142,7 @@ export default function SchedulePage() {
                   {!done && (
                     <button
                       onClick={(e) => { e.stopPropagation(); toggleComplete(currentWeek, dayIdx) }}
-                      className="text-xs bg-brand-50 text-brand-500 font-medium px-3 py-1 rounded-full hover:bg-brand-100 transition"
+                      className="text-xs bg-sp-green-50 text-sp-green-500 font-medium px-3 py-1 rounded-full hover:bg-sp-green-100 transition"
                     >
                       Done
                     </button>
@@ -156,8 +156,8 @@ export default function SchedulePage() {
                 <div className="border-t border-gray-100 divide-y divide-gray-50">
                   {day.exercises.map((ex, i) => (
                     <div key={i} className="px-4 py-3 flex items-start gap-3">
-                      <div className="w-7 h-7 bg-brand-50 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <Zap size={14} className="text-brand-500" />
+                      <div className="w-7 h-7 bg-sp-green-50 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <Zap size={14} className="text-sp-green-500" />
                       </div>
                       <div className="min-w-0">
                         <p className="font-medium text-sm text-gray-900">{ex.name}</p>
@@ -185,7 +185,7 @@ export default function SchedulePage() {
 function PageLoader() {
   return (
     <div className="flex justify-center items-center min-h-[60vh]">
-      <div className="w-8 h-8 border-3 border-brand-500 border-t-transparent rounded-full animate-spin" />
+      <div className="w-8 h-8 border-3 border-sp-green-500 border-t-transparent rounded-full animate-spin" />
     </div>
   )
 }

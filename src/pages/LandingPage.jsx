@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Calendar, TrendingUp, MessageCircle, Zap, ChevronRight, Target, BarChart2, ArrowRight } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import Logo from '../components/Logo'
 
 const FEATURES = [
   {
@@ -71,29 +72,19 @@ export default function LandingPage() {
 
       {/* Background grid */}
       <div className="fixed inset-0 pointer-events-none" style={{
-        backgroundImage: 'linear-gradient(rgba(59,91,219,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(59,91,219,0.06) 1px, transparent 1px)',
+        backgroundImage: 'linear-gradient(rgba(46,158,99,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(46,158,99,0.06) 1px, transparent 1px)',
         backgroundSize: '60px 60px',
       }} />
 
       {/* Glow orbs */}
       <div className="fixed top-[-200px] left-1/2 -translate-x-1/2 w-[800px] h-[800px] rounded-full pointer-events-none"
-        style={{ background: 'radial-gradient(circle, rgba(59,91,219,0.15) 0%, transparent 70%)' }} />
+        style={{ background: 'radial-gradient(circle, rgba(46,158,99,0.15) 0%, transparent 70%)' }} />
       <div className="fixed bottom-[-100px] right-[-100px] w-[500px] h-[500px] rounded-full pointer-events-none"
-        style={{ background: 'radial-gradient(circle, rgba(59,91,219,0.08) 0%, transparent 70%)' }} />
+        style={{ background: 'radial-gradient(circle, rgba(46,158,99,0.08) 0%, transparent 70%)' }} />
 
       {/* Nav */}
       <nav className="relative z-10 flex items-center justify-between px-6 py-5 max-w-7xl mx-auto">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, #3b5bdb, #2541b0)' }}>
-            <svg viewBox="0 0 24 24" className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <circle cx="12" cy="12" r="10"/>
-              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-              <path d="M2 12h20"/>
-            </svg>
-          </div>
-          <span className="font-extrabold text-lg tracking-tight">Superior Performance</span>
-        </div>
+        <Logo className="h-12 w-auto" />
         <Link
           to="/login"
           className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-xl border border-white/10 hover:border-white/25 hover:bg-white/5 transition-all"
@@ -105,16 +96,16 @@ export default function LandingPage() {
       {/* Hero */}
       <section className="relative z-10 px-6 pt-16 pb-32 max-w-7xl mx-auto text-center">
         {/* Badge */}
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-brand-500/30 bg-brand-500/10 text-xs font-semibold text-brand-300 mb-10 tracking-wider uppercase">
-          <span className="w-1.5 h-1.5 bg-brand-400 rounded-full animate-pulse" />
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-sp-green-500/30 bg-sp-green-500/10 text-xs font-semibold text-sp-green-300 mb-10 tracking-wider uppercase">
+          <span className="w-1.5 h-1.5 bg-sp-green-400 rounded-full animate-pulse" />
           Elite Pitcher Development
         </div>
 
         {/* Headline */}
-        <h1 className="text-6xl sm:text-7xl lg:text-8xl font-extrabold tracking-tighter leading-none mb-6">
+        <h1 className="font-display text-6xl sm:text-7xl lg:text-8xl font-extrabold tracking-tighter leading-none mb-6">
           <span className="block text-white">Train Like</span>
           <span className="block" style={{
-            background: 'linear-gradient(90deg, #6b8cff 0%, #3b5bdb 40%, #a78bfa 100%)',
+            background: 'linear-gradient(90deg, #68BC8E 0%, #2E9E63 50%, #1B5E3F 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
@@ -133,7 +124,7 @@ export default function LandingPage() {
           <Link
             to="/login"
             className="group flex items-center gap-2.5 px-7 py-4 font-bold rounded-2xl text-sm transition-all shadow-lg"
-            style={{ background: 'linear-gradient(135deg, #3b5bdb, #2541b0)', boxShadow: '0 0 40px rgba(59,91,219,0.4)' }}
+            style={{ background: 'linear-gradient(135deg, #2E9E63, #216341)', boxShadow: '0 0 40px rgba(46,158,99,0.4)' }}
           >
             Access Your Program
             <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
@@ -160,7 +151,7 @@ export default function LandingPage() {
       {/* Features */}
       <section id="features" className="relative z-10 px-6 pb-28 max-w-7xl mx-auto">
         <div className="text-center mb-16">
-          <p className="text-brand-400 text-xs font-bold uppercase tracking-widest mb-3">The Platform</p>
+          <p className="text-sp-green-400 text-xs font-bold uppercase tracking-widest mb-3">The Platform</p>
           <h2 className="text-4xl font-extrabold tracking-tight mb-4">Everything your development needs.</h2>
           <p className="text-white/40 max-w-md mx-auto">One app. Your program, your data, your coach — all connected.</p>
         </div>
@@ -186,20 +177,20 @@ export default function LandingPage() {
       {/* About / Coach */}
       <section className="relative z-10 px-6 pb-28 max-w-7xl mx-auto">
         <div className="relative rounded-3xl overflow-hidden border border-white/10 p-10 sm:p-16"
-          style={{ background: 'linear-gradient(135deg, rgba(59,91,219,0.15) 0%, rgba(8,12,20,0.8) 60%)' }}>
+          style={{ background: 'linear-gradient(135deg, rgba(46,158,99,0.15) 0%, rgba(8,12,20,0.8) 60%)' }}>
           {/* Accent line */}
           <div className="absolute top-0 left-0 right-0 h-px"
-            style={{ background: 'linear-gradient(90deg, transparent, rgba(59,91,219,0.8), transparent)' }} />
+            style={{ background: 'linear-gradient(90deg, transparent, rgba(46,158,99,0.8), transparent)' }} />
 
           <div className="flex flex-col lg:flex-row gap-10 items-start">
             <div className="flex-shrink-0">
               <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-3xl font-black"
-                style={{ background: 'linear-gradient(135deg, #3b5bdb, #2541b0)' }}>
+                style={{ background: 'linear-gradient(135deg, #2E9E63, #216341)' }}>
                 SP
               </div>
             </div>
             <div className="flex-1">
-              <p className="text-brand-400 text-xs font-bold uppercase tracking-widest mb-3">The Method</p>
+              <p className="text-sp-green-400 text-xs font-bold uppercase tracking-widest mb-3">The Method</p>
               <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-6 leading-tight">
                 Not a template.<br />
                 <span className="text-white/40">Your program.</span>
@@ -214,7 +205,7 @@ export default function LandingPage() {
                 <Link
                   to="/login"
                   className="inline-flex items-center gap-2 px-6 py-3 font-bold text-sm rounded-xl transition-all"
-                  style={{ background: 'linear-gradient(135deg, #3b5bdb, #2541b0)', boxShadow: '0 0 30px rgba(59,91,219,0.3)' }}
+                  style={{ background: 'linear-gradient(135deg, #2E9E63, #216341)', boxShadow: '0 0 30px rgba(46,158,99,0.3)' }}
                 >
                   Sign In <ChevronRight size={15} />
                 </Link>
@@ -236,7 +227,7 @@ export default function LandingPage() {
           <h2 className="text-5xl sm:text-6xl font-extrabold tracking-tighter mb-6">
             Ready to<br />
             <span style={{
-              background: 'linear-gradient(90deg, #6b8cff, #a78bfa)',
+              background: 'linear-gradient(90deg, #68BC8E, #2E9E63)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               backgroundClip: 'text',
@@ -246,7 +237,7 @@ export default function LandingPage() {
           <Link
             to="/login"
             className="inline-flex items-center gap-2.5 px-8 py-4 font-bold rounded-2xl text-sm transition-all"
-            style={{ background: 'linear-gradient(135deg, #3b5bdb, #2541b0)', boxShadow: '0 0 60px rgba(59,91,219,0.35)' }}
+            style={{ background: 'linear-gradient(135deg, #2E9E63, #216341)', boxShadow: '0 0 60px rgba(46,158,99,0.35)' }}
           >
             Access Your Program <ChevronRight size={16} />
           </Link>
@@ -255,16 +246,9 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="relative z-10 border-t border-white/5 px-6 py-8 max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, #3b5bdb, #2541b0)' }}>
-            <svg viewBox="0 0 24 24" className="w-4 h-4 text-white" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <circle cx="12" cy="12" r="10"/>
-              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-              <path d="M2 12h20"/>
-            </svg>
-          </div>
-          <span className="font-bold text-sm text-white/50">Superior Performance</span>
+        <div className="flex items-center gap-2.5 opacity-50">
+          <Logo variant="icon" className="h-7 w-7" />
+          <span className="font-bold text-sm">Superior Performance</span>
         </div>
         <div className="flex items-center gap-6 text-white/25 text-sm">
           <a href="mailto:jcdeakins@gmail.com" className="hover:text-white/60 transition">Contact</a>

@@ -68,7 +68,7 @@ export default function AdminSettingsPage() {
   return (
     <div className="p-8 max-w-2xl">
       <div className="flex items-center gap-3 mb-8">
-        <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
+        <div className="w-10 h-10 rounded-xl bg-sp-green-50 text-sp-green-600 flex items-center justify-center">
           <Settings size={20} />
         </div>
         <div>
@@ -82,7 +82,7 @@ export default function AdminSettingsPage() {
         <div className="flex items-start justify-between mb-1">
           <h2 className="font-semibold text-gray-900">Google Sheets Algorithm</h2>
           {scriptUrl && (
-            <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
+            <span className="flex items-center gap-1 text-xs text-sp-green-600 font-medium">
               <CheckCircle size={13} /> Connected
             </span>
           )}
@@ -103,7 +103,7 @@ export default function AdminSettingsPage() {
               value={scriptUrl}
               onChange={e => setScriptUrl(e.target.value)}
               placeholder="https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec"
-              className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono"
+              className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500 font-mono"
             />
           </div>
           <button
@@ -121,19 +121,19 @@ export default function AdminSettingsPage() {
           <h3 className="text-sm font-semibold text-gray-700 mb-4">How to set up your Google Sheet</h3>
           <ol className="space-y-3 text-sm text-gray-500">
             <li className="flex gap-3">
-              <span className="w-5 h-5 rounded-full bg-brand-100 text-brand-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
+              <span className="w-5 h-5 rounded-full bg-sp-green-100 text-sp-green-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
               <span>Create a new Google Sheet. Add a tab called <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">Inputs</code> and a tab called <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">Output</code>.</span>
             </li>
             <li className="flex gap-3">
-              <span className="w-5 h-5 rounded-full bg-brand-100 text-brand-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
+              <span className="w-5 h-5 rounded-full bg-sp-green-100 text-sp-green-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
               <span>In the <strong>Inputs</strong> tab, put labels in column A and input values in column B, rows 2–9 (Grip Strength, Shoulder ER, Shoulder IR, Hip Mobility, Baseline Velo, Arm Strength, Sprint Time, Body Weight).</span>
             </li>
             <li className="flex gap-3">
-              <span className="w-5 h-5 rounded-full bg-brand-100 text-brand-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
+              <span className="w-5 h-5 rounded-full bg-sp-green-100 text-sp-green-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
               <span>In the <strong>Output</strong> tab, row 1 must be headers: <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">Week, Day, Category, Exercise, Sets, Reps, Intensity, Notes</code>. Your algorithm populates rows 2+ using formulas referencing the Inputs tab.</span>
             </li>
             <li className="flex gap-3">
-              <span className="w-5 h-5 rounded-full bg-brand-100 text-brand-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">4</span>
+              <span className="w-5 h-5 rounded-full bg-sp-green-100 text-sp-green-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">4</span>
               <span>In your Sheet, go to <strong>Extensions → Apps Script</strong>, paste the script from below, then click <strong>Deploy → New deployment → Web app</strong>. Set "Who has access" to <em>Anyone</em>. Copy the URL and paste it above.</span>
             </li>
           </ol>
@@ -148,7 +148,7 @@ export default function AdminSettingsPage() {
                   navigator.clipboard.writeText(APPS_SCRIPT_CODE)
                   toast.success('Copied to clipboard!')
                 }}
-                className="text-xs text-brand-500 hover:text-brand-600 font-medium"
+                className="text-xs text-sp-green-500 hover:text-sp-green-600 font-medium"
               >
                 Copy
               </button>
@@ -194,7 +194,7 @@ function PwField({ label, value, onChange, ...props }) {
         required
         value={value}
         onChange={e => onChange(e.target.value)}
-        className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+        className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
         {...props}
       />
     </div>

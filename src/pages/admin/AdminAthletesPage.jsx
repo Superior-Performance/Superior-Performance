@@ -80,7 +80,7 @@ export default function AdminAthletesPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search athletes…"
-          className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
+          className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-white"
         />
       </div>
 
@@ -109,21 +109,21 @@ export default function AdminAthletesPage() {
                 >
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center font-bold text-sm">
+                      <div className="w-8 h-8 rounded-full bg-sp-green-100 text-sp-green-600 flex items-center justify-center font-bold text-sm">
                         {a.name?.charAt(0) || '?'}
                       </div>
-                      <span className="font-medium text-gray-900 hover:text-brand-600 transition">{a.name}</span>
+                      <span className="font-medium text-gray-900 hover:text-sp-green-600 transition">{a.name}</span>
                     </div>
                   </td>
                   <td className="px-5 py-3.5 text-gray-500">{a.email}</td>
                   <td className="px-5 py-3.5">
                     {a.programId
-                      ? <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">Assigned</span>
+                      ? <span className="px-2 py-1 bg-sp-green-100 text-sp-green-800 text-xs font-medium rounded-full">Assigned</span>
                       : <span className="px-2 py-1 bg-gray-100 text-gray-400 text-xs font-medium rounded-full">None</span>
                     }
                   </td>
                   <td className="px-5 py-3.5 text-right">
-                    <span className="inline-flex items-center gap-1 text-brand-500 text-sm font-medium">
+                    <span className="inline-flex items-center gap-1 text-sp-green-500 text-sm font-medium">
                       View <ChevronRight size={14} />
                     </span>
                   </td>
@@ -149,7 +149,7 @@ export default function AdminAthletesPage() {
                     onClick={() => setRole(r)}
                     className={`flex-1 py-2.5 text-sm font-semibold capitalize transition ${
                       role === r
-                        ? 'bg-brand-500 text-white'
+                        ? 'bg-sp-green-500 text-white'
                         : 'bg-white text-gray-500 hover:bg-gray-50'
                     }`}
                   >
@@ -181,7 +181,7 @@ function Field({ label, value, onChange, ...props }) {
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+        className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
         {...props}
       />
     </div>

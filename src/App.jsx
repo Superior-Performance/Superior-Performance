@@ -34,7 +34,7 @@ function RequireAuth({ children, role }) {
 
 function LoadingScreen() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-brand-900">
+    <div className="min-h-screen flex items-center justify-center bg-sp-ink-900">
       <div className="text-center text-white">
         <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4" />
         <p className="text-sm font-medium opacity-70">Loading...</p>

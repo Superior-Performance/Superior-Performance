@@ -1,6 +1,6 @@
 // Minimal inline trend line — no charting library needed for a single series
 // of recent numeric values. Renders nothing (not "chart unavailable") below 2 points.
-export default function Sparkline({ values, width = 96, height = 32, stroke = '#3b5bdb' }) {
+export default function Sparkline({ values, width = 96, height = 32, stroke = '#2E9E63' }) {
   if (!values || values.length < 2) return null
 
   const min = Math.min(...values)

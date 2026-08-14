@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { sendPasswordResetEmail } from 'firebase/auth'
 import { auth } from '../firebase/config'
 import toast from 'react-hot-toast'
+import Logo from '../components/Logo'
 
 export default function LoginPage() {
   const { login } = useAuth()
@@ -51,22 +52,12 @@ export default function LoginPage() {
       {/* Glow orb, matching the landing page */}
       <div
         className="fixed top-[-200px] left-1/2 -translate-x-1/2 w-[800px] h-[800px] rounded-full pointer-events-none"
-        style={{ background: 'radial-gradient(circle, rgba(59,91,219,0.15) 0%, transparent 70%)' }}
+        style={{ background: 'radial-gradient(circle, rgba(46,158,99,0.15) 0%, transparent 70%)' }}
       />
 
       {/* Logo / Title */}
       <div className="relative z-10 mb-10 text-center">
-        <div
-          className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
-          style={{ background: 'linear-gradient(135deg, #3b5bdb, #2541b0)' }}
-        >
-          <svg viewBox="0 0 24 24" className="w-9 h-9 text-white" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-            <path d="M2 12h20"/>
-          </svg>
-        </div>
-        <h1 className="text-3xl font-bold text-white tracking-tight">Superior Performance</h1>
+        <Logo className="h-14 w-auto mx-auto mb-4" />
         <p className="text-white/60 mt-1 text-sm">Sign in to access your program</p>
       </div>
 
@@ -80,7 +71,7 @@ export default function LoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm transition"
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sp-green-500 text-sm transition"
               placeholder="you@example.com"
               autoComplete="email"
             />
@@ -92,7 +83,7 @@ export default function LoginPage() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm transition"
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sp-green-500 text-sm transition"
               placeholder="••••••••"
               autoComplete="current-password"
             />
@@ -112,7 +103,7 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={() => { setResetEmail(email); setShowReset(true) }}
-            className="w-full text-center text-xs text-gray-400 hover:text-brand-500 transition pt-1"
+            className="w-full text-center text-xs text-gray-400 hover:text-sp-green-500 transition pt-1"
           >
             Forgot your password?
           </button>
@@ -136,7 +127,7 @@ export default function LoginPage() {
                 value={resetEmail}
                 onChange={e => setResetEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sp-green-500 text-sm"
               />
               <div className="flex gap-3">
                 <button type="button" onClick={() => setShowReset(false)} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Cancel</button>

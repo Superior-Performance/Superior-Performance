@@ -266,7 +266,7 @@ export default function AdminAthleteDetail() {
     }
   }
 
-  if (loading) return <div className="flex justify-center py-20"><div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" /></div>
+  if (loading) return <div className="flex justify-center py-20"><div className="w-8 h-8 border-2 border-sp-green-500 border-t-transparent rounded-full animate-spin" /></div>
 
   if (loadError) return (
     <div className="p-8">
@@ -304,7 +304,7 @@ export default function AdminAthleteDetail() {
 
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center font-bold text-xl">
+          <div className="w-12 h-12 rounded-full bg-sp-green-100 text-sp-green-600 flex items-center justify-center font-bold text-xl">
             {athlete.name?.charAt(0)}
           </div>
           <div>
@@ -393,7 +393,7 @@ export default function AdminAthleteDetail() {
                   step="0.1"
                   value={assessment[key] || ''}
                   onChange={(e) => setAssessment(p => ({ ...p, [key]: e.target.value }))}
-                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
                   placeholder="—"
                 />
               </div>
@@ -410,7 +410,7 @@ export default function AdminAthleteDetail() {
                   <select
                     value={posture[key] || ''}
                     onChange={(e) => setPosture(p => ({ ...p, [key]: e.target.value }))}
-                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-white"
                   >
                     <option value="">— Select —</option>
                     {options.map(opt => (
@@ -437,7 +437,7 @@ export default function AdminAthleteDetail() {
                   <p className="text-xs text-gray-400 mt-0.5">{program.weeks?.length || 0} weeks · Active</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">Active</span>
+                  <span className="px-2.5 py-1 bg-sp-green-100 text-sp-green-800 text-xs font-medium rounded-full">Active</span>
                   <button
                     onClick={removeProgram}
                     disabled={saving}
@@ -465,14 +465,14 @@ export default function AdminAthleteDetail() {
                   <button
                     onClick={() => assignProgram(p.id)}
                     disabled={saving}
-                    className="text-xs px-3 py-1.5 bg-brand-50 text-brand-600 font-medium rounded-lg hover:bg-brand-100 transition"
+                    className="text-xs px-3 py-1.5 bg-sp-green-50 text-sp-green-600 font-medium rounded-lg hover:bg-sp-green-100 transition"
                   >
                     Assign
                   </button>
                 </div>
               ))}
               {programs.length === 0 && (
-                <p className="text-gray-400 text-sm">No programs yet. Create one in <Link to="/admin/programs" className="text-brand-500 underline">Programs</Link>.</p>
+                <p className="text-gray-400 text-sm">No programs yet. Create one in <Link to="/admin/programs" className="text-sp-green-500 underline">Programs</Link>.</p>
               )}
             </div>
           </div>
@@ -494,7 +494,7 @@ export default function AdminAthleteDetail() {
                   required
                   value={editName}
                   onChange={e => setEditName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
                 />
               </div>
               <div>
@@ -503,7 +503,7 @@ export default function AdminAthleteDetail() {
                   type="email"
                   value={editEmail}
                   onChange={e => setEditEmail(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
                 />
                 <p className="text-xs text-gray-400 mt-1">Note: this updates the display name only, not their login email.</p>
               </div>

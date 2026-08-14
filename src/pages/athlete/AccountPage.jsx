@@ -44,7 +44,7 @@ export default function AccountPage() {
     <div className="px-4 py-6 max-w-md mx-auto">
       {/* Header */}
       <div className="mb-6">
-        <div className="w-14 h-14 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center font-bold text-2xl mb-3">
+        <div className="w-14 h-14 rounded-full bg-sp-green-100 text-sp-green-600 flex items-center justify-center font-bold text-2xl mb-3">
           {userProfile?.name?.charAt(0) || '?'}
         </div>
         <h1 className="text-xl font-bold text-gray-900">{userProfile?.name}</h1>
@@ -106,7 +106,7 @@ function Field({ label, value, onChange, ...props }) {
       <input
         value={value}
         onChange={e => onChange(e.target.value)}
-        className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+        className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
         {...props}
       />
     </div>

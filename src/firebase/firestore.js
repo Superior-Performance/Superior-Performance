@@ -69,11 +69,14 @@ export const subscribeDataLogs = (uid, callback) =>
   )
 
 // ── Assessments ──────────────────────────────────────────────────────────────
+// Flat field map — keys mirror the "Assessment Intake" Google Sheet columns
+// (minus Athlete Name, which the app already tracks as the athlete's identity)
+// so the whole doc can be handed straight to the Sheets integration.
 export const getAssessment = (uid) =>
   getDoc(doc(db, 'assessments', uid))
 
-export const saveAssessment = (uid, scores, posture = {}) =>
-  setDoc(doc(db, 'assessments', uid), { scores, posture, updatedAt: serverTimestamp() }, { merge: true })
+export const saveAssessment = (uid, data) =>
+  setDoc(doc(db, 'assessments', uid), { ...data, updatedAt: serverTimestamp() }, { merge: true })
 
 // ── App Settings ─────────────────────────────────────────────────────────────
 // settings/global — { sheetsScriptUrl: string }

@@ -12,42 +12,90 @@ import { auth } from '../../firebase/config'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 
-const ASSESSMENT_FIELDS = [
-  { key: 'gripStrength',   label: 'Grip Strength (lbs)' },
-  { key: 'shoulderER',     label: 'Shoulder ER (°)'     },
-  { key: 'shoulderIR',     label: 'Shoulder IR (°)'     },
-  { key: 'hipMobility',    label: 'Hip Mobility (°)'    },
-  { key: 'baselineVelo',   label: 'Baseline Velo (mph)' },
-  { key: 'armStrength',    label: 'Arm Strength Score'  },
-  { key: 'sprintTime',     label: '60-yd Sprint (sec)'  },
-  { key: 'bodyWeight',     label: 'Body Weight (lbs)'   },
-]
+// Mirrors the "Assessment Intake" Google Sheet column-for-column (minus
+// Athlete Name, which the app already tracks) so the saved doc can be handed
+// straight to that sheet once the two are wired together.
+const PASS_FAIL = ['Pass', 'Fail']
+const YES_NO = ['Yes', 'No']
+const FULL_LIMITED_SIDES = ['Full', 'Limited (bilateral)', 'Limited (left)', 'Limited (right)']
 
-const POSTURE_FIELDS = [
+const FIELD_GROUPS = [
   {
-    key: 'pelvis',
-    label: 'Pelvis Positioning',
-    options: ['Neutral', 'Anterior', 'Posterior'],
+    title: 'General',
+    fields: [
+      { key: 'assessmentDate', label: 'Assessment Date', type: 'date' },
+      { key: 'age',            label: 'Age',             type: 'number' },
+      { key: 'ageBracket',     label: 'Age Bracket',      type: 'select', options: ['14u', '15u', '16u', '17u', '18u', 'College'] },
+      { key: 'trainingAge',    label: 'Training Age (yrs lifting)', type: 'number' },
+      { key: 'sportPosition',  label: 'Sport / Position', type: 'text' },
+      { key: 'handedness',     label: 'Handedness',       type: 'select', options: ['Left', 'Right'] },
+      { key: 'injuryHistory',  label: 'Injury History / Pain (red flags)', type: 'text', wide: true },
+    ],
   },
   {
-    key: 'femur',
-    label: 'Femur',
-    options: ['Neutral', 'Externally Rotated', 'Internally Rotated'],
+    title: 'ISA',
+    fields: [
+      { key: 'isaReading',       label: 'ISA Reading',                type: 'select', options: ['Neutral', 'Narrow', 'Wide'] },
+      { key: 'compressionSigns', label: 'Compression Signs (ISA test)', type: 'select', options: ['Not compressed', 'Slightly compressed', 'Compressed'] },
+    ],
   },
   {
-    key: 'foot',
-    label: 'Foot',
-    options: ['Neutral', 'Flat'],
+    title: 'Shoulder',
+    fields: [
+      { key: 'shoulderERLeft',            label: 'Shoulder ER - Left (deg)',  type: 'number' },
+      { key: 'shoulderERRight',           label: 'Shoulder ER - Right (deg)', type: 'number' },
+      { key: 'activeShoulderERTestLeft',  label: 'Active Shoulder ER Test - Left',  type: 'select', options: PASS_FAIL },
+      { key: 'activeShoulderERTestRight', label: 'Active Shoulder ER Test - Right', type: 'select', options: PASS_FAIL },
+      { key: 'shoulderIRLimitedLeft',     label: 'Shoulder IR Limited - Left',  type: 'select', options: YES_NO },
+      { key: 'shoulderIRLimitedRight',    label: 'Shoulder IR Limited - Right', type: 'select', options: YES_NO },
+      { key: 'shoulderFlexion',           label: 'Shoulder Flexion', type: 'select', options: FULL_LIMITED_SIDES },
+    ],
   },
   {
-    key: 'shoulder',
-    label: 'Shoulder',
-    options: ['Neutral', 'Anterior', 'Posterior'],
+    title: 'Hip',
+    fields: [
+      { key: 'hipIRLimitedLeft',  label: 'Hip IR Limited - Left',  type: 'select', options: YES_NO },
+      { key: 'hipIRLimitedRight', label: 'Hip IR Limited - Right', type: 'select', options: YES_NO },
+      { key: 'hipERLimitedLeft',  label: 'Hip ER Limited - Left',  type: 'select', options: YES_NO },
+      { key: 'hipERLimitedRight', label: 'Hip ER Limited - Right', type: 'select', options: YES_NO },
+      { key: 'hipExtension',      label: 'Hip Extension (table test)', type: 'select', options: FULL_LIMITED_SIDES },
+    ],
   },
   {
-    key: 'cervicalSpine',
-    label: 'Cervical Spine',
-    options: ['Neutral', 'Anterior'],
+    title: 'Lower Body',
+    fields: [
+      { key: 'hamstringTest',          label: 'Hamstring Test',            type: 'select', options: PASS_FAIL },
+      { key: 'splitsTest',             label: 'Splits Test',               type: 'select', options: PASS_FAIL },
+      { key: 'ankleDorsiflexionLeft',  label: 'Ankle Dorsiflexion - Left',  type: 'select', options: PASS_FAIL },
+      { key: 'ankleDorsiflexionRight', label: 'Ankle Dorsiflexion - Right', type: 'select', options: PASS_FAIL },
+    ],
+  },
+  {
+    title: 'T-Spine',
+    fields: [
+      { key: 'tSpineRotation',  label: 'T-Spine Rotation',  type: 'select', options: [...FULL_LIMITED_SIDES, 'Limited (glove side)'] },
+      { key: 'tSpineExtension', label: 'T-Spine Extension', type: 'select', options: ['Full', 'Limited'] },
+      { key: 'tSpineFlexion',   label: 'T-Spine Flexion',   type: 'select', options: ['Full', 'Limited'] },
+    ],
+  },
+  {
+    title: 'Elbow / Forearm',
+    fields: [
+      { key: 'pecTest',                 label: 'Pec Test',                 type: 'select', options: PASS_FAIL },
+      { key: 'elbowPainType',           label: 'Elbow Pain Type',          type: 'select', options: ['None', 'Olecranon', 'Tennis elbow', 'Both'] },
+      { key: 'flexorForearmTightness',  label: 'Flexor Forearm Tightness', type: 'select', options: PASS_FAIL },
+    ],
+  },
+  {
+    title: 'Posture & Notes',
+    fields: [
+      { key: 'ribFlare',          label: 'Rib Flare',              type: 'select', options: YES_NO },
+      { key: 'scapControl',       label: 'Scap Control / Winging', type: 'text' },
+      { key: 'postureFeet',       label: 'Posture - Feet',         type: 'text' },
+      { key: 'posturePelvis',     label: 'Posture - Pelvis',       type: 'text' },
+      { key: 'postureUpperBody',  label: 'Posture - Upper Body',   type: 'text' },
+      { key: 'otherNotes',        label: 'Other Notes',            type: 'text', wide: true },
+    ],
   },
 ]
 
@@ -58,7 +106,6 @@ export default function AdminAthleteDetail() {
   const [program, setProgram]       = useState(null)
   const [programs, setPrograms]     = useState([])
   const [assessment, setAssessment] = useState({})
-  const [posture, setPosture]       = useState({})
   const [logs, setLogs]             = useState([])
   const [loading, setLoading]       = useState(true)
   const [loadError, setLoadError]   = useState(null)
@@ -86,8 +133,12 @@ export default function AdminAthleteDetail() {
       ])
       setAthlete(userSnap.exists() ? { id: uid, ...userSnap.data() } : null)
       setProgram(!progSnap.empty ? { id: progSnap.docs[0].id, ...progSnap.docs[0].data() } : null)
-      setAssessment(assessSnap.exists() ? assessSnap.data().scores  || {} : {})
-      setPosture(assessSnap.exists()   ? assessSnap.data().posture || {} : {})
+      if (assessSnap.exists()) {
+        const { updatedAt, ...data } = assessSnap.data()
+        setAssessment(data)
+      } else {
+        setAssessment({})
+      }
       setPrograms(allProgs.docs.map(d => ({ id: d.id, ...d.data() })))
       setLogs(logsSnap.docs.map(d => ({ id: d.id, ...d.data() })))
     } catch (err) {
@@ -101,7 +152,7 @@ export default function AdminAthleteDetail() {
   async function saveAssessmentScores() {
     setSaving(true)
     try {
-      await saveAssessment(uid, assessment, posture)
+      await saveAssessment(uid, assessment)
       toast.success('Assessment saved!')
     } catch {
       toast.error('Save failed.')
@@ -364,7 +415,10 @@ export default function AdminAthleteDetail() {
       {tab === 'assessment' && (
         <div className="bg-white rounded-2xl border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="font-semibold text-gray-900">Assessment Scores</h2>
+            <div>
+              <h2 className="font-semibold text-gray-900">Assessment Intake</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Matches the Assessment Intake Google Sheet field-for-field.</p>
+            </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={saveAssessmentScores}
@@ -384,42 +438,23 @@ export default function AdminAthleteDetail() {
               </button>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            {ASSESSMENT_FIELDS.map(({ key, label }) => (
-              <div key={key}>
-                <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={assessment[key] || ''}
-                  onChange={(e) => setAssessment(p => ({ ...p, [key]: e.target.value }))}
-                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
-                  placeholder="—"
-                />
+
+          <div className="space-y-6">
+            {FIELD_GROUPS.map(({ title, fields }) => (
+              <div key={title} className="pt-5 border-t border-gray-100 first:pt-0 first:border-0">
+                <h3 className="font-semibold text-gray-800 mb-3 text-sm">{title}</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  {fields.map((field) => (
+                    <AssessmentField
+                      key={field.key}
+                      field={field}
+                      value={assessment[field.key] || ''}
+                      onChange={(v) => setAssessment(p => ({ ...p, [field.key]: v }))}
+                    />
+                  ))}
+                </div>
               </div>
             ))}
-          </div>
-
-          {/* Posture Assessment */}
-          <div className="mt-6 pt-6 border-t border-gray-100">
-            <h3 className="font-semibold text-gray-800 mb-4">Posture</h3>
-            <div className="grid grid-cols-2 gap-4">
-              {POSTURE_FIELDS.map(({ key, label, options }) => (
-                <div key={key}>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
-                  <select
-                    value={posture[key] || ''}
-                    onChange={(e) => setPosture(p => ({ ...p, [key]: e.target.value }))}
-                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-white"
-                  >
-                    <option value="">— Select —</option>
-                    {options.map(opt => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       )}
@@ -574,6 +609,43 @@ export default function AdminAthleteDetail() {
           </table>
         </div>
       )}
+    </div>
+  )
+}
+
+function AssessmentField({ field, value, onChange }) {
+  const { label, type, options, wide } = field
+  const wrapClass = wide ? 'col-span-2' : ''
+
+  if (type === 'select') {
+    return (
+      <div className={wrapClass}>
+        <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-white"
+        >
+          <option value="">— Select —</option>
+          {options.map(opt => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
+        </select>
+      </div>
+    )
+  }
+
+  return (
+    <div className={wrapClass}>
+      <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
+      <input
+        type={type === 'number' ? 'number' : type === 'date' ? 'date' : 'text'}
+        step={type === 'number' ? '0.1' : undefined}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
+        placeholder={type === 'text' ? '' : '—'}
+      />
     </div>
   )
 }

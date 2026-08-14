@@ -191,7 +191,9 @@ export default function AdminSettingsPage() {
         <p className="text-sm text-gray-500 mb-6">
           Paste the Apps Script web app URL for your Assessment Intake sheet here. When you click
           "Log to Intake Sheet" on any athlete, their full assessment gets appended as a new row —
-          same fields, same order, same dropdown values as the sheet itself.
+          same fields, same order, same dropdown values as the sheet itself. The same script also
+          handles "Pull Program from Sheet" — once a program for an athlete has been written into
+          the sheet's <strong>Program Output</strong> tab, that button reads it back and assigns it.
         </p>
 
         <form onSubmit={handleSaveAssessmentUrl} className="space-y-4">
@@ -236,6 +238,18 @@ export default function AdminSettingsPage() {
             <li className="flex gap-3">
               <span className="w-5 h-5 rounded-full bg-sp-green-100 text-sp-green-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">4</span>
               <span>On any athlete's Assessment tab, fill in what you have and click <strong>Log to Intake Sheet</strong> — it appends one row to the bottom of the sheet, same as filling it in by hand.</span>
+            </li>
+            <li className="flex gap-3">
+              <span className="w-5 h-5 rounded-full bg-sp-green-100 text-sp-green-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">5</span>
+              <span>
+                Add a tab named exactly <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">Program Output</code> with header row{' '}
+                <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">Athlete Name, Week, Day, Category, Exercise, Sets, Reps, Intensity, Notes</code>.
+                This is where the program for an athlete goes once it's ready — one row per exercise, same athlete name as their assessment row.
+              </span>
+            </li>
+            <li className="flex gap-3">
+              <span className="w-5 h-5 rounded-full bg-sp-green-100 text-sp-green-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">6</span>
+              <span>On that athlete's Assessment tab, click <strong>Pull Program from Sheet</strong> — it reads their rows from Program Output and assigns the program, same shape as Generate Program from Sheet.</span>
             </li>
           </ol>
 
@@ -350,6 +364,12 @@ function respond(obj) {
 }`;
 
 const ASSESSMENT_APPS_SCRIPT_CODE = `function doGet(e) {
+  const action = e.parameter.action || 'append';
+  if (action === 'pullProgram') return pullProgram(e);
+  return appendAssessment(e);
+}
+
+function appendAssessment(e) {
   try {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Assessment Intake');
     if (!sheet) {
@@ -372,6 +392,37 @@ const ASSESSMENT_APPS_SCRIPT_CODE = `function doGet(e) {
     sheet.appendRow(row);
 
     return respond({ success: true });
+
+  } catch (err) {
+    return respond({ success: false, error: err.message });
+  }
+}
+
+function pullProgram(e) {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Program Output');
+    if (!sheet) {
+      return respond({ success: false, error: 'Could not find the "Program Output" tab.' });
+    }
+
+    const athleteName = (e.parameter.athleteName || '').trim().toLowerCase();
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0].map(h => String(h).trim());
+
+    const rows = data.slice(1)
+      .filter(row => row[0] !== '' && row[0] !== null)
+      .map(row => {
+        const obj = {};
+        headers.forEach((h, i) => { obj[h] = row[i]; });
+        return obj;
+      })
+      .filter(row => String(row['Athlete Name'] || '').trim().toLowerCase() === athleteName);
+
+    if (!rows.length) {
+      return respond({ success: false, error: 'No program rows found for "' + e.parameter.athleteName + '" in Program Output.' });
+    }
+
+    return respond({ success: true, program: rows });
 
   } catch (err) {
     return respond({ success: false, error: err.message });

@@ -6,7 +6,7 @@ import {
   createProgram, getSettings,
 } from '../../firebase/firestore'
 import { getDataLogs } from '../../firebase/firestore'
-import { ArrowLeft, Save, Zap, Dumbbell, MessageCircle, Pencil, Trash2, X, Sparkles, KeyRound, XCircle, FileSpreadsheet } from 'lucide-react'
+import { ArrowLeft, Save, Zap, Dumbbell, MessageCircle, Pencil, Trash2, X, Sparkles, KeyRound, XCircle, FileSpreadsheet, Download } from 'lucide-react'
 import { sendPasswordResetEmail } from 'firebase/auth'
 import { auth } from '../../firebase/config'
 import toast from 'react-hot-toast'
@@ -111,6 +111,7 @@ export default function AdminAthleteDetail() {
   const [loadError, setLoadError]   = useState(null)
   const [saving, setSaving]         = useState(false)
   const [sendingToSheet, setSendingToSheet] = useState(false)
+  const [pullingProgram, setPullingProgram] = useState(false)
   const [tab, setTab]               = useState('assessment')
   const [showEdit, setShowEdit]     = useState(false)
   const [showDelete, setShowDelete] = useState(false)
@@ -224,6 +225,52 @@ export default function AdminAthleteDetail() {
     }
   }
 
+  // Shared by generateFromSheet and pullProgramFromSheet — both end up with the
+  // same flat row shape (Week, Day, Category, Exercise, Sets, Reps, Intensity, Notes)
+  // and need it turned into a nested weeks/days program and assigned to this athlete.
+  async function assignProgramFromRows(rows, programName) {
+    const weeksMap = {}
+    rows.forEach(row => {
+      const wk  = Number(row['Week'])  || 1
+      const day = Number(row['Day'])   || 1
+      if (!weeksMap[wk]) weeksMap[wk] = { weekNum: wk, days: {} }
+      if (!weeksMap[wk].days[day]) {
+        weeksMap[wk].days[day] = {
+          dayNum: day,
+          category: row['Category'] || '',
+          exercises: [],
+        }
+      }
+      weeksMap[wk].days[day].exercises.push({
+        name:      row['Exercise']  || '',
+        sets:      row['Sets']      || '',
+        reps:      row['Reps']      || '',
+        intensity: row['Intensity'] || '',
+        notes:     row['Notes']     || '',
+      })
+    })
+
+    const weeks = Object.values(weeksMap)
+      .sort((a, b) => a.weekNum - b.weekNum)
+      .map(w => ({
+        ...w,
+        days: Object.values(w.days).sort((a, b) => a.dayNum - b.dayNum),
+      }))
+
+    if (program) await updateProgram(program.id, { active: false })
+
+    const programRef = await createProgram({
+      name:       programName,
+      athleteId:  uid,
+      totalWeeks: weeks.length,
+      weeks,
+    })
+    await updateUser(uid, { programId: programRef.id })
+
+    const snap = await getProgramForAthlete(uid)
+    setProgram(!snap.empty ? { id: snap.docs[0].id, ...snap.docs[0].data() } : null)
+  }
+
   async function generateFromSheet() {
     setSaving(true)
     try {
@@ -232,7 +279,6 @@ export default function AdminAthleteDetail() {
       const scriptUrl = settingsSnap.exists() ? settingsSnap.data().sheetsScriptUrl : ''
       if (!scriptUrl) {
         toast.error('No Apps Script URL set. Go to Settings first.')
-        setSaving(false)
         return
       }
 
@@ -247,62 +293,51 @@ export default function AdminAthleteDetail() {
 
       if (!json.success || !json.program?.length) {
         toast.error(json.error || 'Sheet returned no program data.')
-        setSaving(false)
         return
       }
 
-      // 4. Transform flat rows into nested weeks structure
-      //    Expected columns: Week, Day, Category, Exercise, Sets, Reps, Intensity, Notes
-      const weeksMap = {}
-      json.program.forEach(row => {
-        const wk  = Number(row['Week'])  || 1
-        const day = Number(row['Day'])   || 1
-        if (!weeksMap[wk]) weeksMap[wk] = { weekNum: wk, days: {} }
-        if (!weeksMap[wk].days[day]) {
-          weeksMap[wk].days[day] = {
-            dayNum: day,
-            category: row['Category'] || '',
-            exercises: [],
-          }
-        }
-        weeksMap[wk].days[day].exercises.push({
-          name:      row['Exercise']  || '',
-          sets:      row['Sets']      || '',
-          reps:      row['Reps']      || '',
-          intensity: row['Intensity'] || '',
-          notes:     row['Notes']     || '',
-        })
-      })
-
-      const weeks = Object.values(weeksMap)
-        .sort((a, b) => a.weekNum - b.weekNum)
-        .map(w => ({
-          ...w,
-          days: Object.values(w.days).sort((a, b) => a.dayNum - b.dayNum),
-        }))
-
-      // 5. Deactivate any current program
-      if (program) await updateProgram(program.id, { active: false })
-
-      // 6. Create the new program and assign to athlete
-      const programRef = await createProgram({
-        name:       `${athlete.name} — Generated Program`,
-        athleteId:  uid,
-        totalWeeks: weeks.length,
-        weeks,
-      })
-      await updateUser(uid, { programId: programRef.id })
-
-      // Refresh local state
-      const snap = await getProgramForAthlete(uid)
-      setProgram(!snap.empty ? { id: snap.docs[0].id, ...snap.docs[0].data() } : null)
-
+      await assignProgramFromRows(json.program, `${athlete.name} — Generated Program`)
       toast.success('Program generated and assigned!')
     } catch (err) {
       console.error(err)
       toast.error('Generation failed: ' + (err.message || 'Unknown error'))
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function pullProgramFromSheet() {
+    setPullingProgram(true)
+    try {
+      // 1. Get the Assessment Intake script URL from settings — same script,
+      //    a different action, reading the "Program Output" tab instead of
+      //    appending to "Assessment Intake".
+      const settingsSnap = await getSettings()
+      const scriptUrl = settingsSnap.exists() ? settingsSnap.data().assessmentSheetScriptUrl : ''
+      if (!scriptUrl) {
+        toast.error('No Assessment Intake script URL set. Go to Settings first.')
+        return
+      }
+
+      // 2. Ask for this athlete's rows from the Program Output tab
+      const params = new URLSearchParams()
+      params.set('action', 'pullProgram')
+      params.set('athleteName', athlete.name)
+      const res = await fetch(`${scriptUrl}?${params.toString()}`)
+      const json = await res.json()
+
+      if (!json.success || !json.program?.length) {
+        toast.error(json.error || 'No program rows found for this athlete in the Program Output tab.')
+        return
+      }
+
+      await assignProgramFromRows(json.program, `${athlete.name} — Program`)
+      toast.success('Program pulled from the sheet and assigned!')
+    } catch (err) {
+      console.error(err)
+      toast.error('Could not reach the sheet: ' + (err.message || 'Unknown error'))
+    } finally {
+      setPullingProgram(false)
     }
   }
 
@@ -465,6 +500,15 @@ export default function AdminAthleteDetail() {
               >
                 <FileSpreadsheet size={14} />
                 {sendingToSheet ? 'Logging…' : 'Log to Intake Sheet'}
+              </button>
+              <button
+                onClick={pullProgramFromSheet}
+                disabled={pullingProgram}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-200 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-50 disabled:opacity-60 transition"
+                title="Pulls this athlete's rows from the Program Output tab and assigns them as a program"
+              >
+                <Download size={14} />
+                {pullingProgram ? 'Pulling…' : 'Pull Program from Sheet'}
               </button>
               <button
                 onClick={generateFromSheet}

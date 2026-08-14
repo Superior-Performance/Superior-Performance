@@ -3,8 +3,8 @@
     "chats": {
       "$athleteUid": {
         "messages": {
-          ".read": "auth != null && (auth.uid == $athleteUid || root.child('users').child(auth.uid).child('role').val() == 'admin')",
-          ".write": "auth != null && (auth.uid == $athleteUid || root.child('users').child(auth.uid).child('role').val() == 'admin')"
+          ".read": "auth != null",
+          ".write": "auth != null"
         },
         "readBy": {
           ".read": "auth != null",

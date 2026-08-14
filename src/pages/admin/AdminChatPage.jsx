@@ -5,6 +5,8 @@ import { subscribeChat, sendMessage, markChatRead } from '../../firebase/realtim
 import { useAuth } from '../../context/AuthContext'
 import { Send, MessageCircle } from 'lucide-react'
 import { format, isToday, isYesterday } from 'date-fns'
+import EmptyState from '../../components/EmptyState'
+import toast from 'react-hot-toast'
 
 export default function AdminChatPage() {
   const { athleteUid } = useParams()
@@ -51,6 +53,8 @@ export default function AdminChatPage() {
         role: 'admin',
       })
       setText('')
+    } catch {
+      toast.error('Message could not be sent.')
     } finally {
       setSending(false)
     }
@@ -110,11 +114,8 @@ export default function AdminChatPage() {
 
         {/* Messages */}
         {!selected ? (
-          <div className="flex-1 flex items-center justify-center text-gray-400">
-            <div className="text-center">
-              <MessageCircle size={40} className="mx-auto mb-3 text-gray-200" />
-              <p className="text-sm">Select an athlete to start chatting</p>
-            </div>
+          <div className="flex-1 flex items-center justify-center">
+            <EmptyState icon={MessageCircle} title="Select an athlete" subtitle="Pick someone from the list to start chatting." compact />
           </div>
         ) : (
           <>
@@ -169,7 +170,7 @@ export default function AdminChatPage() {
               <button
                 type="submit"
                 disabled={!text.trim() || sending}
-                className="w-10 h-10 bg-brand-500 disabled:bg-gray-200 text-white rounded-xl flex items-center justify-center transition hover:bg-brand-600"
+                className="btn-brand w-10 h-10 rounded-xl flex items-center justify-center"
               >
                 <Send size={16} />
               </button>

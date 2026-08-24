@@ -17,8 +17,8 @@ import toast from 'react-hot-toast'
 const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 
 const TRACK_TYPES = [
-  { key: 'velo',   label: 'Velocity', unit: 'mph', Icon: Zap,      color: 'bg-yellow-50 text-yellow-600', dot: 'bg-yellow-400' },
-  { key: 'weight', label: 'Weight',   unit: 'lbs', Icon: Dumbbell, color: 'bg-blue-50 text-blue-600',    dot: 'bg-blue-400'   },
+  { key: 'velo',   label: 'Velocity', unit: 'mph', Icon: Zap,      dot: 'bg-amber-400', pill: 'bg-amber-500/15 text-amber-400', card: 'bg-amber-500/10 text-amber-300 border border-amber-500/20' },
+  { key: 'weight', label: 'Weight',   unit: 'lbs', Icon: Dumbbell, dot: 'bg-sky-400',   pill: 'bg-sky-500/15 text-sky-400',     card: 'bg-sky-500/10 text-sky-300 border border-sky-500/20' },
 ]
 
 export default function ProgressPage() {
@@ -99,11 +99,14 @@ export default function ProgressPage() {
 
   if (loading) return <PageLoader />
   if (programs.length === 0) return (
-    <EmptyState
-      icon={TrendingUp}
-      title="No program yet"
-      subtitle="Progress will appear once your coach assigns a program."
-    />
+    <div className="min-h-[calc(100vh-56px)] bg-sp-ink-900">
+      <EmptyState
+        icon={TrendingUp}
+        title="No program yet"
+        subtitle="Progress will appear once your coach assigns a program."
+        dark
+      />
+    </div>
   )
 
   const totalWeeks = Math.max(1, ...programs.map(p => p.weeks?.length || 0))
@@ -188,9 +191,9 @@ export default function ProgressPage() {
   const weightTrend   = weightEntries.slice(0, 10).map(l => l.value).reverse()
 
   return (
-    <div className="px-4 py-5 space-y-5 pb-24">
+    <div className="min-h-[calc(100vh-56px)] bg-sp-ink-900 px-4 py-4 space-y-4 pb-24">
       {/* Hero — overall progress ring + streak, the "gamified" front door */}
-      <div className="surface-brand relative overflow-hidden text-white rounded-2xl p-5">
+      <div className="surface-brand relative overflow-hidden text-white rounded-2xl p-4">
         <div
           className="absolute inset-0 pointer-events-none"
           style={{ background: 'radial-gradient(circle at 90% 100%, rgba(46,158,99,0.3), transparent 60%)' }}
@@ -212,20 +215,20 @@ export default function ProgressPage() {
       </div>
 
       {/* This week — bar-per-day completion, echoing a weekly report chart */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+      <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 p-4">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <p className="text-xs text-gray-400">This Week</p>
-            <p className="font-bold text-gray-900">Week {currentWeekIdx + 1}</p>
+            <p className="text-xs text-sp-ink-300">This Week</p>
+            <p className="font-bold text-white">Week {currentWeekIdx + 1}</p>
           </div>
-          <span className="text-xs text-gray-400">{weekDone}/{weekTotal} sessions · {weekPct}%</span>
+          <span className="text-xs text-sp-ink-300">{weekDone}/{weekTotal} sessions · {weekPct}%</span>
         </div>
         <WeekBarChart dayCount={dayCount(currentWeekIdx)} dayStats={(di) => dayStats(currentWeekIdx, di)} todayDayNum={pos.dayNum} />
       </div>
 
       {/* By program — correctives / throwing / lifting, differentiated */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-3">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">By Program</p>
+      <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 p-4 space-y-3">
+        <p className="text-xs font-semibold text-sp-ink-300 uppercase tracking-wider">By Program</p>
         {programBreakdown.map(({ program, total, done, pct }) => {
           const info = programTypeInfo(program.programType)
           return (
@@ -234,11 +237,11 @@ export default function ProgressPage() {
                 <div className="flex items-center gap-1.5">
                   <span className={`w-1.5 h-1.5 rounded-full ${info.dotClass}`} />
                   <span className={`text-xs font-bold uppercase tracking-wide ${info.textClass}`}>{info.shortLabel}</span>
-                  <span className="text-xs text-gray-400">{program.name}</span>
+                  <span className="text-xs text-sp-ink-300">{program.name}</span>
                 </div>
-                <span className="text-xs text-gray-400">{done}/{total}</span>
+                <span className="text-xs text-sp-ink-300">{done}/{total}</span>
               </div>
-              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
                 <div className={`h-full rounded-full transition-all ${info.dotClass}`} style={{ width: `${pct}%` }} />
               </div>
             </div>
@@ -248,19 +251,19 @@ export default function ProgressPage() {
 
       {/* Lift log — read-only, fed in from the Lift tab's inline weight fields */}
       {liftLog.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+        <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 p-4">
           <div className="flex items-center gap-1.5 mb-3">
-            <Dumbbell size={13} className="text-amber-500" />
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Lift Log</p>
+            <Dumbbell size={13} className="text-amber-400" />
+            <p className="text-xs font-semibold text-sp-ink-300 uppercase tracking-wider">Lift Log</p>
           </div>
           <div className="space-y-2.5">
             {liftLog.slice(0, 12).map((entry) => (
               <div key={entry.key} className="flex items-center justify-between">
-                <span className="text-sm text-gray-700 truncate mr-3">{entry.exercise || 'Exercise'}</span>
+                <span className="text-sm text-sp-ink-100 truncate mr-3">{entry.exercise || 'Exercise'}</span>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-sm font-semibold text-gray-900">{entry.value} lbs</span>
+                  <span className="text-sm font-semibold text-white">{entry.value} lbs</span>
                   {entry.updatedAt?.toMillis && (
-                    <span className="text-xs text-gray-400">{format(entry.updatedAt.toDate(), 'MMM d')}</span>
+                    <span className="text-xs text-sp-ink-300">{format(entry.updatedAt.toDate(), 'MMM d')}</span>
                   )}
                 </div>
               </div>
@@ -271,7 +274,7 @@ export default function ProgressPage() {
 
       {/* All weeks — the long-term program overview, migrated in from Schedule */}
       <div>
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">All Weeks</p>
+        <p className="text-xs font-semibold text-sp-ink-300 uppercase tracking-wider mb-3">All Weeks</p>
         <div className="space-y-2">
           {Array.from({ length: totalWeeks }, (_, wi) => {
             const { total, done } = weekStats(wi)
@@ -279,23 +282,23 @@ export default function ProgressPage() {
             const isCurrentWeek = wi === currentWeekIdx
             const isPast = wi < currentWeekIdx
             return (
-              <div key={wi} className={`bg-white rounded-xl px-4 py-3 border ${isCurrentWeek ? 'border-sp-green-200' : 'border-gray-100'} shadow-sm`}>
+              <div key={wi} className={`bg-sp-ink-800 rounded-xl px-4 py-3 border ${isCurrentWeek ? 'border-sp-green-500/40' : 'border-sp-ink-600'}`}>
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     {isPast
-                      ? <CheckCircle2 size={15} className="text-sp-green-400" />
+                      ? <CheckCircle2 size={15} className="text-sp-green-500" />
                       : isCurrentWeek
                         ? <div className="w-2 h-2 rounded-full bg-sp-green-500" />
-                        : <Lock size={13} className="text-gray-300" />
+                        : <Lock size={13} className="text-sp-ink-300" />
                     }
-                    <span className={`text-sm font-medium ${isCurrentWeek ? 'text-sp-green-600' : 'text-gray-700'}`}>
+                    <span className={`text-sm font-medium ${isCurrentWeek ? 'text-sp-green-500' : 'text-sp-ink-100'}`}>
                       Week {wi + 1}
-                      {isCurrentWeek && <span className="ml-1.5 text-[10px] bg-sp-green-100 text-sp-green-600 px-1.5 py-0.5 rounded-full">Current</span>}
+                      {isCurrentWeek && <span className="ml-1.5 text-[10px] bg-sp-green-500/15 text-sp-green-500 px-1.5 py-0.5 rounded-full">Current</span>}
                     </span>
                   </div>
-                  <span className="text-xs text-gray-400">{done}/{total}</span>
+                  <span className="text-xs text-sp-ink-300">{done}/{total}</span>
                 </div>
-                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
                   <div className="h-full bg-sp-green-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
                 </div>
               </div>
@@ -308,12 +311,12 @@ export default function ProgressPage() {
       <div>
         <div className="flex items-center gap-1.5 mb-3">
           <Trophy size={13} className="text-sp-green-500" />
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Performance Tracking</p>
+          <p className="text-xs font-semibold text-sp-ink-300 uppercase tracking-wider">Performance Tracking</p>
         </div>
 
         <div className="grid grid-cols-2 gap-3 mb-4">
-          <StatCard label="Best Velo" value={bestVelo} unit="mph" color="bg-yellow-50 text-yellow-600" trend={veloTrend} trendColor="#2E9E63" />
-          <StatCard label="Latest Weight" value={latestWeight} unit="lbs" color="bg-blue-50 text-blue-600" trend={weightTrend} trendColor="#278052" />
+          <StatCard label="Best Velo" value={bestVelo} unit="mph" cardClass={TRACK_TYPES[0].card} trend={veloTrend} trendColor="#2E9E63" />
+          <StatCard label="Latest Weight" value={latestWeight} unit="lbs" cardClass={TRACK_TYPES[1].card} trend={weightTrend} trendColor="#68BC8E" />
         </div>
 
         <div className="flex gap-2 mb-3">
@@ -322,7 +325,7 @@ export default function ProgressPage() {
               key={k}
               onClick={() => setLogFilter(k)}
               className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
-                logFilter === k ? 'bg-sp-green-500 text-white' : 'bg-white border border-gray-200 text-gray-600'
+                logFilter === k ? 'bg-sp-green-500 text-white' : 'bg-sp-ink-800 border border-sp-ink-600 text-sp-ink-300'
               }`}
             >
               {l}
@@ -332,25 +335,25 @@ export default function ProgressPage() {
 
         <div className="space-y-2">
           {filteredLogs.length === 0 && (
-            <p className="text-center text-gray-400 text-sm py-6">No entries yet. Tap + to log a PR.</p>
+            <p className="text-center text-sp-ink-300 text-sm py-6">No entries yet. Tap + to log a PR.</p>
           )}
           {filteredLogs.map((entry) => {
             const t = TRACK_TYPES.find(t => t.key === entry.type) || TRACK_TYPES[0]
             const { Icon, dot } = t
             return (
-              <div key={entry.id} className="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3 flex items-center gap-3">
+              <div key={entry.id} className="bg-sp-ink-800 rounded-xl border border-sp-ink-600 px-4 py-3 flex items-center gap-3">
                 <div className={`w-2 h-2 rounded-full flex-shrink-0 ${dot}`} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-1.5">
-                    <span className="font-bold text-gray-900">{entry.value}</span>
-                    <span className="text-xs text-gray-400">{t.unit}</span>
-                    {entry.exercise && <span className="text-xs text-gray-500 truncate">· {entry.exercise}</span>}
+                    <span className="font-bold text-white">{entry.value}</span>
+                    <span className="text-xs text-sp-ink-300">{t.unit}</span>
+                    {entry.exercise && <span className="text-xs text-sp-ink-300 truncate">· {entry.exercise}</span>}
                   </div>
-                  {entry.notes && <p className="text-xs text-gray-400 mt-0.5 truncate">{entry.notes}</p>}
+                  {entry.notes && <p className="text-xs text-sp-ink-300 mt-0.5 truncate">{entry.notes}</p>}
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <p className="text-xs text-gray-400">{entry.date ? format(new Date(entry.date), 'MMM d') : ''}</p>
-                  <p className={`text-[10px] font-medium mt-0.5 ${t.color} px-1.5 py-0.5 rounded-full`}>{t.label}</p>
+                  <p className="text-xs text-sp-ink-300">{entry.date ? format(new Date(entry.date), 'MMM d') : ''}</p>
+                  <p className={`text-[10px] font-medium mt-0.5 ${t.pill} px-1.5 py-0.5 rounded-full`}>{t.label}</p>
                 </div>
               </div>
             )
@@ -372,12 +375,12 @@ export default function ProgressPage() {
         <div className="fixed inset-0 z-50 flex items-end" onClick={() => setShowLogForm(false)}>
           <div className="absolute inset-0 bg-black/40" />
           <div
-            className="relative bg-white w-full rounded-t-3xl px-5 pt-5 pb-8 safe-bottom"
+            className="relative bg-sp-ink-800 w-full rounded-t-3xl px-5 pt-5 pb-8 safe-bottom border-t border-sp-ink-600"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-bold">Log Entry</h2>
-              <button onClick={() => setShowLogForm(false)} className="p-1"><X size={20} /></button>
+              <h2 className="text-lg font-bold text-white">Log Entry</h2>
+              <button onClick={() => setShowLogForm(false)} className="p-1 text-sp-ink-300"><X size={20} /></button>
             </div>
 
             <form onSubmit={handleLogSubmit} className="space-y-4">
@@ -388,7 +391,7 @@ export default function ProgressPage() {
                     type="button"
                     onClick={() => setLogType(t.key)}
                     className={`flex-1 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition ${
-                      logType === t.key ? 'bg-sp-green-500 text-white' : 'bg-gray-100 text-gray-600'
+                      logType === t.key ? 'bg-sp-green-500 text-white' : 'bg-white/5 text-sp-ink-300'
                     }`}
                   >
                     <t.Icon size={15} />
@@ -398,7 +401,7 @@ export default function ProgressPage() {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-gray-500 mb-1 block">
+                <label className="text-xs font-medium text-sp-ink-300 mb-1 block">
                   {TRACK_TYPES.find(t => t.key === logType)?.label} ({TRACK_TYPES.find(t => t.key === logType)?.unit})
                 </label>
                 <input
@@ -408,31 +411,31 @@ export default function ProgressPage() {
                   value={logValue}
                   onChange={(e) => setLogValue(e.target.value)}
                   placeholder={logType === 'velo' ? 'e.g. 87.5' : 'e.g. 185'}
-                  className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
+                  className="w-full px-4 py-3 bg-sp-ink-900 border border-sp-ink-600 text-white placeholder-sp-ink-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
                 />
               </div>
 
               {logType === 'weight' && (
                 <div>
-                  <label className="text-xs font-medium text-gray-500 mb-1 block">Exercise (optional)</label>
+                  <label className="text-xs font-medium text-sp-ink-300 mb-1 block">Exercise (optional)</label>
                   <input
                     type="text"
                     value={logExercise}
                     onChange={(e) => setLogExercise(e.target.value)}
                     placeholder="e.g. Squat, Bench"
-                    className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
+                    className="w-full px-4 py-3 bg-sp-ink-900 border border-sp-ink-600 text-white placeholder-sp-ink-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
                   />
                 </div>
               )}
 
               <div>
-                <label className="text-xs font-medium text-gray-500 mb-1 block">Notes (optional)</label>
+                <label className="text-xs font-medium text-sp-ink-300 mb-1 block">Notes (optional)</label>
                 <input
                   type="text"
                   value={logNotes}
                   onChange={(e) => setLogNotes(e.target.value)}
                   placeholder="How did it feel?"
-                  className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
+                  className="w-full px-4 py-3 bg-sp-ink-900 border border-sp-ink-600 text-white placeholder-sp-ink-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
                 />
               </div>
 
@@ -462,7 +465,7 @@ function WeekBarChart({ dayCount, dayStats, todayDayNum }) {
   })
 
   if (bars.length === 0) {
-    return <p className="text-xs text-gray-400 text-center py-6">Nothing scheduled this week.</p>
+    return <p className="text-xs text-sp-ink-300 text-center py-6">Nothing scheduled this week.</p>
   }
 
   return (
@@ -471,15 +474,15 @@ function WeekBarChart({ dayCount, dayStats, todayDayNum }) {
         const isToday = b.dayNum === todayDayNum
         return (
           <div key={b.dayNum} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
-            <div className="w-full flex-1 flex items-end bg-gray-100 rounded-md overflow-hidden">
+            <div className="w-full flex-1 flex items-end bg-white/5 rounded-md overflow-hidden">
               {b.total > 0 && (
                 <div
-                  className={`w-full rounded-md transition-all ${isToday ? 'bg-sp-green-500' : 'bg-sp-green-300'}`}
+                  className={`w-full rounded-md transition-all ${isToday ? 'bg-sp-green-500' : 'bg-sp-green-700'}`}
                   style={{ height: `${Math.max(b.pct, b.pct > 0 ? 8 : 0)}%` }}
                 />
               )}
             </div>
-            <span className={`text-[10px] font-semibold ${isToday ? 'text-sp-green-600' : 'text-gray-400'}`}>
+            <span className={`text-[10px] font-semibold ${isToday ? 'text-sp-green-500' : 'text-sp-ink-300'}`}>
               {DAY_LABELS[b.dayNum - 1] || ''}
             </span>
           </div>
@@ -489,10 +492,10 @@ function WeekBarChart({ dayCount, dayStats, todayDayNum }) {
   )
 }
 
-function StatCard({ label, value, unit, color, trend, trendColor }) {
+function StatCard({ label, value, unit, cardClass, trend, trendColor }) {
   return (
-    <div className={`${color} rounded-2xl p-4`}>
-      <p className="text-xs font-medium opacity-70 mb-1">{label}</p>
+    <div className={`${cardClass} rounded-2xl p-4`}>
+      <p className="text-xs font-medium opacity-80 mb-1">{label}</p>
       <div className="flex items-end justify-between gap-2">
         <p className="text-2xl font-bold">
           {value != null ? value : '—'}
@@ -507,7 +510,7 @@ function StatCard({ label, value, unit, color, trend, trendColor }) {
 }
 
 function PageLoader() {
-  return <div className="flex justify-center items-center min-h-[60vh]">
+  return <div className="flex justify-center items-center min-h-[calc(100vh-56px)] bg-sp-ink-900">
     <div className="w-8 h-8 border-2 border-sp-green-500 border-t-transparent rounded-full animate-spin" />
   </div>
 }

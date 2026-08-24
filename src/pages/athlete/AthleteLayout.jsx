@@ -79,8 +79,10 @@ export default function AthleteLayout() {
         <Outlet />
       </main>
 
-      {/* Bottom nav */}
-      <nav className="fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 safe-bottom z-50">
+      {/* Bottom nav — stays dark across every tab, light or dark page content
+          alike, so it reads as one consistent app chrome rather than
+          flipping tone depending on which page is open. */}
+      <nav className="fixed bottom-0 inset-x-0 bg-sp-ink-900 border-t border-sp-ink-600 safe-bottom z-50">
         <div className="flex px-1.5 py-1.5">
           {NAV.map(({ to, label, Icon }) => (
             <NavLink
@@ -88,7 +90,7 @@ export default function AthleteLayout() {
               to={to}
               className={({ isActive }) =>
                 `flex-1 flex flex-col items-center justify-center py-1.5 gap-0.5 rounded-xl mx-0.5 transition-colors ${
-                  isActive ? 'bg-sp-green-50 text-sp-green-600' : 'text-gray-400 hover:text-gray-600'
+                  isActive ? 'bg-sp-green-500/15 text-sp-green-500' : 'text-sp-ink-300 hover:text-white'
                 }`
               }
             >

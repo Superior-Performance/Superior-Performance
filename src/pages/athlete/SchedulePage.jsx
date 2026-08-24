@@ -201,11 +201,14 @@ export default function SchedulePage() {
 
   if (programs.length === 0) {
     return (
-      <EmptyState
-        icon={Dumbbell}
-        title="No program assigned yet"
-        subtitle="Your coach will assign a program soon."
-      />
+      <div className="min-h-[calc(100vh-56px)] bg-sp-ink-900">
+        <EmptyState
+          icon={Dumbbell}
+          title="No program assigned yet"
+          subtitle="Your coach will assign a program soon."
+          dark
+        />
+      </div>
     )
   }
 
@@ -214,7 +217,7 @@ export default function SchedulePage() {
 
   if (pos.notStartedYet) {
     return (
-      <div className="px-4 py-5">
+      <div className="min-h-[calc(100vh-56px)] bg-sp-ink-900 px-4 py-5">
         <UpdateNotice programs={updatedPrograms} onDismiss={dismissUpdateNotice} dismissing={dismissing} />
         <div className="surface-brand relative overflow-hidden text-white rounded-2xl p-8 text-center">
           <div
@@ -252,7 +255,7 @@ export default function SchedulePage() {
     .sort((a, b) => a.dayNum - b.dayNum)
 
   return (
-    <div className="px-4 py-5">
+    <div className="min-h-[calc(100vh-56px)] bg-sp-ink-900 px-4 py-4">
       <UpdateNotice programs={updatedPrograms} onDismiss={dismissUpdateNotice} dismissing={dismissing} />
 
       <TodayHero
@@ -267,10 +270,10 @@ export default function SchedulePage() {
       />
 
       {days.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center">
-          <Moon size={26} className="mx-auto mb-2 text-gray-300" />
-          <p className="text-sm font-medium text-gray-600">Rest day</p>
-          <p className="text-xs text-gray-400 mt-0.5">Nothing scheduled — recover up for the next one.</p>
+        <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 p-8 text-center">
+          <Moon size={26} className="mx-auto mb-2 text-sp-ink-300" />
+          <p className="text-sm font-medium text-white">Rest day</p>
+          <p className="text-xs text-sp-ink-300 mt-0.5">Nothing scheduled — recover up for the next one.</p>
         </div>
       ) : isRemote ? (
         <div className="space-y-3">
@@ -322,11 +325,11 @@ export default function SchedulePage() {
 function UpdateNotice({ programs, onDismiss, dismissing }) {
   if (programs.length === 0) return null
   return (
-    <div className="flex items-start gap-2.5 bg-sp-green-50 border border-sp-green-200 rounded-2xl px-4 py-3 mb-4">
-      <Sparkles size={16} className="text-sp-green-600 flex-shrink-0 mt-0.5" />
+    <div className="flex items-start gap-2.5 bg-sp-green-500/10 border border-sp-green-500/30 rounded-2xl px-4 py-3 mb-3">
+      <Sparkles size={16} className="text-sp-green-500 flex-shrink-0 mt-0.5" />
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-sp-green-800">Your coach updated your program</p>
-        <p className="text-xs text-sp-green-700 mt-0.5">
+        <p className="text-sm font-semibold text-sp-green-400">Your coach updated your program</p>
+        <p className="text-xs text-sp-green-300/80 mt-0.5">
           {programs.map(p => programTypeInfo(p.programType).shortLabel).join(' and ')}
           {programs.length === 1 ? ' has' : ' have'} changed. Anything you already
           checked off is still saved.
@@ -335,7 +338,7 @@ function UpdateNotice({ programs, onDismiss, dismissing }) {
       <button
         onClick={onDismiss}
         disabled={dismissing}
-        className="p-1 -m-1 text-sp-green-600 hover:text-sp-green-800 transition flex-shrink-0"
+        className="p-1 -m-1 text-sp-green-500 hover:text-sp-green-300 transition flex-shrink-0"
         aria-label="Dismiss"
       >
         <X size={16} />
@@ -353,7 +356,7 @@ function TodayHero({ isRemote, weekIdx, dayNum, pastProgram, streak, todayDone, 
 
   if (pastProgram) {
     return (
-      <div className="surface-brand relative overflow-hidden text-white rounded-2xl p-5 mb-5 text-center">
+      <div className="surface-brand relative overflow-hidden text-white rounded-2xl p-4 mb-4 text-center">
         <div
           className="absolute inset-0 pointer-events-none"
           style={{ background: 'radial-gradient(circle at 50% 0%, rgba(46,158,99,0.35), transparent 60%)' }}
@@ -368,7 +371,7 @@ function TodayHero({ isRemote, weekIdx, dayNum, pastProgram, streak, todayDone, 
   }
 
   return (
-    <div className="surface-brand relative overflow-hidden text-white rounded-2xl p-5 mb-5">
+    <div className="surface-brand relative overflow-hidden text-white rounded-2xl p-4 mb-4">
       <div
         className="absolute inset-0 pointer-events-none"
         style={{ background: 'radial-gradient(circle at 90% 0%, rgba(46,158,99,0.35), transparent 60%)' }}
@@ -425,7 +428,7 @@ function DayBody({
               key={t}
               onClick={() => onSelectType(t)}
               className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                activeType === t ? 'bg-sp-green-500 text-white' : 'bg-white border border-gray-200 text-gray-500'
+                activeType === t ? 'bg-sp-green-500 text-white' : 'bg-sp-ink-800 border border-sp-ink-600 text-sp-ink-300'
               }`}
             >
               {TAB_META[t].label}
@@ -435,7 +438,7 @@ function DayBody({
       )}
 
       {activeEntry && (
-        <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+        <div className="bg-sp-ink-800 rounded-2xl overflow-hidden border border-sp-ink-600">
           <CategoryTiles
             program={activeEntry.program}
             day={activeEntry.day}
@@ -479,28 +482,28 @@ function DayCard({
   const done = totalExercises > 0 && doneCount === totalExercises
 
   return (
-    <div className={`bg-white rounded-2xl overflow-hidden shadow-sm border transition ${done ? 'border-sp-green-200' : 'border-gray-100'}`}>
+    <div className={`bg-sp-ink-800 rounded-2xl overflow-hidden border transition ${done ? 'border-sp-green-500/40' : 'border-sp-ink-600'}`}>
       <div
         className="flex items-center px-4 py-3.5 cursor-pointer select-none"
         onClick={() => setExpanded(isExpanded ? null : key)}
       >
-        <div className={`w-9 h-9 rounded-full flex items-center justify-center mr-3 flex-shrink-0 ${done ? 'bg-sp-green-100' : 'bg-gray-100'}`}>
-          {done ? <CheckCircle2 size={20} className="text-sp-green-500" /> : <ListChecks size={16} className="text-gray-400" />}
+        <div className={`w-9 h-9 rounded-full flex items-center justify-center mr-3 flex-shrink-0 ${done ? 'bg-sp-green-500/20' : 'bg-white/5'}`}>
+          {done ? <CheckCircle2 size={20} className="text-sp-green-500" /> : <ListChecks size={16} className="text-sp-ink-300" />}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-gray-900 truncate">Focus {dayNum}</p>
-          <p className="text-xs text-gray-400">Tap to view</p>
+          <p className="font-semibold text-white truncate">Focus {dayNum}</p>
+          <p className="text-xs text-sp-ink-300">Tap to view</p>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${done ? 'bg-sp-green-50 text-sp-green-500' : 'bg-gray-50 text-gray-400'}`}>
+          <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${done ? 'bg-sp-green-500/15 text-sp-green-500' : 'bg-white/5 text-sp-ink-300'}`}>
             {doneCount}/{totalExercises}
           </span>
-          {isExpanded ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+          {isExpanded ? <ChevronUp size={16} className="text-sp-ink-300" /> : <ChevronDown size={16} className="text-sp-ink-300" />}
         </div>
       </div>
 
       {isExpanded && (
-        <div className="border-t border-gray-100 px-1 pt-1">
+        <div className="border-t border-sp-ink-600 px-1 pt-1">
           <DayBody
             entries={entries}
             weekIdx={weekIdx}
@@ -537,23 +540,23 @@ function CategoryTiles({
         const blockDone = block.slots.filter(slot => isSlotComplete(completions, program.id, slot, currentWeek, dayIdx)).length
 
         return (
-          <div key={block.key} className="border-b border-gray-50 last:border-0">
+          <div key={block.key} className="border-b border-sp-ink-600 last:border-0">
             <button
               onClick={() => toggleBlock(groupKey, block.key)}
-              className="w-full flex items-center justify-between gap-2 px-4 py-2.5 hover:bg-gray-50/60 transition"
+              className="w-full flex items-center justify-between gap-2 px-4 py-2.5 hover:bg-white/5 transition"
             >
               <div className="flex items-center gap-2 min-w-0">
-                <span className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 ${info.badgeClass}`}>
-                  <Icon size={13} />
+                <span className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 ${info.dotClass}`}>
+                  <Icon size={13} className="text-white" />
                 </span>
-                <span className="text-[11px] font-bold uppercase tracking-wide text-gray-700 truncate">{info.label}</span>
-                <span className="text-[11px] text-gray-400 flex-shrink-0">{blockDone}/{block.slots.length}</span>
+                <span className="text-[11px] font-bold uppercase tracking-wide text-sp-ink-100 truncate">{info.label}</span>
+                <span className="text-[11px] text-sp-ink-300 flex-shrink-0">{blockDone}/{block.slots.length}</span>
               </div>
-              {blockOpen ? <ChevronUp size={14} className="text-gray-300 flex-shrink-0" /> : <ChevronDown size={14} className="text-gray-300 flex-shrink-0" />}
+              {blockOpen ? <ChevronUp size={14} className="text-sp-ink-300 flex-shrink-0" /> : <ChevronDown size={14} className="text-sp-ink-300 flex-shrink-0" />}
             </button>
 
             {blockOpen && (
-              <div className="divide-y divide-gray-50">
+              <div className="divide-y divide-sp-ink-600/60">
                 {block.slots.map((slot) => slot.items.length > 1
                   ? (
                     <AltOptionSlot
@@ -618,7 +621,7 @@ function ExerciseRow({
       >
         {exDone
           ? <CheckCircle2 size={22} className="text-sp-green-500" />
-          : <Circle size={22} className="text-gray-300" />
+          : <Circle size={22} className="text-sp-ink-300" />
         }
       </button>
       <button
@@ -626,12 +629,12 @@ function ExerciseRow({
         className="flex-1 min-w-0 text-left"
       >
         <div className="flex items-center gap-1.5">
-          <p className={`font-medium text-sm truncate ${exDone ? 'text-gray-400 line-through' : 'text-gray-900'}`}>{ex.name}</p>
+          <p className={`font-medium text-sm truncate ${exDone ? 'text-sp-ink-300 line-through' : 'text-sp-ink-50'}`}>{ex.name}</p>
           {ex.notes && (
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" title="Note added — tap to view" />
           )}
         </div>
-        <p className="text-xs text-gray-400 mt-0.5">
+        <p className="text-xs text-sp-ink-300 mt-0.5">
           {[ex.sets && `${ex.sets} sets`, ex.reps && `${ex.reps} reps`, ex.intensity || ex.load]
             .filter(Boolean).join(' · ')}
         </p>
@@ -652,7 +655,7 @@ function AltOptionSlot({ slot, program, currentWeek, dayIdx, doneCount, totalExe
   const anyDone = isSlotComplete(completions, program.id, slot, currentWeek, dayIdx)
   return (
     <div className="px-4 py-3">
-      <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-1.5">Choose one</p>
+      <p className="text-[10px] font-bold uppercase tracking-wide text-sp-ink-300 mb-1.5">Choose one</p>
       <div className="space-y-1.5">
         {slot.items.map(({ ex, i }, pos) => {
           const exDone = isExerciseComplete(completions, program.id, ex, currentWeek, dayIdx, i)
@@ -661,7 +664,7 @@ function AltOptionSlot({ slot, program, currentWeek, dayIdx, doneCount, totalExe
             <div
               key={ex.id || i}
               className={`flex items-center gap-2 rounded-xl border px-2.5 py-2 transition ${
-                exDone ? 'border-sp-green-200 bg-sp-green-50' : 'border-gray-200'
+                exDone ? 'border-sp-green-500/40 bg-sp-green-500/10' : 'border-sp-ink-600'
               }`}
             >
               <button
@@ -674,18 +677,18 @@ function AltOptionSlot({ slot, program, currentWeek, dayIdx, doneCount, totalExe
               >
                 {exDone
                   ? <CheckCircle2 size={20} className="text-sp-green-500" />
-                  : <Circle size={20} className="text-gray-300" />
+                  : <Circle size={20} className="text-sp-ink-300" />
                 }
               </button>
               <button onClick={() => onOpenDetail({ ex, program })} className="flex-1 min-w-0 text-left">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] font-bold text-gray-400 flex-shrink-0">{pos === 0 ? 'A' : 'B'}</span>
-                  <p className={`font-medium text-sm truncate ${exDone ? 'text-gray-400 line-through' : 'text-gray-900'}`}>{ex.name}</p>
+                  <span className="text-[10px] font-bold text-sp-ink-300 flex-shrink-0">{pos === 0 ? 'A' : 'B'}</span>
+                  <p className={`font-medium text-sm truncate ${exDone ? 'text-sp-ink-300 line-through' : 'text-sp-ink-50'}`}>{ex.name}</p>
                   {ex.notes && (
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" title="Note added — tap to view" />
                   )}
                 </div>
-                <p className="text-xs text-gray-400 mt-0.5 pl-4">
+                <p className="text-xs text-sp-ink-300 mt-0.5 pl-4">
                   {[ex.sets && `${ex.sets} sets`, ex.reps && `${ex.reps} reps`, ex.intensity || ex.load]
                     .filter(Boolean).join(' · ')}
                 </p>
@@ -709,22 +712,22 @@ function ExerciseDetailModal({ detail, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl w-full max-w-sm max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start justify-between px-5 py-4 border-b border-gray-100">
+      <div className="bg-sp-ink-800 rounded-2xl w-full max-w-sm max-h-[85vh] overflow-y-auto border border-sp-ink-600" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between px-5 py-4 border-b border-sp-ink-600">
           <div className="min-w-0">
-            <p className="font-bold text-gray-900">{ex.name}</p>
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="font-bold text-sp-ink-50">{ex.name}</p>
+            <p className="text-xs text-sp-ink-300 mt-0.5">
               {[ex.sets && `${ex.sets} sets`, ex.reps && `${ex.reps} reps`, ex.intensity || ex.load].filter(Boolean).join(' · ')}
             </p>
           </div>
-          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg transition flex-shrink-0"><X size={18} /></button>
+          <button onClick={onClose} className="p-1.5 hover:bg-white/10 rounded-lg transition flex-shrink-0 text-sp-ink-300"><X size={18} /></button>
         </div>
 
         <div className="p-5 space-y-4">
           {ex.notes && (
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Notes</p>
-              <p className="text-sm text-gray-700">{ex.notes}</p>
+              <p className="text-xs font-semibold text-sp-ink-300 uppercase tracking-wide mb-1">Notes</p>
+              <p className="text-sm text-sp-ink-100">{ex.notes}</p>
             </div>
           )}
 
@@ -750,7 +753,7 @@ function ExerciseDetailModal({ detail, onClose }) {
           )}
 
           {!ex.notes && !ex.videoUrl && (
-            <p className="text-sm text-gray-400">No additional details for this exercise.</p>
+            <p className="text-sm text-sp-ink-300">No additional details for this exercise.</p>
           )}
         </div>
       </div>
@@ -788,7 +791,7 @@ function WeightField({ value, onSave }) {
         onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
         placeholder="lbs"
         disabled={saving}
-        className="w-14 px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-center text-gray-700 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-sp-green-500 disabled:opacity-60"
+        className="w-14 px-2 py-1.5 bg-sp-ink-900 border border-sp-ink-600 rounded-lg text-xs text-center text-sp-ink-50 placeholder-sp-ink-300 focus:outline-none focus:ring-2 focus:ring-sp-green-500 disabled:opacity-60"
       />
     </div>
   )
@@ -796,7 +799,7 @@ function WeightField({ value, onSave }) {
 
 function PageLoader() {
   return (
-    <div className="flex justify-center items-center min-h-[60vh]">
+    <div className="flex justify-center items-center min-h-[calc(100vh-56px)] bg-sp-ink-900">
       <div className="w-8 h-8 border-3 border-sp-green-500 border-t-transparent rounded-full animate-spin" />
     </div>
   )

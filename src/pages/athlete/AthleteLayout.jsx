@@ -1,17 +1,18 @@
 import { Outlet, NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import {
-  CalendarDays, MessageCircle, TrendingUp, BarChart2, Activity, LogOut, UserCircle, ExternalLink,
+  Flame, MessageCircle, TrendingUp, Activity, LogOut, UserCircle, ExternalLink,
 } from 'lucide-react'
 import Logo from '../../components/Logo'
 
+// "Track" no longer gets its own tab — velo/weight PR logging moved into
+// Progress alongside the rest of the long-term view. See ProgressPage.
 const NAV = [
-  { to: 'schedule', label: 'Schedule',  Icon: CalendarDays },
-  { to: 'progress', label: 'Progress',  Icon: TrendingUp    },
-  { to: 'data',     label: 'Track',     Icon: BarChart2     },
-  { to: 'chat',     label: 'Chat',      Icon: MessageCircle },
-  { to: 'rapsodo',  label: 'Rapsodo',   Icon: Activity      },
-  { to: 'account',  label: 'Account',   Icon: UserCircle    },
+  { to: 'schedule', label: 'Today',    Icon: Flame         },
+  { to: 'progress', label: 'Progress', Icon: TrendingUp    },
+  { to: 'chat',     label: 'Chat',     Icon: MessageCircle },
+  { to: 'rapsodo',  label: 'Rapsodo',  Icon: Activity      },
+  { to: 'account',  label: 'Account',  Icon: UserCircle    },
 ]
 
 export default function AthleteLayout() {

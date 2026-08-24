@@ -2,15 +2,20 @@
  * Firestore helper functions
  *
  * Collections:
- *  users/{uid}               — { name, email, role: 'athlete'|'admin', programId?, createdAt }
- *  programs/{programId}      — { name, athleteId, totalWeeks, weeks: [...], createdAt, active }
+ *  users/{uid}               — { name, email, role: 'athlete'|'admin', programTypes?: string[], createdAt }
+ *  programs/{programId}      — { name, athleteId, programType: 'correctives'|'throwing'|'lifting', totalWeeks, weeks: [...], startDate?, createdAt, active }
  *  dataLogs/{uid}/entries/{} — { date, type: 'velo'|'weight', value, exercise?, notes, createdAt }
  *  assessments/{uid}         — { scores: {...}, programId, updatedAt }
+ *
+ * An athlete can have up to one *active* program per programType at a time —
+ * correctives, throwing, and lifting run concurrently rather than one program
+ * at a time. Programs missing `programType` predate this and are treated as
+ * 'correctives' everywhere they're read.
  */
 import {
   collection, doc, getDoc, getDocs, setDoc, addDoc,
   updateDoc, deleteDoc, query, where, orderBy, onSnapshot,
-  serverTimestamp, Timestamp,
+  serverTimestamp, Timestamp, writeBatch,
 } from 'firebase/firestore'
 import { db } from './config'
 
@@ -33,6 +38,8 @@ export const getAllAthletes = () =>
 export const getProgram = (programId) =>
   getDoc(doc(db, 'programs', programId))
 
+// Returns every active program for this athlete — up to one per programType
+// (correctives/throwing/lifting), since all three can run concurrently.
 export const getProgramForAthlete = (athleteId) =>
   getDocs(query(
     collection(db, 'programs'),
@@ -48,8 +55,16 @@ export const createProgram = (data) =>
 export const updateProgram = (programId, data) =>
   updateDoc(doc(db, 'programs', programId), data)
 
+// Edit to a program the athlete can already see. Stamps lastEditedAt so their
+// schedule can show a "your coach updated this" banner.
+export const updateLiveProgram = (programId, data) =>
+  updateDoc(doc(db, 'programs', programId), { ...data, lastEditedAt: serverTimestamp() })
+
 export const getAllPrograms = () =>
   getDocs(query(collection(db, 'programs'), orderBy('createdAt', 'desc')))
+
+export const deleteProgram = (programId) =>
+  deleteDoc(doc(db, 'programs', programId))
 
 // ── Data Logs ────────────────────────────────────────────────────────────────
 export const addDataLog = (uid, entry) =>
@@ -80,6 +95,16 @@ export const getAssessment = (uid) =>
 export const saveAssessment = (uid, data) =>
   setDoc(doc(db, 'assessments', uid), { ...data, updatedAt: serverTimestamp() }, { merge: true })
 
+// ── Athlete preferences ──────────────────────────────────────────────────────
+// athletePrefs/{uid} — { programNoticesSeen: { [programId]: millis } }
+// Deliberately separate from users/{uid}, which is admin-write-only because it
+// carries `role`. Nothing in here is security-relevant, so athletes own it.
+export const getAthletePrefs = (uid) =>
+  getDoc(doc(db, 'athletePrefs', uid))
+
+export const saveAthletePrefs = (uid, data) =>
+  setDoc(doc(db, 'athletePrefs', uid), data, { merge: true })
+
 // ── App Settings ─────────────────────────────────────────────────────────────
 // settings/global — { sheetsScriptUrl: string, assessmentSheetScriptUrl: string }
 export const getSettings = () =>
@@ -88,17 +113,77 @@ export const getSettings = () =>
 export const saveSettings = (data) =>
   setDoc(doc(db, 'settings', 'global'), data, { merge: true })
 
+// settings/public — { inquiryScriptUrl: string }. Readable while signed out
+// (see firestore.rules) so the landing page's inquiry form can reach it.
+export const getPublicSettings = () =>
+  getDoc(doc(db, 'settings', 'public'))
+
+export const savePublicSettings = (data) =>
+  setDoc(doc(db, 'settings', 'public'), data, { merge: true })
+
 // ── Workout completion ────────────────────────────────────────────────────────
-// completions/{uid}/weeks/{weekDay}  — { completed: true, completedAt }
-export const markWorkoutComplete = (uid, weekIdx, dayIdx) =>
+// completions/{uid}/weeks/{completionKey}  — { completed: true, completedAt }
+//
+// completionKey is `${programId}_${exercise.id}`. It used to be positional
+// (`${programId}_${week}_${day}_${exercise}`), which broke as soon as a coach
+// edited a live program — deleting one exercise shifted every checkmark after
+// it onto the wrong row. Both formats are readable; see src/utils/programIds.js.
+// Callers build the key with keyForWrite() rather than assembling it here.
+// Toggling off just flips `completed` back to false rather than deleting the
+// doc — keeps completedAt as a "last touched" timestamp and avoids a delete
+// racing a concurrent write.
+export const setExerciseComplete = (uid, completionKey, completed) =>
   setDoc(
-    doc(db, 'completions', uid, 'weeks', `${weekIdx}_${dayIdx}`),
-    { completed: true, completedAt: serverTimestamp() },
+    doc(db, 'completions', uid, 'weeks', completionKey),
+    { completed, completedAt: serverTimestamp() },
     { merge: true },
   )
+
+/**
+ * Move completion docs from legacy positional keys onto stable exercise-id keys.
+ *
+ * `remaps` is [{ from, to }]. Missing source docs are skipped, so this is safe
+ * to run repeatedly and safe when the athlete never completed anything. Done in
+ * one batch so a partial failure can't leave completions split across formats.
+ */
+export const migrateCompletionKeys = async (uid, remaps) => {
+  if (!remaps || remaps.length === 0) return 0
+  const existing = await getDocs(collection(db, 'completions', uid, 'weeks'))
+  const byId = {}
+  existing.forEach((d) => { byId[d.id] = d.data() })
+
+  const batch = writeBatch(db)
+  let moved = 0
+  for (const { from, to } of remaps) {
+    if (from === to) continue
+    const data = byId[from]
+    if (!data) continue                 // nothing was completed at that position
+    if (byId[to]) continue              // already migrated — don't clobber
+    batch.set(doc(db, 'completions', uid, 'weeks', to), data, { merge: true })
+    batch.delete(doc(db, 'completions', uid, 'weeks', from))
+    moved++
+  }
+  if (moved > 0) await batch.commit()
+  return moved
+}
 
 export const getCompletions = (uid) =>
   getDocs(collection(db, 'completions', uid, 'weeks'))
 
 export const subscribeCompletions = (uid, callback) =>
   onSnapshot(collection(db, 'completions', uid, 'weeks'), callback)
+
+// ── Exercise weight tracking ───────────────────────────────────────────────────
+// exerciseWeights/{uid}/entries/{programId_exerciseId} — { value, exercise, updatedAt }
+// One editable value per exercise instance — the athlete logs this week's
+// working weight inline on the program tab, mid-workout. This is a current
+// value, not a growing history (see dataLogs for that).
+export const saveExerciseWeight = (uid, key, data) =>
+  setDoc(
+    doc(db, 'exerciseWeights', uid, 'entries', key),
+    { ...data, updatedAt: serverTimestamp() },
+    { merge: true },
+  )
+
+export const subscribeExerciseWeights = (uid, callback) =>
+  onSnapshot(collection(db, 'exerciseWeights', uid, 'entries'), callback)

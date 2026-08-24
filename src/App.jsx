@@ -10,7 +10,6 @@ import AthleteLayout from './pages/athlete/AthleteLayout'
 import SchedulePage   from './pages/athlete/SchedulePage'
 import ChatPage       from './pages/athlete/ChatPage'
 import ProgressPage   from './pages/athlete/ProgressPage'
-import DataPage       from './pages/athlete/DataPage'
 import RapsodoPage    from './pages/athlete/RapsodoPage'
 import AccountPage    from './pages/athlete/AccountPage'
 
@@ -71,7 +70,6 @@ export default function App() {
         <Route path="schedule" element={<SchedulePage />} />
         <Route path="chat"     element={<ChatPage />} />
         <Route path="progress" element={<ProgressPage />} />
-        <Route path="data"     element={<DataPage />} />
         <Route path="rapsodo"  element={<RapsodoPage />} />
         <Route path="account"  element={<AccountPage />} />
       </Route>

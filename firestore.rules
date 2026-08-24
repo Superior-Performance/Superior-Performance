@@ -40,15 +40,39 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Completions: athletes write their own; admins read all
+    // Completions: athletes write their own; admins read and write all.
+    // Admin writes are needed so editing a live program can move an athlete's
+    // existing completions onto stable exercise-id keys (see utils/programIds),
+    // and so a coach can correct a mis-tapped checkmark.
     match /completions/{uid}/weeks/{key} {
       allow read:  if isAdmin() || (isAuth() && request.auth.uid == uid);
-      allow write: if isAuth() && request.auth.uid == uid;
+      allow write: if isAdmin() || (isAuth() && request.auth.uid == uid);
     }
 
-    // App settings: admins only
+    // Athlete-owned UI preferences — dismissed banners and the like. Kept out
+    // of users/{uid} on purpose: that doc holds role and is admin-write-only,
+    // and nothing here is security-relevant.
+    match /athletePrefs/{uid} {
+      allow read:  if isAdmin() || (isAuth() && request.auth.uid == uid);
+      allow write: if isAdmin() || (isAuth() && request.auth.uid == uid);
+    }
+
+    // Exercise weight tracking — one editable "this week's weight" value per
+    // exercise instance, logged inline on the athlete's program tab so they
+    // don't have to leave it mid-workout. Not a history (see dataLogs for
+    // that) — same read/write shape as completions.
+    match /exerciseWeights/{uid}/entries/{key} {
+      allow read:  if isAdmin() || (isAuth() && request.auth.uid == uid);
+      allow write: if isAdmin() || (isAuth() && request.auth.uid == uid);
+    }
+
+    // App settings: admin-only, except settings/public — the landing page's
+    // inquiry form needs to read its Apps Script URL while signed out. Nothing
+    // sensitive lives there (an "Anyone can execute" script URL isn't a secret;
+    // it's already callable by anyone who has it, same as the other integrations).
     match /settings/{docId} {
-      allow read, write: if isAdmin();
+      allow read:  if isAdmin() || docId == 'public';
+      allow write: if isAdmin();
     }
   }
 }

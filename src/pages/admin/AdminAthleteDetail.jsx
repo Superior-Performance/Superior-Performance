@@ -3,15 +3,18 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   getUser, getAllPrograms, getAssessment, saveAssessment,
   updateUser, deleteUser, getProgramForAthlete, updateProgram,
+  updateLiveProgram, migrateCompletionKeys,
   createProgram, getSettings,
 } from '../../firebase/firestore'
 import { getDataLogs } from '../../firebase/firestore'
-import { ArrowLeft, Save, Zap, Dumbbell, MessageCircle, Pencil, Trash2, X, Sparkles, KeyRound, XCircle, FileSpreadsheet, Download } from 'lucide-react'
+import { ensureExerciseIds, completionKey, legacyCompletionKey, makeExerciseId } from '../../utils/programIds'
+import { ArrowLeft, Save, Zap, Dumbbell, MessageCircle, Pencil, Trash2, X, Sparkles, KeyRound, XCircle, FileSpreadsheet, Download, ChevronDown } from 'lucide-react'
 import { sendPasswordResetEmail } from 'firebase/auth'
 import { auth } from '../../firebase/config'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 import ProgramEditorModal from '../../components/ProgramEditorModal'
+import { PROGRAM_TYPES } from '../../constants/programTypes'
 
 // Mirrors the "Assessment Intake" Google Sheet column-for-column (minus
 // Athlete Name, which the app already tracks) so the saved doc can be handed
@@ -31,6 +34,15 @@ const FIELD_GROUPS = [
       { key: 'sportPosition',  label: 'Sport / Position', type: 'text' },
       { key: 'handedness',     label: 'Handedness',       type: 'select', options: ['Left', 'Right'] },
       { key: 'injuryHistory',  label: 'Injury History / Pain (red flags)', type: 'text', wide: true },
+    ],
+  },
+  {
+    title: 'Program Planning',
+    fields: [
+      { key: 'programLengthWeeks',   label: 'Program Length (weeks)', type: 'number' },
+      { key: 'trainingDaysPerWeek',  label: 'Training Days per Week', type: 'number' },
+      { key: 'trainingPhase',        label: 'Training Phase', type: 'select', options: ['Off-season', 'Pre-season / Ramp-up', 'In-season', 'Post-season', 'Return to Throw'] },
+      { key: 'equipmentAccess',      label: 'Equipment Access', type: 'text', wide: true },
     ],
   },
   {
@@ -104,7 +116,7 @@ export default function AdminAthleteDetail() {
   const { uid } = useParams()
   const navigate = useNavigate()
   const [athlete, setAthlete]       = useState(null)
-  const [program, setProgram]       = useState(null)
+  const [activePrograms, setActivePrograms] = useState({}) // { correctives, throwing, lifting } -> program | undefined
   const [programs, setPrograms]     = useState([])
   const [assessment, setAssessment] = useState({})
   const [logs, setLogs]             = useState([])
@@ -112,13 +124,20 @@ export default function AdminAthleteDetail() {
   const [loadError, setLoadError]   = useState(null)
   const [saving, setSaving]         = useState(false)
   const [sendingToSheet, setSendingToSheet] = useState(false)
-  const [pullingProgram, setPullingProgram] = useState(false)
+  const [pullingOutputs, setPullingOutputs]         = useState(false)
+  const [pullingThrowingOutputs, setPullingThrowingOutputs] = useState(false)
+  const [pullingMobilityOutputs, setPullingMobilityOutputs] = useState(false)
+  const [pullingLiftingOutputs, setPullingLiftingOutputs]   = useState(false)
+  const [pullingAllOutputs, setPullingAllOutputs]           = useState(false)
+  const [showGenerateMenu, setShowGenerateMenu]     = useState(false)
   const [editingDraft, setEditingDraft]     = useState(null)
+  const [editingLive, setEditingLive]       = useState(null)   // an already-published program
   const [tab, setTab]               = useState('assessment')
   const [showEdit, setShowEdit]     = useState(false)
   const [showDelete, setShowDelete] = useState(false)
   const [editName, setEditName]     = useState('')
   const [editEmail, setEditEmail]   = useState('')
+  const [editAthleteType, setEditAthleteType] = useState('in_house')
 
   useEffect(() => {
     load()
@@ -136,7 +155,12 @@ export default function AdminAthleteDetail() {
         getDataLogs(uid),
       ])
       setAthlete(userSnap.exists() ? { id: uid, ...userSnap.data() } : null)
-      setProgram(!progSnap.empty ? { id: progSnap.docs[0].id, ...progSnap.docs[0].data() } : null)
+      const active = {}
+      progSnap.docs.forEach(d => {
+        const data = d.data()
+        active[data.programType || 'correctives'] = { id: d.id, ...data }
+      })
+      setActivePrograms(active)
       if (assessSnap.exists()) {
         const { updatedAt, ...data } = assessSnap.data()
         setAssessment(data)
@@ -168,6 +192,7 @@ export default function AdminAthleteDetail() {
   function openEdit() {
     setEditName(athlete.name || '')
     setEditEmail(athlete.email || '')
+    setEditAthleteType(athlete.athleteType || 'in_house')
     setShowEdit(true)
   }
 
@@ -175,8 +200,8 @@ export default function AdminAthleteDetail() {
     e.preventDefault()
     setSaving(true)
     try {
-      await updateUser(uid, { name: editName, email: editEmail })
-      setAthlete(a => ({ ...a, name: editName, email: editEmail }))
+      await updateUser(uid, { name: editName, email: editEmail, athleteType: editAthleteType })
+      setAthlete(a => ({ ...a, name: editName, email: editEmail, athleteType: editAthleteType }))
       setShowEdit(false)
       toast.success('Athlete updated!')
     } catch {
@@ -227,30 +252,74 @@ export default function AdminAthleteDetail() {
     }
   }
 
-  // Shared by generateFromSheet and pullProgramFromSheet — both end up with the
-  // same flat row shape (Week, Day, Category, Exercise, Sets, Reps, Intensity, Notes).
-  // Creates a DRAFT (active: false) rather than publishing straight to the
-  // athlete, so it can be reviewed and edited first — see the Drafts Awaiting
-  // Review section on the Program tab.
-  async function createDraftFromRows(rows, programName) {
+  const WEEKDAY_TO_NUM = { monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6, sunday: 7 }
+
+  // Coaches write Week/Day as either a single number ("2"), a labeled number
+  // ("Day 2", "Week 2"), a repeating range ("1-4", "1-3 (every training
+  // day)") to mean "this block runs on every one of these weeks/days," or —
+  // for in-house athletes with set training days — a weekday name
+  // ("Monday", "Friday (optional)"). Weekday names map to a stable
+  // Mon=1..Sun=7 so each real day lands on its own bucket instead of
+  // collapsing into Day 1 — and "Day 1"/"Day 2"/"Day 3" must have their
+  // label stripped first or they'd all fail to parse and collapse the same way.
+  function parseWeekOrDayRange(raw) {
+    const str = String(raw ?? '').trim().replace(/^(day|week)\s+/i, '')
+    const range = str.match(/^(\d+)\s*-\s*(\d+)/)
+    if (range) {
+      const start = Number(range[1])
+      const end   = Number(range[2])
+      const nums = []
+      for (let n = start; n <= end; n++) nums.push(n)
+      return nums.length ? nums : [1]
+    }
+    const single = Number(str.match(/^\d+/)?.[0])
+    if (Number.isFinite(single)) return [single]
+    const weekday = WEEKDAY_TO_NUM[str.replace(/\(.*?\)/g, '').trim().toLowerCase()]
+    return weekday ? [weekday] : [1]
+  }
+
+  // Shared by every Outputs-tab pull — all end up with the same flat row
+  // shape (Week, Day, Category, Exercise, Sets, Reps, Intensity, Notes,
+  // Video URL). The Outputs tabs call their category column "Type" and
+  // their Day column can be blank (one session a week) or a weekday name —
+  // both are handled here so every pull path shares one code path. Creates
+  // a DRAFT (active: false) rather than publishing straight to the athlete,
+  // so it can be reviewed and edited first — see the Drafts Awaiting Review
+  // section on the Program tab. programType determines which of the
+  // athlete's 4 concurrent program slots this fills.
+  async function createDraftFromRows(rows, programName, programType = 'correctives') {
     const weeksMap = {}
     rows.forEach(row => {
-      const wk  = Number(row['Week'])  || 1
-      const day = Number(row['Day'])   || 1
-      if (!weeksMap[wk]) weeksMap[wk] = { weekNum: wk, days: {} }
-      if (!weeksMap[wk].days[day]) {
-        weeksMap[wk].days[day] = {
-          dayNum: day,
-          category: row['Category'] || '',
-          exercises: [],
-        }
-      }
-      weeksMap[wk].days[day].exercises.push({
-        name:      row['Exercise']  || '',
-        sets:      row['Sets']      || '',
-        reps:      row['Reps']      || '',
-        intensity: row['Intensity'] || '',
-        notes:     row['Notes']     || '',
+      const weekNums = parseWeekOrDayRange(row['Week'])
+      const dayNums  = row['Day'] !== undefined && row['Day'] !== ''
+        ? parseWeekOrDayRange(row['Day'])
+        : [1]
+      const dayOptional = /\(optional\)/i.test(String(row['Day'] ?? ''))
+      weekNums.forEach(wk => {
+        if (!weeksMap[wk]) weeksMap[wk] = { weekNum: wk, days: {} }
+        dayNums.forEach(day => {
+          if (!weeksMap[wk].days[day]) {
+            weeksMap[wk].days[day] = {
+              dayNum: day,
+              optional: dayOptional,
+              exercises: [],
+            }
+          }
+          weeksMap[wk].days[day].exercises.push({
+            id:        makeExerciseId(),   // stable across later edits — see utils/programIds
+            name:      row['Exercise']  || '',
+            sets:      row['Sets']      || '',
+            reps:      row['Reps']      || '',
+            intensity: row['Intensity'] || '',
+            notes:     row['Notes']     || '',
+            // Per-exercise, not per-day — one day can mix Mobilization,
+            // Correctives, Movement Activation and a plyo routine. See
+            // constants/programTypes.js for the category taxonomy. "Type" is
+            // the outputs tab's name for the same column.
+            category:  row['Category']  || row['Type'] || '',
+            videoUrl:  row['Video URL'] || row['Video'] || '',
+          })
+        })
       })
     })
 
@@ -264,8 +333,12 @@ export default function AdminAthleteDetail() {
     await createProgram({
       name:       programName,
       athleteId:  uid,
+      programType,
       totalWeeks: weeks.length,
       weeks,
+      // Defaults to today — the coach can adjust it in the review editor
+      // before publishing, since it's what sets the athlete's Day 1.
+      startDate:  new Date().toISOString().slice(0, 10),
       active:     false,
     })
 
@@ -273,47 +346,75 @@ export default function AdminAthleteDetail() {
     setPrograms(allProgs.docs.map(d => ({ id: d.id, ...d.data() })))
   }
 
-  async function generateFromSheet() {
-    setSaving(true)
-    try {
-      // 1. Get the Apps Script URL from settings
-      const settingsSnap = await getSettings()
-      const scriptUrl = settingsSnap.exists() ? settingsSnap.data().sheetsScriptUrl : ''
-      if (!scriptUrl) {
-        toast.error('No Apps Script URL set. Go to Settings first.')
-        return
-      }
+  // The coach's Sheet splits its exercise output across several tabs now —
+  // Mobilization/Correctives/Movement Activation in "Pre-Throw Outputs", the
+  // plyo routines in "Plyo Outputs", and one tab each for Mobility and
+  // Lifting. pullOutputs needs a `tab` param and returns just that tab's
+  // rows. Throwing/Post-Throw and Pre-Throw each pull two tabs and still
+  // land as one program with category tiles, exactly like when it was one
+  // tab; Mobility and Lifting each pull a single tab into their own program.
+  const OUTPUT_PULL_GROUPS = [
+    { tabs: ['Pre-Throw Outputs'],                                  programType: 'correctives', nameSuffix: 'Program',  label: 'Pre-Throw' },
+    { tabs: ['Throwing/Post-Throw Outputs', 'Plyo Outputs'],   programType: 'throwing',    nameSuffix: 'Throwing', label: 'Throwing/Post-Throw' },
+    { tabs: ['Lifting Outputs'],                                    programType: 'lifting',     nameSuffix: 'Lifting',  label: 'Lifting' },
+    { tabs: ['Mobility Outputs'],                                   programType: 'mobility',    nameSuffix: 'Mobility', label: 'Mobility' },
+  ]
 
-      // 2. Build query string from current assessment scores
+  // No toast here — callers decide how to report results, since the
+  // "combined" pull needs one summary toast instead of one per group.
+  async function fetchOutputDraft(scriptUrl, { tabs, programType, nameSuffix, label }) {
+    const results = await Promise.all(tabs.map(async (tabName) => {
       const params = new URLSearchParams()
-      Object.entries(assessment).forEach(([k, v]) => { if (v) params.set(k, v) })
+      params.set('action', 'pullOutputs')
+      params.set('tab', tabName)
       params.set('athleteName', athlete.name)
-
-      // 3. Call the Apps Script (GET with query params avoids CORS redirect issues)
       const res = await fetch(`${scriptUrl}?${params.toString()}`)
-      const json = await res.json()
+      return res.json()
+    }))
 
-      if (!json.success || !json.program?.length) {
-        toast.error(json.error || 'Sheet returned no program data.')
+    const failed = results.find(r => !r.success)
+    const rows = results.flatMap(r => r.program || [])
+    if (!rows.length) return { label, ok: false, error: failed?.error || `No rows in ${tabs.join(' or ')}` }
+
+    await createDraftFromRows(rows, `${athlete.name} — ${nameSuffix}`, programType)
+    return { label, ok: true, count: rows.length }
+  }
+
+  async function pullOneGroup(group, setPulling) {
+    setPulling(true)
+    try {
+      const settingsSnap = await getSettings()
+      const scriptUrl = settingsSnap.exists() ? settingsSnap.data().assessmentSheetScriptUrl : ''
+      if (!scriptUrl) {
+        toast.error('No Assessment Intake script URL set. Go to Settings first.')
         return
       }
-
-      await createDraftFromRows(json.program, `${athlete.name} — Generated Program`)
-      toast.success('Draft created — review it below before publishing.')
+      const result = await fetchOutputDraft(scriptUrl, group)
+      if (!result.ok) {
+        toast.error(result.error)
+        return
+      }
+      toast.success(`Draft pulled from ${group.tabs.join(' + ')} — review it below before publishing.`)
     } catch (err) {
       console.error(err)
-      toast.error('Generation failed: ' + (err.message || 'Unknown error'))
+      toast.error('Could not reach the sheet: ' + (err.message || 'Unknown error'))
     } finally {
-      setSaving(false)
+      setPulling(false)
     }
   }
 
-  async function pullProgramFromSheet() {
-    setPullingProgram(true)
+  const pullOutputsFromSheet         = () => pullOneGroup(OUTPUT_PULL_GROUPS[0], setPullingOutputs)
+  const pullThrowingOutputsFromSheet = () => pullOneGroup(OUTPUT_PULL_GROUPS[1], setPullingThrowingOutputs)
+  const pullLiftingOutputsFromSheet  = () => pullOneGroup(OUTPUT_PULL_GROUPS[2], setPullingLiftingOutputs)
+  const pullMobilityOutputsFromSheet = () => pullOneGroup(OUTPUT_PULL_GROUPS[3], setPullingMobilityOutputs)
+
+  // "All combined" pulls all four program types in one click — each still
+  // becomes its own draft (an athlete can have one active program per type
+  // at once, so there's no such thing as a single program spanning all of
+  // them), just without clicking through the menu four times.
+  async function pullAllOutputsFromSheet() {
+    setPullingAllOutputs(true)
     try {
-      // 1. Get the Assessment Intake script URL from settings — same script,
-      //    a different action, reading the "Program Output" tab instead of
-      //    appending to "Assessment Intake".
       const settingsSnap = await getSettings()
       const scriptUrl = settingsSnap.exists() ? settingsSnap.data().assessmentSheetScriptUrl : ''
       if (!scriptUrl) {
@@ -321,25 +422,23 @@ export default function AdminAthleteDetail() {
         return
       }
 
-      // 2. Ask for this athlete's rows from the Program Output tab
-      const params = new URLSearchParams()
-      params.set('action', 'pullProgram')
-      params.set('athleteName', athlete.name)
-      const res = await fetch(`${scriptUrl}?${params.toString()}`)
-      const json = await res.json()
+      const results = await Promise.all(OUTPUT_PULL_GROUPS.map(group => fetchOutputDraft(scriptUrl, group)))
+      const succeeded = results.filter(r => r.ok)
+      const failed = results.filter(r => !r.ok)
 
-      if (!json.success || !json.program?.length) {
-        toast.error(json.error || 'No program rows found for this athlete in the Program Output tab.')
+      if (succeeded.length === 0) {
+        toast.error('No rows found for this athlete in any Outputs tab.')
         return
       }
-
-      await createDraftFromRows(json.program, `${athlete.name} — Program`)
-      toast.success('Draft pulled from the sheet — review it below before publishing.')
+      toast.success(
+        `Pulled ${succeeded.length} of ${results.length} programs (${succeeded.map(r => r.label).join(', ')})` +
+        (failed.length ? ` — nothing yet for ${failed.map(r => r.label).join(', ')}.` : '.')
+      )
     } catch (err) {
       console.error(err)
       toast.error('Could not reach the sheet: ' + (err.message || 'Unknown error'))
     } finally {
-      setPullingProgram(false)
+      setPullingAllOutputs(false)
     }
   }
 
@@ -352,13 +451,22 @@ export default function AdminAthleteDetail() {
     }
   }
 
-  async function removeProgram() {
-    if (!program) return
+  // Keeps a lightweight list of which program types this athlete currently has
+  // active on their user doc, so the Athletes list can show it without an
+  // extra programs query per row.
+  async function syncProgramTypesFlag(nextActive) {
+    await updateUser(uid, { programTypes: Object.keys(nextActive).filter(t => nextActive[t]) })
+  }
+
+  async function removeProgram(type) {
+    const current = activePrograms[type]
+    if (!current) return
     setSaving(true)
     try {
-      await updateProgram(program.id, { active: false, athleteId: null })
-      await updateUser(uid, { programId: null })
-      setProgram(null)
+      await updateProgram(current.id, { active: false, athleteId: null })
+      const nextActive = { ...activePrograms, [type]: undefined }
+      setActivePrograms(nextActive)
+      await syncProgramTypesFlag(nextActive)
       toast.success('Program removed.')
     } catch {
       toast.error('Could not remove program.')
@@ -370,15 +478,42 @@ export default function AdminAthleteDetail() {
   async function assignProgram(programId) {
     setSaving(true)
     try {
-      // Deactivate any existing program
-      if (program) await updateProgram(program.id, { active: false })
-      await updateProgram(programId, { athleteId: uid, active: true })
-      await updateUser(uid, { programId })
+      const target = programs.find(p => p.id === programId)
+      if (!target) { toast.error('Program not found.'); return }
+      const type = target.programType || 'correctives'
+      // Guard against assigning away a program that's already active for a
+      // different athlete — the Assign Existing list is filtered to prevent
+      // this, but check again here so a stale list can't silently steal it.
+      if (target.athleteId && target.athleteId !== uid) {
+        toast.error('That program already belongs to another athlete.')
+        return
+      }
+      // Deactivate whatever's currently active for that same program type only
+      // — correctives/throwing/lifting are independent, assigning one doesn't
+      // touch the others.
+      const current = activePrograms[type]
+      if (current) await updateProgram(current.id, { active: false })
+      // Clone rather than mutate the source program — a reusable template
+      // (or a program built for a different athlete) stays exactly as it
+      // was, still assignable to the next athlete. This athlete gets their
+      // own independent copy, so editing it never touches the original or
+      // anyone else who started from the same template.
+      const { id: _sourceId, athleteId: _sourceAthleteId, createdAt: _sourceCreatedAt, lastEditedAt: _sourceLastEditedAt, ...templateData } = target
+      // Reset to today rather than inheriting the source program's start
+      // date — a reusable template's original date has no bearing on when
+      // *this* athlete is actually starting it. Adjustable after in the editor.
+      await createProgram({ ...templateData, startDate: new Date().toISOString().slice(0, 10), athleteId: uid, active: true })
       const snap = await getProgramForAthlete(uid)
-      setProgram(!snap.empty ? { id: snap.docs[0].id, ...snap.docs[0].data() } : null)
+      const nextActive = {}
+      snap.docs.forEach(d => {
+        const data = d.data()
+        nextActive[data.programType || 'correctives'] = { id: d.id, ...data }
+      })
+      setActivePrograms(nextActive)
+      await syncProgramTypesFlag(nextActive)
       const allProgs = await getAllPrograms()
       setPrograms(allProgs.docs.map(d => ({ id: d.id, ...d.data() })))
-      toast.success('Program assigned!')
+      toast.success('Program assigned — this athlete has their own copy, separate from the original.')
     } catch {
       toast.error('Assignment failed.')
     } finally {
@@ -386,10 +521,50 @@ export default function AdminAthleteDetail() {
     }
   }
 
-  async function saveDraftWeeks(programId, weeks) {
-    await updateProgram(programId, { weeks, totalWeeks: weeks.length })
+  async function saveDraftWeeks(programId, weeks, startDate) {
+    await updateProgram(programId, { weeks, totalWeeks: weeks.length, startDate })
     const allProgs = await getAllPrograms()
     setPrograms(allProgs.docs.map(d => ({ id: d.id, ...d.data() })))
+  }
+
+  /**
+   * Open a published program for editing.
+   *
+   * Before the editor can safely reorder or delete anything, every exercise
+   * needs a stable id — otherwise the athlete's completions (keyed by position)
+   * would shift onto the wrong exercises. So we backfill ids first and move any
+   * existing completion docs onto the new keys, then open the editor on the
+   * migrated copy. Programs already carrying ids skip straight through.
+   */
+  async function openLiveProgram(program) {
+    const { weeks, assigned, changed } = ensureExerciseIds(program.weeks)
+    if (!changed) {
+      setEditingLive(program)
+      return
+    }
+    setSaving(true)
+    try {
+      const remaps = assigned.map(({ id, wi, di, ei }) => ({
+        from: legacyCompletionKey(program.id, wi, di, ei),
+        to:   completionKey(program.id, id),
+      }))
+      await migrateCompletionKeys(uid, remaps)
+      await updateProgram(program.id, { weeks })
+      const migrated = { ...program, weeks }
+      setActivePrograms(prev => ({ ...prev, [program.programType || 'correctives']: migrated }))
+      setEditingLive(migrated)
+    } catch {
+      toast.error('Could not open this program for editing.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  /** Save an edit to a program the athlete is already following. Goes live immediately. */
+  async function saveLiveWeeks(programId, weeks, startDate) {
+    const { weeks: withIds } = ensureExerciseIds(weeks)
+    await updateLiveProgram(programId, { weeks: withIds, totalWeeks: withIds.length, startDate })
+    await load()
   }
 
   if (loading) return <div className="flex justify-center py-20"><div className="w-8 h-8 border-2 border-sp-green-500 border-t-transparent rounded-full animate-spin" /></div>
@@ -511,23 +686,75 @@ export default function AdminAthleteDetail() {
                 <FileSpreadsheet size={14} />
                 {sendingToSheet ? 'Logging…' : 'Log to Intake Sheet'}
               </button>
-              <button
-                onClick={pullProgramFromSheet}
-                disabled={pullingProgram}
-                className="flex items-center gap-2 px-4 py-2 border border-gray-200 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-50 disabled:opacity-60 transition"
-                title="Pulls this athlete's rows from the Program Output tab and assigns them as a program"
-              >
-                <Download size={14} />
-                {pullingProgram ? 'Pulling…' : 'Pull Program from Sheet'}
-              </button>
-              <button
-                onClick={generateFromSheet}
-                disabled={saving}
-                className="btn-brand flex items-center gap-2 px-4 py-2 text-sm rounded-xl"
-              >
-                <Sparkles size={14} />
-                {saving ? 'Generating…' : 'Generate Program from Sheet'}
-              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setShowGenerateMenu(v => !v)}
+                  disabled={pullingOutputs || pullingThrowingOutputs || pullingMobilityOutputs || pullingLiftingOutputs || pullingAllOutputs}
+                  className="btn-brand flex items-center gap-2 px-4 py-2 text-sm rounded-xl disabled:opacity-60"
+                >
+                  <Sparkles size={14} />
+                  {pullingOutputs || pullingThrowingOutputs || pullingMobilityOutputs || pullingLiftingOutputs || pullingAllOutputs ? 'Working…' : 'Generate Program'}
+                  <ChevronDown size={14} className={showGenerateMenu ? 'rotate-180 transition-transform' : 'transition-transform'} />
+                </button>
+
+                {showGenerateMenu && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setShowGenerateMenu(false)} />
+                    <div className="absolute right-0 mt-2 w-96 bg-white rounded-xl border border-gray-200 shadow-lg z-20 overflow-hidden">
+                      <button
+                        onClick={() => { setShowGenerateMenu(false); pullOutputsFromSheet() }}
+                        className="w-full text-left px-4 py-3 hover:bg-gray-50 transition flex items-start gap-3"
+                      >
+                        <Download size={15} className="text-gray-400 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Pull from Pre-Throw Outputs</p>
+                          <p className="text-xs text-gray-400 mt-0.5">Mobilization, Correctives and Movement Activation merged into one program, by category.</p>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => { setShowGenerateMenu(false); pullThrowingOutputsFromSheet() }}
+                        className="w-full text-left px-4 py-3 hover:bg-gray-50 transition flex items-start gap-3 border-t border-gray-50"
+                      >
+                        <Download size={15} className="text-gray-400 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Pull from Throwing/Post-Throw Outputs</p>
+                          <p className="text-xs text-gray-400 mt-0.5">Catch Play/Post-Throw plus the plyo routines, merged into one throwing program, by category.</p>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => { setShowGenerateMenu(false); pullLiftingOutputsFromSheet() }}
+                        className="w-full text-left px-4 py-3 hover:bg-gray-50 transition flex items-start gap-3 border-t border-gray-50"
+                      >
+                        <Download size={15} className="text-gray-400 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Pull from Lifting Outputs</p>
+                          <p className="text-xs text-gray-400 mt-0.5">Reads the Lifting Outputs tab (with video URLs) as their lifting program.</p>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => { setShowGenerateMenu(false); pullMobilityOutputsFromSheet() }}
+                        className="w-full text-left px-4 py-3 hover:bg-gray-50 transition flex items-start gap-3 border-t border-gray-50"
+                      >
+                        <Download size={15} className="text-gray-400 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Pull from Mobility Outputs</p>
+                          <p className="text-xs text-gray-400 mt-0.5">Reads the Mobility Outputs tab as their mobility program.</p>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => { setShowGenerateMenu(false); pullAllOutputsFromSheet() }}
+                        className="w-full text-left px-4 py-3 hover:bg-sp-green-50 transition flex items-start gap-3 border-t border-gray-100"
+                      >
+                        <Sparkles size={15} className="text-sp-green-500 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Pull All (combined)</p>
+                          <p className="text-xs text-gray-400 mt-0.5">Runs all four pulls above in one click — each still lands as its own program, since an athlete keeps one active program per type.</p>
+                        </div>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
@@ -551,82 +778,113 @@ export default function AdminAthleteDetail() {
         </div>
       )}
 
-      {/* Program tab */}
+      {/* Program tab — one section per concurrent program type */}
       {tab === 'program' && (
-        <div className="space-y-4">
-          {/* Current program */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-5">
-            <h2 className="font-semibold text-gray-900 mb-3">Current Program</h2>
-            {program ? (
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-gray-900">{program.name}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">{program.weeks?.length || 0} weeks · Active</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-1 bg-sp-green-100 text-sp-green-800 text-xs font-medium rounded-full">Active</span>
-                  <button
-                    onClick={removeProgram}
-                    disabled={saving}
-                    className="flex items-center gap-1.5 px-3 py-1.5 border border-red-200 text-red-500 text-xs font-medium rounded-lg hover:bg-red-50 transition"
-                  >
-                    <XCircle size={13} /> Remove
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <p className="text-gray-400 text-sm">No program assigned.</p>
-            )}
-          </div>
+        <div className="space-y-8">
+          {PROGRAM_TYPES.map(({ key, label }) => {
+            const current = activePrograms[key]
+            const drafts = programs.filter(p => p.athleteId === uid && p.active === false && (p.programType || 'correctives') === key)
+            // Only unassigned templates or this athlete's own (non-draft) programs
+            // belong here — a program already active for a DIFFERENT athlete must
+            // never show up as assignable, or "Assign" would silently steal it.
+            const assignable = programs.filter(p =>
+              (p.programType || 'correctives') === key &&
+              p.id !== current?.id &&
+              (!p.athleteId || p.athleteId === uid) &&
+              !(p.active === false && p.athleteId === uid)
+            )
+            return (
+              <div key={key} className="space-y-4">
+                <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider">{label}</h2>
 
-          {/* Drafts awaiting review — created by Generate/Pull Program from Sheet,
-              not visible to the athlete until published from the editor below */}
-          {programs.filter(p => p.athleteId === uid && p.active === false).length > 0 && (
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
-              <h2 className="font-semibold text-amber-900 mb-3">Drafts Awaiting Review</h2>
-              <div className="space-y-2">
-                {programs.filter(p => p.athleteId === uid && p.active === false).map((p) => (
-                  <div key={p.id} className="flex items-center justify-between py-2 border-b border-amber-100 last:border-0">
-                    <div>
-                      <p className="text-sm font-medium text-gray-800">{p.name}</p>
-                      <p className="text-xs text-gray-500">{p.weeks?.length || 0} weeks · not visible to the athlete yet</p>
+                {/* Current program of this type */}
+                <div className="bg-white rounded-2xl border border-gray-200 p-5">
+                  {current ? (
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-gray-900">{current.name}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {current.weeks?.length || 0} weeks ·{' '}
+                          {(current.weeks || []).reduce((s, wk) => s + (wk.days || []).reduce((t, d) => t + (d.exercises?.length || 0), 0), 0)} exercises
+                          {current.lastEditedAt && (
+                            <> · edited {format(current.lastEditedAt.toDate?.() ?? current.lastEditedAt, 'MMM d')}</>
+                          )}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-1 bg-sp-green-100 text-sp-green-800 text-xs font-medium rounded-full">Active</span>
+                        <button
+                          onClick={() => openLiveProgram(current)}
+                          disabled={saving}
+                          className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 disabled:opacity-60 transition"
+                        >
+                          <Pencil size={13} /> View / Edit
+                        </button>
+                        <button
+                          onClick={() => removeProgram(key)}
+                          disabled={saving}
+                          className="flex items-center gap-1.5 px-3 py-1.5 border border-red-200 text-red-500 text-xs font-medium rounded-lg hover:bg-red-50 transition"
+                        >
+                          <XCircle size={13} /> Remove
+                        </button>
+                      </div>
                     </div>
-                    <button
-                      onClick={() => setEditingDraft(p)}
-                      className="text-xs px-3 py-1.5 bg-amber-100 text-amber-800 font-medium rounded-lg hover:bg-amber-200 transition"
-                    >
-                      Review
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Assign from existing */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-5">
-            <h2 className="font-semibold text-gray-900 mb-3">Assign Program</h2>
-            <div className="space-y-2">
-              {programs.filter(p => p.id !== program?.id && !(p.active === false && p.athleteId)).map((p) => (
-                <div key={p.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">{p.name}</p>
-                    <p className="text-xs text-gray-400">{p.weeks?.length || 0} weeks</p>
-                  </div>
-                  <button
-                    onClick={() => assignProgram(p.id)}
-                    disabled={saving}
-                    className="text-xs px-3 py-1.5 bg-sp-green-50 text-sp-green-600 font-medium rounded-lg hover:bg-sp-green-100 transition"
-                  >
-                    Assign
-                  </button>
+                  ) : (
+                    <p className="text-gray-400 text-sm">No {label.toLowerCase()} program assigned.</p>
+                  )}
                 </div>
-              ))}
-              {programs.length === 0 && (
-                <p className="text-gray-400 text-sm">No programs yet. Create one in <Link to="/admin/programs" className="text-sp-green-500 underline">Programs</Link>.</p>
-              )}
-            </div>
-          </div>
+
+                {/* Drafts awaiting review for this type — not visible to the
+                    athlete until published from the editor below */}
+                {drafts.length > 0 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
+                    <h3 className="font-semibold text-amber-900 mb-3 text-sm">Drafts Awaiting Review</h3>
+                    <div className="space-y-2">
+                      {drafts.map((p) => (
+                        <div key={p.id} className="flex items-center justify-between py-2 border-b border-amber-100 last:border-0">
+                          <div>
+                            <p className="text-sm font-medium text-gray-800">{p.name}</p>
+                            <p className="text-xs text-gray-500">{p.weeks?.length || 0} weeks · not visible to the athlete yet</p>
+                          </div>
+                          <button
+                            onClick={() => setEditingDraft(p)}
+                            className="text-xs px-3 py-1.5 bg-amber-100 text-amber-800 font-medium rounded-lg hover:bg-amber-200 transition"
+                          >
+                            Review
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Assign an existing program of this type */}
+                <div className="bg-white rounded-2xl border border-gray-200 p-5">
+                  <h3 className="font-semibold text-gray-900 mb-3 text-sm">Assign Existing</h3>
+                  <div className="space-y-2">
+                    {assignable.map((p) => (
+                      <div key={p.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                        <div>
+                          <p className="text-sm font-medium text-gray-800">{p.name}</p>
+                          <p className="text-xs text-gray-400">{p.weeks?.length || 0} weeks</p>
+                        </div>
+                        <button
+                          onClick={() => assignProgram(p.id)}
+                          disabled={saving}
+                          className="text-xs px-3 py-1.5 bg-sp-green-50 text-sp-green-600 font-medium rounded-lg hover:bg-sp-green-100 transition"
+                        >
+                          Assign
+                        </button>
+                      </div>
+                    ))}
+                    {assignable.length === 0 && (
+                      <p className="text-gray-400 text-sm">No {label.toLowerCase()} programs yet. Create one in <Link to="/admin/programs" className="text-sp-green-500 underline">Programs</Link>.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
 
@@ -634,8 +892,17 @@ export default function AdminAthleteDetail() {
         <ProgramEditorModal
           program={editingDraft}
           onClose={() => setEditingDraft(null)}
-          onSave={(weeks) => saveDraftWeeks(editingDraft.id, weeks)}
+          onSave={(weeks, startDate) => saveDraftWeeks(editingDraft.id, weeks, startDate)}
           onPublish={() => assignProgram(editingDraft.id)}
+        />
+      )}
+
+      {editingLive && (
+        <ProgramEditorModal
+          live
+          program={editingLive}
+          onClose={() => setEditingLive(null)}
+          onSave={(weeks, startDate) => saveLiveWeeks(editingLive.id, weeks, startDate)}
         />
       )}
 
@@ -666,6 +933,18 @@ export default function AdminAthleteDetail() {
                   className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
                 />
                 <p className="text-xs text-gray-400 mt-1">Note: this updates the display name only, not their login email.</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Athlete Type</label>
+                <select
+                  value={editAthleteType}
+                  onChange={e => setEditAthleteType(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-white"
+                >
+                  <option value="in_house">In-house</option>
+                  <option value="remote">Remote</option>
+                </select>
+                <p className="text-xs text-gray-400 mt-1">Remote athletes see their week as one flexible set of focuses instead of fixed training days.</p>
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowEdit(false)} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Cancel</button>

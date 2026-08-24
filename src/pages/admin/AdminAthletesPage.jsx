@@ -5,6 +5,7 @@ import { createAthleteAuth } from '../../firebase/adminAuth'
 import { Users, Plus, Search, ChevronRight, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import EmptyState from '../../components/EmptyState'
+import { programTypeInfo } from '../../constants/programTypes'
 
 export default function AdminAthletesPage() {
   const navigate = useNavigate()
@@ -117,10 +118,17 @@ export default function AdminAthletesPage() {
                   </td>
                   <td className="px-5 py-3.5 text-gray-500">{a.email}</td>
                   <td className="px-5 py-3.5">
-                    {a.programId
-                      ? <span className="px-2 py-1 bg-sp-green-100 text-sp-green-800 text-xs font-medium rounded-full">Assigned</span>
-                      : <span className="px-2 py-1 bg-gray-100 text-gray-400 text-xs font-medium rounded-full">None</span>
-                    }
+                    {a.programTypes?.length ? (
+                      <div className="flex flex-wrap gap-1">
+                        {a.programTypes.map(t => (
+                          <span key={t} className={`px-2 py-1 text-xs font-medium rounded-full ${programTypeInfo(t).badgeClass}`}>
+                            {programTypeInfo(t).shortLabel}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="px-2 py-1 bg-gray-100 text-gray-400 text-xs font-medium rounded-full">None</span>
+                    )}
                   </td>
                   <td className="px-5 py-3.5 text-right">
                     <span className="inline-flex items-center gap-1 text-sp-green-500 text-sm font-medium">

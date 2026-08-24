@@ -549,7 +549,7 @@ function CategoryTiles({
                 <span className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 ${info.dotClass}`}>
                   <Icon size={13} className="text-white" />
                 </span>
-                <span className="text-[11px] font-bold uppercase tracking-wide text-sp-ink-100 truncate">{info.label}</span>
+                <span className="text-[11px] font-bold uppercase tracking-wide text-sp-ink-100 truncate">{info.shortLabel || info.label}</span>
                 <span className="text-[11px] text-sp-ink-300 flex-shrink-0">{blockDone}/{block.slots.length}</span>
               </div>
               {blockOpen ? <ChevronUp size={14} className="text-sp-ink-300 flex-shrink-0" /> : <ChevronDown size={14} className="text-sp-ink-300 flex-shrink-0" />}

@@ -29,9 +29,15 @@ export const EXERCISE_CATEGORIES = [
   { key: 'Mobilization',           label: 'Mobilization',           icon: 'Wind',  badgeClass: 'bg-sky-50 text-sky-700',       dotClass: 'bg-sky-500' },
   { key: 'Correctives',            label: 'Correctives',            icon: 'Heart', badgeClass: 'bg-sp-green-100 text-sp-green-800', dotClass: 'bg-sp-green-500' },
   { key: 'Movement Activation',    label: 'Movement Activation',    icon: 'Zap',   badgeClass: 'bg-amber-50 text-amber-700',   dotClass: 'bg-amber-500' },
-  { key: 'Hybrid Day Plyos',       label: 'Hybrid Day Plyos',       icon: 'Flame', badgeClass: 'bg-purple-50 text-purple-700', dotClass: 'bg-purple-500', aliases: ['Hybrid Plyo', 'Hybrid Plyos'] },
-  { key: 'High-Intent Day Plyos',  label: 'High-Intent Day Plyos',  icon: 'Flame', badgeClass: 'bg-purple-50 text-purple-700', dotClass: 'bg-purple-500', aliases: ['High Intent Day Plyo', 'High Intent Plyo', 'High-Intent Plyo'] },
-  { key: 'Recovery Day Plyos',     label: 'Recovery Day Plyos',     icon: 'Flame', badgeClass: 'bg-purple-50 text-purple-700', dotClass: 'bg-purple-500', aliases: ['Recovery Plyo', 'Recovery Plyos'] },
+  // shortLabel is what the athlete's daily schedule shows — "Hybrid Day
+  // Plyos" vs. "High-Intent Day Plyos" vs. "Recovery Day Plyos" is a
+  // distinction the coach needs when building the program (see the category
+  // dropdown in ProgramEditorModal, which still shows the full `label`), but
+  // a given day only ever has one of the three, so the athlete just sees
+  // "Plyos" rather than the routine-specific name.
+  { key: 'Hybrid Day Plyos',       label: 'Hybrid Day Plyos',       shortLabel: 'Plyos', icon: 'Flame', badgeClass: 'bg-purple-50 text-purple-700', dotClass: 'bg-purple-500', aliases: ['Hybrid Plyo', 'Hybrid Plyos'] },
+  { key: 'High-Intent Day Plyos',  label: 'High-Intent Day Plyos',  shortLabel: 'Plyos', icon: 'Flame', badgeClass: 'bg-purple-50 text-purple-700', dotClass: 'bg-purple-500', aliases: ['High Intent Day Plyo', 'High Intent Plyo', 'High-Intent Plyo'] },
+  { key: 'Recovery Day Plyos',     label: 'Recovery Day Plyos',     shortLabel: 'Plyos', icon: 'Flame', badgeClass: 'bg-purple-50 text-purple-700', dotClass: 'bg-purple-500', aliases: ['Recovery Plyo', 'Recovery Plyos'] },
 ]
 
 export const CATCH_PLAY_INFO = { key: 'Catch Play', label: 'Catch Play', icon: 'CircleDot', badgeClass: 'bg-indigo-50 text-indigo-700', dotClass: 'bg-indigo-500' }

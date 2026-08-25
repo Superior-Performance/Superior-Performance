@@ -511,7 +511,7 @@ function RemoteDayTypePicker({ programs, weights, onSaveWeight, onOpenDetail }) 
     const key = keyForWrite(programId, exercise, wi, di, ei)
     const wasComplete = isExerciseComplete(ephemeral, programId, exercise, wi, di, ei)
     setEphemeral(prev => ({ ...prev, [key]: { completed: !wasComplete } }))
-    if (!wasComplete && wouldFinishDay) toast.success('Workout complete! 💪')
+    if (!wasComplete && wouldFinishDay) toast.success('Workout complete.')
   }
 
   function ephemeralChooseSlotOption(programId, slot, chosenPos, wi, di, wouldFinishDay) {

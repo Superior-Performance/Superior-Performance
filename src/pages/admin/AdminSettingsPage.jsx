@@ -489,8 +489,8 @@ function respond(obj) {
 const ASSESSMENT_APPS_SCRIPT_CODE = `function doGet(e) {
   const action = e.parameter.action || 'append';
   if (action === 'pullProgram') return pullProgram(e);
-  if (action === 'pullLifting') return pullLifting(e);
   if (action === 'pullOutputs') return pullOutputs(e);
+  if (action === 'setupOutputTabs') return setupOutputTabs();
   return appendAssessment(e);
 }
 
@@ -527,21 +527,6 @@ function appendAssessment(e) {
   }
 }
 
-// Sheet headers are typed by hand and casing drifts ("Athlete Name" vs
-// "athlete name") — match case/whitespace-insensitively and normalize to the
-// Title Case keys the app's ingestion code reads. Unrecognized headers pass
-// through as-is.
-function normalizeHeader(h) {
-  const key = String(h).trim().toLowerCase();
-  const known = {
-    'athlete name': 'Athlete Name', 'week': 'Week', 'day': 'Day',
-    'type': 'Type', 'category': 'Category', 'exercise': 'Exercise',
-    'sets': 'Sets', 'reps': 'Reps', 'intensity': 'Intensity', 'notes': 'Notes',
-    'video url': 'Video URL', 'video': 'Video URL',
-  };
-  return known[key] || String(h).trim();
-}
-
 function pullProgram(e) {
   try {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Program Output');
@@ -551,7 +536,7 @@ function pullProgram(e) {
 
     const athleteName = (e.parameter.athleteName || '').trim().toLowerCase();
     const data = sheet.getDataRange().getValues();
-    const headers = data[0].map(h => normalizeHeader(h));
+    const headers = data[0].map(h => String(h).trim());
 
     const rows = data.slice(1)
       .filter(row => row[0] !== '' && row[0] !== null)
@@ -573,47 +558,39 @@ function pullProgram(e) {
   }
 }
 
-function pullLifting(e) {
-  try {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Lifting Output');
-    if (!sheet) {
-      return respond({ success: false, error: 'Could not find the "Lifting Output" tab.' });
-    }
+const OUTPUT_TABS = ["Pre-Throw Outputs", "Plyo Outputs", "Throwing/Post-Throw Outputs", "Mobility Outputs", "Lifting Outputs", "Throwing Ramp-Up Template"];
+const OUTPUT_HEADERS = ["Athlete Name", "Week", "Day", "Type", "Exercise", "Sets", "Reps", "Intensity", "Notes", "Video URL"];
 
-    const athleteName = (e.parameter.athleteName || '').trim().toLowerCase();
-    const data = sheet.getDataRange().getValues();
-    const headers = data[0].map(h => normalizeHeader(h));
+// "Pre-Throw Outputs" already has 6 extra columns in the live sheet (added
+// by hand) for the choice-pair correctives' 2nd option - every "option B"
+// goes in these columns on the SAME row as its primary, not as a separate
+// row. Other Outputs tabs don't have this pattern yet, so headers are
+// per-tab, not one shared constant.
+const OUTPUT_HEADERS_BY_TAB = {
+  "Pre-Throw Outputs": OUTPUT_HEADERS.concat([
+    "Alternate Exercise", "Alternate Sets", "Alternate Reps",
+    "Alternate Intensity", "Alternate Notes", "Alternate Video URL",
+  ]),
+};
 
-    const rows = data.slice(1)
-      .filter(row => row[0] !== '' && row[0] !== null)
-      .map(row => {
-        const obj = {};
-        headers.forEach((h, i) => { obj[h] = row[i]; });
-        return obj;
-      })
-      .filter(row => String(row['Athlete Name'] || '').trim().toLowerCase() === athleteName);
-
-    if (!rows.length) {
-      return respond({ success: false, error: 'No lifting rows found for "' + e.parameter.athleteName + '" in Lifting Output.' });
-    }
-
-    return respond({ success: true, program: rows });
-
-  } catch (err) {
-    return respond({ success: false, error: err.message });
-  }
+function outputHeadersFor(tabName) {
+  return OUTPUT_HEADERS_BY_TAB[tabName] || OUTPUT_HEADERS;
 }
 
 function pullOutputs(e) {
   try {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Pre-Throw Outputs');
+    const tabName = e.parameter.tab;
+    if (!tabName || OUTPUT_TABS.indexOf(tabName) === -1) {
+      return respond({ success: false, error: 'tab parameter must be one of: ' + OUTPUT_TABS.join(', ') });
+    }
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(tabName);
     if (!sheet) {
-      return respond({ success: false, error: 'Could not find the "Pre-Throw Outputs" tab.' });
+      return respond({ success: false, error: 'No "' + tabName + '" tab - run setupOutputTabs first.' });
     }
 
     const athleteName = (e.parameter.athleteName || '').trim().toLowerCase();
     const data = sheet.getDataRange().getValues();
-    const headers = data[0].map(h => normalizeHeader(h));
+    const headers = data[0].map(h => String(h).trim());
 
     const rows = data.slice(1)
       .filter(row => row[0] !== '' && row[0] !== null)
@@ -622,13 +599,9 @@ function pullOutputs(e) {
         headers.forEach((h, i) => { obj[h] = row[i]; });
         return obj;
       })
-      .filter(row => String(row['Athlete Name'] || '').trim().toLowerCase() === athleteName);
+      .filter(row => !athleteName || String(row['Athlete Name'] || '').trim().toLowerCase() === athleteName);
 
-    if (!rows.length) {
-      return respond({ success: false, error: 'No rows found for "' + e.parameter.athleteName + '" in the outputs tab.' });
-    }
-
-    return respond({ success: true, program: rows });
+    return respond({ success: true, tab: tabName, program: rows });
 
   } catch (err) {
     return respond({ success: false, error: err.message });
@@ -639,6 +612,206 @@ function respond(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  try {
+    const payload = JSON.parse(e.postData.contents);
+    const action = payload.action || 'pushProgram';
+    if (action === 'pushProgram') return pushProgram(payload);
+    if (action === 'pushOutputs') return pushOutputs(payload);
+    if (action === 'deleteOutputsRows') return deleteOutputsRows(payload);
+    if (action === 'addDropdownColumns') return addDropdownColumns(payload);
+    return respond({ success: false, error: 'Unknown action: ' + action });
+  } catch (err) {
+    return respond({ success: false, error: err.message });
+  }
+}
+
+// Appends new columns with header labels + a dropdown validation list, added
+// after whatever the target tab's current last column is. Doesn't touch
+// existing columns or data - safe to run on Assessment Intake with real
+// athlete rows already in it.
+function addDropdownColumns(payload) {
+  try {
+    const sheetName = payload.sheetName;
+    const columns = payload.columns; // [{ header: "Mode", options: ["In-House", "Remote"] }, ...]
+    const dataRowCount = payload.dataRowCount || 300;
+    if (!sheetName) return respond({ success: false, error: 'sheetName is required.' });
+    if (!Array.isArray(columns) || !columns.length) return respond({ success: false, error: 'columns must be a non-empty array.' });
+
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+    if (!sheet) return respond({ success: false, error: 'No sheet named "' + sheetName + '"' });
+
+    const startCol = sheet.getLastColumn() + 1;
+    const neededCols = startCol + columns.length - 1;
+    if (sheet.getMaxColumns() < neededCols) {
+      sheet.insertColumnsAfter(sheet.getMaxColumns(), neededCols - sheet.getMaxColumns());
+    }
+    const neededRows = dataRowCount + 1;
+    if (sheet.getMaxRows() < neededRows) {
+      sheet.insertRowsAfter(sheet.getMaxRows(), neededRows - sheet.getMaxRows());
+    }
+
+    columns.forEach(function (col, i) {
+      const c = startCol + i;
+      sheet.getRange(1, c).setValue(col.header).setFontWeight('bold');
+      if (col.options && col.options.length) {
+        const rule = SpreadsheetApp.newDataValidation().requireValueInList(col.options, true).setAllowInvalid(true).build();
+        sheet.getRange(2, c, dataRowCount, 1).setDataValidation(rule);
+      }
+      sheet.setColumnWidth(c, 140);
+    });
+
+    return respond({ success: true, sheetName: sheetName, startCol: startCol, columnsAdded: columns.length });
+  } catch (err) {
+    return respond({ success: false, error: err.message });
+  }
+}
+
+function pushProgram(payload) {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Program Output');
+    if (!sheet) {
+      return respond({ success: false, error: 'Could not find the "Program Output" tab.' });
+    }
+
+    const athleteName = String(payload.athleteName || '').trim();
+    const rows = payload.rows;
+    if (!athleteName) {
+      return respond({ success: false, error: 'athleteName is required.' });
+    }
+    if (!Array.isArray(rows) || !rows.length) {
+      return respond({ success: false, error: 'rows must be a non-empty array.' });
+    }
+
+    const headers = ['Athlete Name', 'Week', 'Day', 'Category', 'Exercise', 'Sets', 'Reps', 'Intensity', 'Notes'];
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      const existing = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+      for (let i = existing.length - 1; i >= 0; i--) {
+        if (String(existing[i][0]).trim().toLowerCase() === athleteName.toLowerCase()) {
+          sheet.deleteRow(i + 2);
+        }
+      }
+    }
+
+    const values = rows.map(row => headers.map(h => (row[h] !== undefined ? row[h] : '')));
+    const target = sheet.getRange(sheet.getLastRow() + 1, 1, values.length, headers.length);
+    target.setNumberFormat('@');
+    target.setValues(values);
+
+    return respond({ success: true, rowsWritten: values.length });
+
+  } catch (err) {
+    return respond({ success: false, error: err.message });
+  }
+}
+
+function pushOutputs(payload) {
+  try {
+    const tabName = payload.tab;
+    if (!tabName || OUTPUT_TABS.indexOf(tabName) === -1) {
+      return respond({ success: false, error: 'tab must be one of: ' + OUTPUT_TABS.join(', ') });
+    }
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(tabName);
+    if (!sheet) {
+      return respond({ success: false, error: 'No "' + tabName + '" tab - run setupOutputTabs first.' });
+    }
+    const headers = outputHeadersFor(tabName);
+
+    const athleteName = String(payload.athleteName || '').trim();
+    const rows = payload.rows;
+    if (!athleteName) return respond({ success: false, error: 'athleteName is required.' });
+    if (!Array.isArray(rows) || !rows.length) return respond({ success: false, error: 'rows must be a non-empty array.' });
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      const existing = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+      for (let i = existing.length - 1; i >= 0; i--) {
+        if (String(existing[i][0]).trim().toLowerCase() === athleteName.toLowerCase()) {
+          sheet.deleteRow(i + 2);
+        }
+      }
+    }
+
+    const values = rows.map(row => headers.map(h => (row[h] !== undefined ? row[h] : '')));
+    const target = sheet.getRange(sheet.getLastRow() + 1, 1, values.length, headers.length);
+    target.setNumberFormat('@');
+    target.setValues(values);
+
+    return respond({ success: true, tab: tabName, rowsWritten: values.length });
+
+  } catch (err) {
+    return respond({ success: false, error: err.message });
+  }
+}
+
+function deleteOutputsRows(payload) {
+  try {
+    const tabName = payload.tab;
+    if (!tabName || OUTPUT_TABS.indexOf(tabName) === -1) {
+      return respond({ success: false, error: 'tab must be one of: ' + OUTPUT_TABS.join(', ') });
+    }
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(tabName);
+    if (!sheet) return respond({ success: false, error: 'No "' + tabName + '" tab.' });
+
+    const athleteName = String(payload.athleteName || '').trim();
+    if (!athleteName) return respond({ success: false, error: 'athleteName is required.' });
+
+    const lastRow = sheet.getLastRow();
+    let deleted = 0;
+    if (lastRow > 1) {
+      const existing = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+      for (let i = existing.length - 1; i >= 0; i--) {
+        if (String(existing[i][0]).trim().toLowerCase() === athleteName.toLowerCase()) {
+          sheet.deleteRow(i + 2);
+          deleted++;
+        }
+      }
+    }
+    return respond({ success: true, tab: tabName, rowsDeleted: deleted });
+  } catch (err) {
+    return respond({ success: false, error: err.message });
+  }
+}
+
+function setupOutputTabs() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const preThrowTypeOptions = ["Mobilization", "Correctives", "Movement Activation"];
+  const plyoTypeOptions = ["Recovery Plyo", "Hybrid Plyo", "High Intent Day Plyo"];
+  const throwingTypeOptions = ["Catch Play", "Post-Throw"];
+
+  OUTPUT_TABS.forEach(function (tabName) {
+    let sheet = ss.getSheetByName(tabName);
+    if (!sheet) {
+      sheet = ss.insertSheet(tabName);
+    }
+    // Always verify the header row matches exactly - a no-op if it's already
+    // correct, but fixes tabs that were created blank (no header row at all).
+    const headers = outputHeadersFor(tabName);
+    const headerRange = sheet.getRange(1, 1, 1, headers.length);
+    const currentHeaders = headerRange.getValues()[0];
+    const matches = headers.every(function (h, i) { return currentHeaders[i] === h; });
+    if (!matches) {
+      headerRange.setValues([headers]);
+      headerRange.setFontWeight("bold");
+    }
+
+    const lastRow = 300;
+    let typeOptions = null;
+    if (tabName === "Pre-Throw Outputs") typeOptions = preThrowTypeOptions;
+    if (tabName === "Plyo Outputs") typeOptions = plyoTypeOptions;
+    if (tabName === "Throwing/Post-Throw Outputs") typeOptions = throwingTypeOptions;
+
+    if (typeOptions) {
+      const rule = SpreadsheetApp.newDataValidation().requireValueInList(typeOptions, true).setAllowInvalid(true).build();
+      sheet.getRange(2, 4, lastRow - 1, 1).setDataValidation(rule);
+    }
+  });
+
+  return respond({ success: true, tabs: OUTPUT_TABS });
 }`;
 
 const INQUIRY_APPS_SCRIPT_CODE = `function doGet(e) {

@@ -40,10 +40,9 @@ const FIELD_GROUPS = [
   {
     title: 'Program Planning',
     fields: [
-      { key: 'programLengthWeeks',   label: 'Program Length (weeks)', type: 'number' },
-      { key: 'trainingDaysPerWeek',  label: 'Training Days per Week', type: 'number' },
-      { key: 'trainingPhase',        label: 'Training Phase', type: 'select', options: ['Off-season', 'Pre-season / Ramp-up', 'In-season', 'Post-season', 'Return to Throw'] },
-      { key: 'equipmentAccess',      label: 'Equipment Access', type: 'text', wide: true },
+      { key: 'mode',                label: 'Mode',            type: 'select', options: ['College Remote Athlete', 'In-house'] },
+      { key: 'programLengthWeeks',  label: 'Program Length',  type: 'select', options: ['4 Weeks', '8 Weeks', '12 Weeks'] },
+      { key: 'trainingPhase',       label: 'Training Phase',  type: 'select', options: ['On-Ramp', 'In-Season', 'Off-Season'] },
     ],
   },
   {

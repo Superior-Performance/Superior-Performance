@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { X, Plus, Trash2, CheckCircle2, AlertTriangle, CalendarPlus, ChevronDown, ChevronUp, Link2, Unlink, Wind, Heart, Zap, Flame, CircleDot, ListChecks } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { makeExerciseId, groupIntoSlots } from '../utils/programIds'
-import { EXERCISE_CATEGORIES, exerciseCategoryInfo, categoryRank } from '../constants/programTypes'
+import { EXERCISE_CATEGORIES, exerciseCategoryInfo, categoryRank, DAY_TYPES } from '../constants/programTypes'
 
 const CATEGORY_ICONS = { Wind, Heart, Zap, Flame, CircleDot, ListChecks }
 
@@ -280,6 +280,15 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
                         placeholder="Focus (e.g. Long Toss)"
                         className="flex-1 px-2.5 py-1 border border-gray-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-sp-green-500"
                       />
+                      <select
+                        value={day.dayType || ''}
+                        onChange={e => updateDayField(wi, di, 'dayType', e.target.value)}
+                        title="Day Type — for College Remote Athlete Mode, matches this day across every program type"
+                        className="flex-shrink-0 w-36 px-2 py-1 border border-gray-200 rounded-lg text-xs bg-white text-gray-500 focus:outline-none focus:ring-2 focus:ring-sp-green-500"
+                      >
+                        <option value="">No day type</option>
+                        {DAY_TYPES.map(dt => <option key={dt.key} value={dt.key}>{dt.label}</option>)}
+                      </select>
                       <button
                         onClick={() => removeDay(wi, di)}
                         className="p-1.5 text-gray-300 hover:text-red-500 transition flex-shrink-0"

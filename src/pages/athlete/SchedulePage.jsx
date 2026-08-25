@@ -5,18 +5,32 @@ import {
   subscribeExerciseWeights, saveExerciseWeight,
 } from '../../firebase/firestore'
 import {
-  CheckCircle2, Circle, ChevronDown, ChevronUp, Dumbbell, Sparkles, X, Wind, Heart, Zap, Flame,
+  CheckCircle2, Circle, ChevronDown, ChevronUp, ChevronLeft, Dumbbell, Sparkles, X, Wind, Heart, Zap, Flame,
   CircleDot, ListChecks, PlayCircle, CalendarClock, PartyPopper, Moon,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 import EmptyState from '../../components/EmptyState'
 import ProgressRing from '../../components/ProgressRing'
-import { programTypeInfo, exerciseCategoryInfo, categoryRank } from '../../constants/programTypes'
+import { programTypeInfo, exerciseCategoryInfo, categoryRank, DAY_TYPES, dayTypeInfo } from '../../constants/programTypes'
 import { isExerciseComplete, keyForWrite, groupIntoSlots, buildSlots, isSlotComplete } from '../../utils/programIds'
 import { computeStreak } from '../../utils/programSchedule'
 
 const CATEGORY_ICONS = { Wind, Heart, Zap, Flame, CircleDot, ListChecks }
+const DAY_TYPE_ICONS = { Moon, Flame, Zap }
+
+// The one day (first found, in week order) in this program tagged with the
+// given College Remote Athlete day type — see ProgramEditorModal's Day
+// Type dropdown. A program only ever defines one instance of each type;
+// it isn't repeated per week the way an in-house athlete's calendar is.
+function findDayForType(program, typeKey) {
+  for (const week of program.weeks || []) {
+    for (const day of week.days || []) {
+      if (day.dayType === typeKey && day.exercises?.length) return day
+    }
+  }
+  return null
+}
 
 // Labels are custom here rather than pulled from programTypeInfo because
 // "Throwing/Post-Throw" reads better as a tab name than the program badge's
@@ -81,16 +95,17 @@ function toEmbedUrl(url) {
 
 export default function SchedulePage() {
   const { currentUser, userProfile } = useAuth()
-  // Remote athletes pick their own days — the week's program is one flexible
-  // set of focuses rather than fixed training days, so this tab shows their
-  // whole current week (still just one week, never browsable) instead of a
-  // single dated day. In-house athletes (the default) get literally today.
+  // College Remote Athlete Mode — no fixed calendar to plan around, so
+  // instead of "today" mapping to one dated day, the athlete picks which of
+  // the program's four day types (Recovery/High-Intent/Hybrid 1/Hybrid 2 —
+  // see constants/programTypes' DAY_TYPES) fits that session. See
+  // RemoteDayTypePicker below, which takes over the whole page for these
+  // athletes; everything from here through `dayMap` is in-house-only.
   const isRemote = userProfile?.athleteType === 'remote'
 
   const [programs, setPrograms]       = useState([]) // every active program, any type
   const [completions, setCompletions] = useState({})
   const [weights, setWeights]         = useState({}) // this week's working weight per exercise
-  const [expanded, setExpanded]       = useState(null)
   const [dayTabs, setDayTabs]         = useState({}) // which program tab is selected within each day
   // Category tiles are an accordion, not independent toggles — opening one
   // auto-collapses whatever else was open in that day/program-tab so this
@@ -220,6 +235,18 @@ export default function SchedulePage() {
     )
   }
 
+  // College Remote Athletes get a completely different page — no calendar,
+  // no weeks, just a pick-a-day-type flow. See RemoteDayTypePicker.
+  if (isRemote) {
+    return (
+      <div className="min-h-[calc(100vh-56px)] bg-sp-ink-900 px-4 py-4">
+        <UpdateNotice programs={updatedPrograms} onDismiss={dismissUpdateNotice} dismissing={dismissing} />
+        <RemoteDayTypePicker programs={programs} weights={weights} onSaveWeight={saveWeight} onOpenDetail={setDetail} />
+        <ExerciseDetailModal detail={detail} onClose={() => setDetail(null)} />
+      </div>
+    )
+  }
+
   const totalWeeks = Math.max(1, ...programs.map(p => p.weeks?.length || 0))
   const { streak, todayDone, todayDoneCount, todayTotal, pos } = computeStreak(programs, completions, totalWeeks)
 
@@ -245,15 +272,12 @@ export default function SchedulePage() {
   }
 
   // Week → Day → (if more than one program lands on that day) program tab.
-  // Non-remote athletes only ever see today's dayNum; remote athletes see
-  // every day in the current week, since their "days" are flexible focuses
-  // rather than dated sessions.
   const dayMap = new Map() // dayNum -> [{ program, day }]
   programs.forEach(program => {
     (program.weeks?.[pos.weekIdx]?.days || []).forEach((day, i) => {
       if (!day.exercises?.length) return
       const dayNum = day.dayNum ?? i + 1
-      if (!isRemote && dayNum !== pos.dayNum) return
+      if (dayNum !== pos.dayNum) return
       if (!dayMap.has(dayNum)) dayMap.set(dayNum, [])
       dayMap.get(dayNum).push({ program, day })
     })
@@ -267,7 +291,6 @@ export default function SchedulePage() {
       <UpdateNotice programs={updatedPrograms} onDismiss={dismissUpdateNotice} dismissing={dismissing} />
 
       <TodayHero
-        isRemote={isRemote}
         weekIdx={pos.weekIdx}
         dayNum={pos.dayNum}
         pastProgram={pos.pastProgram}
@@ -282,31 +305,6 @@ export default function SchedulePage() {
           <Moon size={26} className="mx-auto mb-2 text-sp-ink-300" />
           <p className="text-sm font-medium text-white">Rest day</p>
           <p className="text-xs text-sp-ink-300 mt-0.5">Nothing scheduled — recover up for the next one.</p>
-        </div>
-      ) : isRemote ? (
-        <div className="space-y-3">
-          {days.map(({ dayNum, entries }) => (
-            <DayCard
-              key={dayNum}
-              dayNum={dayNum}
-              entries={entries}
-              weekIdx={pos.weekIdx}
-              completions={completions}
-              weights={weights}
-              expanded={expanded}
-              setExpanded={setExpanded}
-              selectedType={dayTabs[dayNum]}
-              onSelectType={(type) => setDayTabs(prev => ({ ...prev, [dayNum]: type }))}
-              openBlock={openBlock}
-              toggleBlock={toggleBlock}
-              openSlot={openSlot}
-              toggleSlot={toggleSlot}
-              onToggleComplete={toggleExerciseComplete}
-              onChooseSlotOption={chooseSlotOption}
-              onOpenDetail={setDetail}
-              onSaveWeight={saveWeight}
-            />
-          ))}
         </div>
       ) : (
         <DayBody
@@ -363,7 +361,7 @@ function UpdateNotice({ programs, onDismiss, dismissing }) {
 // This is the whole point of the "gamified" pass: the athlete's very first
 // glance at the tab tells them where they stand today and how many days
 // in a row they've kept it up.
-function TodayHero({ isRemote, weekIdx, dayNum, pastProgram, streak, todayDone, todayDoneCount, todayTotal }) {
+function TodayHero({ weekIdx, dayNum, pastProgram, streak, todayDone, todayDoneCount, todayTotal }) {
   const pct = todayTotal ? Math.round((todayDoneCount / todayTotal) * 100) : 0
 
   if (pastProgram) {
@@ -393,7 +391,7 @@ function TodayHero({ isRemote, weekIdx, dayNum, pastProgram, streak, todayDone, 
         <div className="flex-1 min-w-0">
           <p className="text-xs text-white/60">{format(new Date(), 'EEEE, MMM d')}</p>
           <p className="font-display text-lg font-bold truncate">
-            {isRemote ? "This Week's Focuses" : `Week ${weekIdx + 1} · Day ${dayNum}`}
+            Week {weekIdx + 1} · Day {dayNum}
           </p>
           <p className="text-xs text-white/70 mt-0.5">
             {todayTotal > 0
@@ -478,65 +476,135 @@ function DayBody({
   )
 }
 
-// Only used for remote athletes, who see several flexible "day" cards for
-// the current week rather than one dated day.
-function DayCard({
-  dayNum, entries, weekIdx,
-  completions, weights, expanded, setExpanded, selectedType, onSelectType,
-  openBlock, toggleBlock, openSlot, toggleSlot, onToggleComplete, onChooseSlotOption, onOpenDetail, onSaveWeight,
-}) {
-  const dayIdx = dayNum - 1
-  const key    = `day_${dayNum}`
-  const isExpanded = expanded === key
+// College Remote Athlete Mode's whole page: pick one of the program's four
+// day types, then see every program type's content tagged with it (merged
+// via the same DayBody/CategoryTiles machinery in-house athletes use).
+// Deliberately self-contained — none of this touches the real `completions`
+// from Firestore. A college athlete might run "Recovery Day" many times
+// over a season, and re-running it should start fresh each time rather
+// than showing everything already checked off from weeks ago, so
+// completion here is ephemeral local state that resets on every selection
+// instead of being persisted per exercise like the in-house flow.
+function RemoteDayTypePicker({ programs, weights, onSaveWeight, onOpenDetail }) {
+  const [selectedDayType, setSelectedDayType] = useState(null)
+  const [activeProgramTab, setActiveProgramTab] = useState(null)
+  const [ephemeral, setEphemeral] = useState({})
+  const [openBlock, setOpenBlock] = useState({})
+  const [openSlot, setOpenSlot] = useState({})
 
-  const totalExercises = entries.reduce((s, e) => s + buildSlots(e.day.exercises).length, 0)
-  const doneCount = entries.reduce((s, e) => (
-    s + buildSlots(e.day.exercises).filter(slot => isSlotComplete(completions, e.program.id, slot, weekIdx, dayIdx)).length
-  ), 0)
-  const done = totalExercises > 0 && doneCount === totalExercises
+  function toggleBlock(groupKey, blockKey) {
+    setOpenBlock(prev => ({ ...prev, [groupKey]: prev[groupKey] === blockKey ? null : blockKey }))
+  }
+  function toggleSlot(scopeKey, altGroup) {
+    setOpenSlot(prev => ({ ...prev, [scopeKey]: prev[scopeKey] === altGroup ? null : altGroup }))
+  }
 
-  return (
-    <div className={`bg-sp-ink-800 rounded-2xl overflow-hidden border transition ${done ? 'border-sp-green-500/40' : 'border-sp-ink-600'}`}>
-      <div
-        className="flex items-center px-4 py-3.5 cursor-pointer select-none"
-        onClick={() => setExpanded(isExpanded ? null : key)}
-      >
-        <div className={`w-9 h-9 rounded-full flex items-center justify-center mr-3 flex-shrink-0 ${done ? 'bg-sp-green-500/20' : 'bg-white/5'}`}>
-          {done ? <CheckCircle2 size={20} className="text-sp-green-500" /> : <ListChecks size={16} className="text-sp-ink-300" />}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-white truncate">Focus {dayNum}</p>
-          <p className="text-xs text-sp-ink-300">Tap to view</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${done ? 'bg-sp-green-500/15 text-sp-green-500' : 'bg-white/5 text-sp-ink-300'}`}>
-            {doneCount}/{totalExercises}
-          </span>
-          {isExpanded ? <ChevronUp size={16} className="text-sp-ink-300" /> : <ChevronDown size={16} className="text-sp-ink-300" />}
+  function selectDayType(key) {
+    setSelectedDayType(key)
+    setActiveProgramTab(null)
+    setEphemeral({})
+    setOpenBlock({})
+    setOpenSlot({})
+  }
+
+  function ephemeralToggle(programId, exercise, wi, di, ei, wouldFinishDay) {
+    const key = keyForWrite(programId, exercise, wi, di, ei)
+    const wasComplete = isExerciseComplete(ephemeral, programId, exercise, wi, di, ei)
+    setEphemeral(prev => ({ ...prev, [key]: { completed: !wasComplete } }))
+    if (!wasComplete && wouldFinishDay) toast.success('Workout complete! 💪')
+  }
+
+  function ephemeralChooseSlotOption(programId, slot, chosenPos, wi, di, wouldFinishDay) {
+    slot.items.forEach(({ ex, i }, pos) => {
+      if (pos === chosenPos) return
+      if (isExerciseComplete(ephemeral, programId, ex, wi, di, i)) {
+        ephemeralToggle(programId, ex, wi, di, i, false)
+      }
+    })
+    const { ex, i } = slot.items[chosenPos]
+    ephemeralToggle(programId, ex, wi, di, i, wouldFinishDay)
+  }
+
+  const availableTypes = DAY_TYPES.filter(dt =>
+    programs.some(p => findDayForType(p, dt.key))
+  )
+
+  if (availableTypes.length === 0) {
+    return (
+      <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 p-8 text-center">
+        <ListChecks size={26} className="mx-auto mb-2 text-sp-ink-300" />
+        <p className="text-sm font-medium text-white">No day types set up yet</p>
+        <p className="text-xs text-sp-ink-300 mt-0.5">Ask your coach to tag a day as Recovery, High-Intent, or Hybrid.</p>
+      </div>
+    )
+  }
+
+  if (!selectedDayType) {
+    return (
+      <div>
+        <p className="text-sm text-sp-ink-300 mb-3">Pick whichever day type fits the session you're about to run.</p>
+        <div className="grid grid-cols-2 gap-3">
+          {availableTypes.map(dt => {
+            const Icon = DAY_TYPE_ICONS[dt.icon] || Zap
+            return (
+              <button
+                key={dt.key}
+                onClick={() => selectDayType(dt.key)}
+                className="bg-sp-ink-800 border border-sp-ink-600 rounded-2xl p-4 text-left hover:border-sp-green-500/40 transition"
+              >
+                <div className="w-9 h-9 rounded-full bg-sp-green-500/15 flex items-center justify-center mb-3">
+                  <Icon size={17} className="text-sp-green-500" />
+                </div>
+                <p className="font-semibold text-white text-sm">{dt.label}</p>
+              </button>
+            )
+          })}
         </div>
       </div>
+    )
+  }
 
-      {isExpanded && (
-        <div className="border-t border-sp-ink-600 px-1 pt-1">
-          <DayBody
-            entries={entries}
-            weekIdx={weekIdx}
-            dayIdx={dayIdx}
-            groupPrefix={key}
-            completions={completions}
-            weights={weights}
-            selectedType={selectedType}
-            onSelectType={onSelectType}
-            openBlock={openBlock}
-            toggleBlock={toggleBlock}
-            openSlot={openSlot}
-            toggleSlot={toggleSlot}
-            onToggleComplete={onToggleComplete}
-            onChooseSlotOption={onChooseSlotOption}
-            onOpenDetail={onOpenDetail}
-            onSaveWeight={onSaveWeight}
-          />
+  const typeInfo = dayTypeInfo(selectedDayType)
+  const entries = programs
+    .map(program => {
+      const day = findDayForType(program, selectedDayType)
+      return day ? { program, day } : null
+    })
+    .filter(Boolean)
+
+  return (
+    <div>
+      <button
+        onClick={() => setSelectedDayType(null)}
+        className="flex items-center gap-1.5 text-sm text-sp-ink-300 hover:text-white transition mb-3"
+      >
+        <ChevronLeft size={16} /> Change day type
+      </button>
+      <p className="font-display text-lg font-bold text-white mb-3">{typeInfo?.label}</p>
+
+      {entries.length === 0 ? (
+        <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 p-6 text-center text-sm text-sp-ink-300">
+          Nothing tagged {typeInfo?.label} yet.
         </div>
+      ) : (
+        <DayBody
+          entries={entries}
+          weekIdx={0}
+          dayIdx={0}
+          groupPrefix={`remote_${selectedDayType}`}
+          completions={ephemeral}
+          weights={weights}
+          selectedType={activeProgramTab}
+          onSelectType={setActiveProgramTab}
+          openBlock={openBlock}
+          toggleBlock={toggleBlock}
+          openSlot={openSlot}
+          toggleSlot={toggleSlot}
+          onToggleComplete={ephemeralToggle}
+          onChooseSlotOption={ephemeralChooseSlotOption}
+          onOpenDetail={onOpenDetail}
+          onSaveWeight={onSaveWeight}
+        />
       )}
     </div>
   )

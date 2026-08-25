@@ -214,9 +214,11 @@ export default function AdminAthleteDetail() {
   // College Remote Athlete Mode — flips straight from the profile page
   // rather than through the Edit modal, since it's the kind of thing a
   // coach needs to flip quickly (an athlete heading off to campus, or back)
-  // without clicking through a form. Athletes in this mode see every day in
-  // their current week at once and pick which one they're doing, instead of
-  // one fixed day per weekday — see the isRemote branch in SchedulePage.
+  // without clicking through a form. Athletes in this mode aren't on a
+  // per-week calendar at all — they pick from a fixed set of day types
+  // (Recovery/High-Intent/Hybrid 1/Hybrid 2, tagged per day in the program
+  // editor) that apply across the whole program, not any specific week —
+  // see the isRemote branch in SchedulePage.
   async function toggleAthleteType(nextIsRemote) {
     const nextType = nextIsRemote ? 'remote' : 'in_house'
     setTogglingType(true)
@@ -725,9 +727,10 @@ export default function AdminAthleteDetail() {
           <div>
             <p className="font-semibold text-gray-900 text-sm">College Remote Athlete Mode</p>
             <p className="text-xs text-gray-400 mt-0.5 max-w-md">
-              For athletes without a fixed schedule to plan around in advance. Instead of one
-              training day per weekday, they see every day scheduled this week at once and pick
-              whichever one they need that day.
+              For athletes without a fixed schedule to plan around in advance. Instead of a
+              per-week calendar, they pick the day type — Recovery, High-Intent, Hybrid 1, or
+              Hybrid 2 — that fits their session and see that day's pre-throw, throw, mobility,
+              and lift content together. Tag each day's type from the program editor.
             </p>
           </div>
         </div>

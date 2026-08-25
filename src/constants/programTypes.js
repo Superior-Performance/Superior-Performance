@@ -47,6 +47,23 @@ export const EXERCISE_CATEGORIES = [
 
 export const CATCH_PLAY_INFO = { key: 'Catch Play', label: 'Catch Play', icon: 'CircleDot', badgeClass: 'bg-indigo-50 text-indigo-700', dotClass: 'bg-indigo-500' }
 
+// College Remote Athlete Mode's four fixed day types (see AdminAthleteDetail
+// and SchedulePage). A day in ANY of the athlete's active programs
+// (correctives/pre-throw, throwing, mobility, lifting) can be tagged with
+// one of these via ProgramEditorModal's Day Type dropdown — the athlete
+// then picks a type and sees every program's content tagged with it,
+// merged together, regardless of which week it lives in.
+export const DAY_TYPES = [
+  { key: 'recovery',    label: 'Recovery Day',    icon: 'Moon' },
+  { key: 'high_intent', label: 'High-Intent Day', icon: 'Flame' },
+  { key: 'hybrid_1',    label: 'Hybrid Day 1',    icon: 'Zap' },
+  { key: 'hybrid_2',    label: 'Hybrid Day 2',    icon: 'Zap' },
+]
+
+export function dayTypeInfo(key) {
+  return DAY_TYPES.find(t => t.key === key) || null
+}
+
 const GENERAL_INFO = { key: 'General', label: 'General', icon: 'ListChecks', badgeClass: 'bg-gray-100 text-gray-600', dotClass: 'bg-gray-400' }
 
 function matchesCategory(cat, trimmedLower) {

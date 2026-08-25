@@ -290,6 +290,13 @@ export default function AdminAthleteDetail() {
     if (range) {
       const start = Number(range[1])
       const end   = Number(range[2])
+      // A stray value in the Week/Day cell (a date serial, an ID, a typo)
+      // can still match this pattern with a huge span — no real program
+      // block runs more than a couple months, so cap it rather than
+      // spinning a loop with millions of iterations and freezing the tab.
+      if (!Number.isFinite(start) || !Number.isFinite(end) || end < start || end - start > 60) {
+        return [1]
+      }
       const nums = []
       for (let n = start; n <= end; n++) nums.push(n)
       return nums.length ? nums : [1]
@@ -418,7 +425,20 @@ export default function AdminAthleteDetail() {
       params.set('action', 'pullOutputs')
       params.set('tab', tabName)
       params.set('athleteName', athlete.name)
-      const res = await fetch(`${scriptUrl}?${params.toString()}`)
+      // Apps Script occasionally just never responds — a hard timeout so
+      // the button surfaces an error instead of sitting on "Working…"
+      // forever with no way out but a page refresh.
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000)
+      let res
+      try {
+        res = await fetch(`${scriptUrl}?${params.toString()}`, { signal: controller.signal })
+      } catch (err) {
+        if (err.name === 'AbortError') throw new Error(`The sheet took too long to respond (${tabName}). Try again.`)
+        throw err
+      } finally {
+        clearTimeout(timeoutId)
+      }
       return res.json()
     }))
 

@@ -8,12 +8,13 @@ import {
 } from '../../firebase/firestore'
 import { getDataLogs } from '../../firebase/firestore'
 import { ensureExerciseIds, completionKey, legacyCompletionKey, makeExerciseId } from '../../utils/programIds'
-import { ArrowLeft, Save, Zap, Dumbbell, MessageCircle, Pencil, Trash2, X, Sparkles, KeyRound, XCircle, FileSpreadsheet, Download, ChevronDown } from 'lucide-react'
+import { ArrowLeft, Save, Zap, Dumbbell, MessageCircle, Pencil, Trash2, X, Sparkles, KeyRound, XCircle, FileSpreadsheet, Download, ChevronDown, GraduationCap } from 'lucide-react'
 import { sendPasswordResetEmail } from 'firebase/auth'
 import { auth } from '../../firebase/config'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 import ProgramEditorModal from '../../components/ProgramEditorModal'
+import ToggleSwitch from '../../components/ToggleSwitch'
 import { PROGRAM_TYPES } from '../../constants/programTypes'
 
 // Mirrors the "Assessment Intake" Google Sheet column-for-column (minus
@@ -137,7 +138,7 @@ export default function AdminAthleteDetail() {
   const [showDelete, setShowDelete] = useState(false)
   const [editName, setEditName]     = useState('')
   const [editEmail, setEditEmail]   = useState('')
-  const [editAthleteType, setEditAthleteType] = useState('in_house')
+  const [togglingType, setTogglingType] = useState(false)
 
   useEffect(() => {
     load()
@@ -192,7 +193,6 @@ export default function AdminAthleteDetail() {
   function openEdit() {
     setEditName(athlete.name || '')
     setEditEmail(athlete.email || '')
-    setEditAthleteType(athlete.athleteType || 'in_house')
     setShowEdit(true)
   }
 
@@ -200,14 +200,36 @@ export default function AdminAthleteDetail() {
     e.preventDefault()
     setSaving(true)
     try {
-      await updateUser(uid, { name: editName, email: editEmail, athleteType: editAthleteType })
-      setAthlete(a => ({ ...a, name: editName, email: editEmail, athleteType: editAthleteType }))
+      await updateUser(uid, { name: editName, email: editEmail })
+      setAthlete(a => ({ ...a, name: editName, email: editEmail }))
       setShowEdit(false)
       toast.success('Athlete updated!')
     } catch {
       toast.error('Update failed.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  // College Remote Athlete Mode — flips straight from the profile page
+  // rather than through the Edit modal, since it's the kind of thing a
+  // coach needs to flip quickly (an athlete heading off to campus, or back)
+  // without clicking through a form. Athletes in this mode see every day in
+  // their current week at once and pick which one they're doing, instead of
+  // one fixed day per weekday — see the isRemote branch in SchedulePage.
+  async function toggleAthleteType(nextIsRemote) {
+    const nextType = nextIsRemote ? 'remote' : 'in_house'
+    setTogglingType(true)
+    const prevType = athlete.athleteType
+    setAthlete(a => ({ ...a, athleteType: nextType })) // optimistic
+    try {
+      await updateUser(uid, { athleteType: nextType })
+      toast.success(nextIsRemote ? 'College Remote Athlete Mode on.' : 'College Remote Athlete Mode off.')
+    } catch {
+      setAthlete(a => ({ ...a, athleteType: prevType }))
+      toast.error('Could not update athlete type.')
+    } finally {
+      setTogglingType(false)
     }
   }
 
@@ -646,6 +668,29 @@ export default function AdminAthleteDetail() {
         </div>
       </div>
 
+      {/* College Remote Athlete Mode */}
+      <div className="flex items-center justify-between gap-4 bg-white rounded-2xl border border-gray-200 px-5 py-4 mb-6">
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-full bg-sp-green-100 text-sp-green-600 flex items-center justify-center flex-shrink-0">
+            <GraduationCap size={17} />
+          </div>
+          <div>
+            <p className="font-semibold text-gray-900 text-sm">College Remote Athlete Mode</p>
+            <p className="text-xs text-gray-400 mt-0.5 max-w-md">
+              For athletes without a fixed schedule to plan around in advance. Instead of one
+              training day per weekday, they see every day scheduled this week at once and pick
+              whichever one they need that day.
+            </p>
+          </div>
+        </div>
+        <ToggleSwitch
+          checked={athlete.athleteType === 'remote'}
+          onChange={toggleAthleteType}
+          disabled={togglingType}
+          label="College Remote Athlete Mode"
+        />
+      </div>
+
       {/* Tabs */}
       <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-fit">
         {[['assessment','Assessment'],['program','Program'],['logs','Data Logs']].map(([k,l]) => (
@@ -933,18 +978,6 @@ export default function AdminAthleteDetail() {
                   className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
                 />
                 <p className="text-xs text-gray-400 mt-1">Note: this updates the display name only, not their login email.</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Athlete Type</label>
-                <select
-                  value={editAthleteType}
-                  onChange={e => setEditAthleteType(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-white"
-                >
-                  <option value="in_house">In-house</option>
-                  <option value="remote">Remote</option>
-                </select>
-                <p className="text-xs text-gray-400 mt-1">Remote athletes see their week as one flexible set of focuses instead of fixed training days.</p>
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowEdit(false)} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Cancel</button>

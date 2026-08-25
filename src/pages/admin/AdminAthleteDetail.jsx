@@ -302,9 +302,11 @@ export default function AdminAthleteDetail() {
 
   // Shared by every Outputs-tab pull — all end up with the same flat row
   // shape (Week, Day, Category, Exercise, Sets, Reps, Intensity, Notes,
-  // Video URL). The Outputs tabs call their category column "Type" and
-  // their Day column can be blank (one session a week) or a weekday name —
-  // both are handled here so every pull path shares one code path. Creates
+  // Video URL, plus an optional Alternate Exercise/Sets/Reps/Intensity/
+  // Notes/Video URL for a same-row either/or option). The Outputs tabs call
+  // their category column "Type" and their Day column can be blank (one
+  // session a week) or a weekday name — both are handled here so every pull
+  // path shares one code path. Creates
   // a DRAFT (active: false) rather than publishing straight to the athlete,
   // so it can be reviewed and edited first — see the Drafts Awaiting Review
   // section on the Program tab. programType determines which of the
@@ -327,6 +329,7 @@ export default function AdminAthleteDetail() {
               exercises: [],
             }
           }
+          const category = row['Category'] || row['Type'] || ''
           weeksMap[wk].days[day].exercises.push({
             id:        makeExerciseId(),   // stable across later edits — see utils/programIds
             name:      row['Exercise']  || '',
@@ -338,9 +341,34 @@ export default function AdminAthleteDetail() {
             // Correctives, Movement Activation and a plyo routine. See
             // constants/programTypes.js for the category taxonomy. "Type" is
             // the outputs tab's name for the same column.
-            category:  row['Category']  || row['Type'] || '',
+            category,
             videoUrl:  row['Video URL'] || row['Video'] || '',
           })
+
+          // The sheet can carry a second, either/or option on the same
+          // row — same column names with "Alternate " in front (Alternate
+          // Exercise, Alternate Sets, ...). When filled in, pair it with
+          // the exercise just pushed via a shared altGroup so the athlete
+          // sees them as one "choose one" slot instead of two separate
+          // exercises — see utils/programIds and ProgramEditorModal's
+          // "Add alt option".
+          const altName = row['Alternate Exercise'] || ''
+          if (altName.trim()) {
+            const exercises = weeksMap[wk].days[day].exercises
+            const group = makeExerciseId()
+            exercises[exercises.length - 1].altGroup = group
+            exercises.push({
+              id:        makeExerciseId(),
+              name:      altName,
+              sets:      row['Alternate Sets']      || '',
+              reps:      row['Alternate Reps']      || '',
+              intensity: row['Alternate Intensity'] || '',
+              notes:     row['Alternate Notes']     || '',
+              category,
+              videoUrl:  row['Alternate Video URL'] || row['Alternate Video'] || '',
+              altGroup:  group,
+            })
+          }
         })
       })
     })

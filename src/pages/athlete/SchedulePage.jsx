@@ -96,6 +96,10 @@ export default function SchedulePage() {
   // auto-collapses whatever else was open in that day/program-tab so this
   // page never turns into a long stack of expanded exercise lists.
   const [openBlock, setOpenBlock]     = useState({})
+  // Same idea, one level deeper — numbered either/or slots (e.g. "Corrective
+  // 1"/"Corrective 2", see EXERCISE_CATEGORIES' slotLabel) stay collapsed
+  // until tapped, and opening one closes whichever was open in that block.
+  const [openSlot, setOpenSlot]       = useState({})
   const [detail, setDetail]           = useState(null) // { ex, program } — exercise detail modal
   const [loading, setLoading]         = useState(true)
   // Programs the coach has edited since this athlete last acknowledged them.
@@ -134,6 +138,10 @@ export default function SchedulePage() {
 
   function toggleBlock(groupKey, blockKey) {
     setOpenBlock(prev => ({ ...prev, [groupKey]: prev[groupKey] === blockKey ? null : blockKey }))
+  }
+
+  function toggleSlot(blockScopeKey, altGroup) {
+    setOpenSlot(prev => ({ ...prev, [blockScopeKey]: prev[blockScopeKey] === altGroup ? null : altGroup }))
   }
 
   async function saveWeight(programId, exerciseId, exerciseName, value) {
@@ -291,6 +299,8 @@ export default function SchedulePage() {
               onSelectType={(type) => setDayTabs(prev => ({ ...prev, [dayNum]: type }))}
               openBlock={openBlock}
               toggleBlock={toggleBlock}
+              openSlot={openSlot}
+              toggleSlot={toggleSlot}
               onToggleComplete={toggleExerciseComplete}
               onChooseSlotOption={chooseSlotOption}
               onOpenDetail={setDetail}
@@ -310,6 +320,8 @@ export default function SchedulePage() {
           onSelectType={(type) => setDayTabs(prev => ({ ...prev, today: type }))}
           openBlock={openBlock}
           toggleBlock={toggleBlock}
+          openSlot={openSlot}
+          toggleSlot={toggleSlot}
           onToggleComplete={toggleExerciseComplete}
           onChooseSlotOption={chooseSlotOption}
           onOpenDetail={setDetail}
@@ -406,7 +418,7 @@ function TodayHero({ isRemote, weekIdx, dayNum, pastProgram, streak, todayDone, 
 function DayBody({
   entries, weekIdx, dayIdx, groupPrefix,
   completions, weights, selectedType, onSelectType,
-  openBlock, toggleBlock, onToggleComplete, onChooseSlotOption, onOpenDetail, onSaveWeight,
+  openBlock, toggleBlock, openSlot, toggleSlot, onToggleComplete, onChooseSlotOption, onOpenDetail, onSaveWeight,
 }) {
   const availableTypes = TAB_ORDER.filter(t => entries.some(e => (e.program.programType || 'correctives') === t))
   const activeType = availableTypes.includes(selectedType) ? selectedType : availableTypes[0]
@@ -453,6 +465,8 @@ function DayBody({
             weights={weights}
             openBlockKey={openBlock[groupKey]}
             toggleBlock={toggleBlock}
+            openSlot={openSlot}
+            toggleSlot={toggleSlot}
             onToggleComplete={onToggleComplete}
             onChooseSlotOption={onChooseSlotOption}
             onOpenDetail={onOpenDetail}
@@ -469,7 +483,7 @@ function DayBody({
 function DayCard({
   dayNum, entries, weekIdx,
   completions, weights, expanded, setExpanded, selectedType, onSelectType,
-  openBlock, toggleBlock, onToggleComplete, onChooseSlotOption, onOpenDetail, onSaveWeight,
+  openBlock, toggleBlock, openSlot, toggleSlot, onToggleComplete, onChooseSlotOption, onOpenDetail, onSaveWeight,
 }) {
   const dayIdx = dayNum - 1
   const key    = `day_${dayNum}`
@@ -515,6 +529,8 @@ function DayCard({
             onSelectType={onSelectType}
             openBlock={openBlock}
             toggleBlock={toggleBlock}
+            openSlot={openSlot}
+            toggleSlot={toggleSlot}
             onToggleComplete={onToggleComplete}
             onChooseSlotOption={onChooseSlotOption}
             onOpenDetail={onOpenDetail}
@@ -529,7 +545,7 @@ function DayCard({
 function CategoryTiles({
   program, day, fallbackCategory, currentWeek, dayIdx, groupKey,
   doneCount, totalExercises, showWeight, completions, weights,
-  openBlockKey, toggleBlock, onToggleComplete, onChooseSlotOption, onOpenDetail, onSaveWeight,
+  openBlockKey, toggleBlock, openSlot, toggleSlot, onToggleComplete, onChooseSlotOption, onOpenDetail, onSaveWeight,
 }) {
   return (
     <>
@@ -538,6 +554,12 @@ function CategoryTiles({
         const Icon = CATEGORY_ICONS[info.icon] || ListChecks
         const blockOpen = openBlockKey === block.key
         const blockDone = block.slots.filter(slot => isSlotComplete(completions, program.id, slot, currentWeek, dayIdx)).length
+
+        // Number the either/or slots ("Corrective 1", "Corrective 2", ...)
+        // in the order they appear — single-exercise slots aren't numbered.
+        let slotNum = 0
+        const numberedSlots = block.slots.map(slot => slot.items.length > 1 ? { ...slot, slotNum: ++slotNum } : slot)
+        const slotScopeKey = `${groupKey}__${block.key}`
 
         return (
           <div key={block.key} className="border-b border-sp-ink-600 last:border-0">
@@ -557,40 +579,86 @@ function CategoryTiles({
 
             {blockOpen && (
               <div className="divide-y divide-sp-ink-600/60">
-                {block.slots.map((slot) => slot.items.length > 1
-                  ? (
-                    <AltOptionSlot
-                      key={slot.altGroup}
-                      slot={slot}
-                      program={program}
-                      currentWeek={currentWeek}
-                      dayIdx={dayIdx}
-                      doneCount={doneCount}
-                      totalExercises={totalExercises}
-                      completions={completions}
-                      onChooseSlotOption={onChooseSlotOption}
-                      onOpenDetail={onOpenDetail}
-                    />
+                {numberedSlots.map((slot) => {
+                  if (slot.items.length <= 1) {
+                    return (
+                      <ExerciseRow
+                        key={slot.items[0].ex.id || slot.items[0].i}
+                        ex={slot.items[0].ex}
+                        i={slot.items[0].i}
+                        program={program}
+                        currentWeek={currentWeek}
+                        dayIdx={dayIdx}
+                        doneCount={doneCount}
+                        totalExercises={totalExercises}
+                        completions={completions}
+                        showWeight={showWeight}
+                        weights={weights}
+                        onToggleComplete={onToggleComplete}
+                        onOpenDetail={onOpenDetail}
+                        onSaveWeight={onSaveWeight}
+                      />
+                    )
+                  }
+
+                  // Either/or pair — without a slotLabel (e.g. Mobilization),
+                  // both options just show inline as before.
+                  if (!info.slotLabel) {
+                    return (
+                      <AltOptionSlot
+                        key={slot.altGroup}
+                        slot={slot}
+                        program={program}
+                        currentWeek={currentWeek}
+                        dayIdx={dayIdx}
+                        doneCount={doneCount}
+                        totalExercises={totalExercises}
+                        completions={completions}
+                        onChooseSlotOption={onChooseSlotOption}
+                        onOpenDetail={onOpenDetail}
+                      />
+                    )
+                  }
+
+                  // With a slotLabel (Correctives) — collapsed behind a
+                  // numbered row ("Corrective 1") the athlete taps to reveal
+                  // its two options, rather than always showing both.
+                  const slotOpen = openSlot[slotScopeKey] === slot.altGroup
+                  const slotDone = isSlotComplete(completions, program.id, slot, currentWeek, dayIdx)
+                  return (
+                    <div key={slot.altGroup}>
+                      <button
+                        onClick={() => toggleSlot(slotScopeKey, slot.altGroup)}
+                        className="w-full flex items-center justify-between gap-2 px-4 py-3 hover:bg-white/5 transition"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          {slotDone
+                            ? <CheckCircle2 size={18} className="text-sp-green-500 flex-shrink-0" />
+                            : <Circle size={18} className="text-sp-ink-300 flex-shrink-0" />
+                          }
+                          <span className="font-medium text-sm text-sp-ink-50">{info.slotLabel} {slot.slotNum}</span>
+                        </div>
+                        {slotOpen ? <ChevronUp size={14} className="text-sp-ink-300 flex-shrink-0" /> : <ChevronDown size={14} className="text-sp-ink-300 flex-shrink-0" />}
+                      </button>
+                      {slotOpen && (
+                        <div className="pb-2">
+                          <AltOptionSlot
+                            slot={slot}
+                            program={program}
+                            currentWeek={currentWeek}
+                            dayIdx={dayIdx}
+                            doneCount={doneCount}
+                            totalExercises={totalExercises}
+                            completions={completions}
+                            onChooseSlotOption={onChooseSlotOption}
+                            onOpenDetail={onOpenDetail}
+                            showChooseLabel={false}
+                          />
+                        </div>
+                      )}
+                    </div>
                   )
-                  : (
-                    <ExerciseRow
-                      key={slot.items[0].ex.id || slot.items[0].i}
-                      ex={slot.items[0].ex}
-                      i={slot.items[0].i}
-                      program={program}
-                      currentWeek={currentWeek}
-                      dayIdx={dayIdx}
-                      doneCount={doneCount}
-                      totalExercises={totalExercises}
-                      completions={completions}
-                      showWeight={showWeight}
-                      weights={weights}
-                      onToggleComplete={onToggleComplete}
-                      onOpenDetail={onOpenDetail}
-                      onSaveWeight={onSaveWeight}
-                    />
-                  )
-                )}
+                })}
               </div>
             )}
           </div>
@@ -651,11 +719,11 @@ function ExerciseRow({
 
 // Two corrective exercises presented as either/or — the athlete picks
 // whichever they actually did that day and only that one needs checking off.
-function AltOptionSlot({ slot, program, currentWeek, dayIdx, doneCount, totalExercises, completions, onChooseSlotOption, onOpenDetail }) {
+function AltOptionSlot({ slot, program, currentWeek, dayIdx, doneCount, totalExercises, completions, onChooseSlotOption, onOpenDetail, showChooseLabel = true }) {
   const anyDone = isSlotComplete(completions, program.id, slot, currentWeek, dayIdx)
   return (
     <div className="px-4 py-3">
-      <p className="text-[10px] font-bold uppercase tracking-wide text-sp-ink-300 mb-1.5">Choose one</p>
+      {showChooseLabel && <p className="text-[10px] font-bold uppercase tracking-wide text-sp-ink-300 mb-1.5">Choose one</p>}
       <div className="space-y-1.5">
         {slot.items.map(({ ex, i }, pos) => {
           const exDone = isExerciseComplete(completions, program.id, ex, currentWeek, dayIdx, i)

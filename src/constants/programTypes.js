@@ -27,7 +27,12 @@ export function programTypeInfo(key) {
 // Day Plyos") — matched case/whitespace-insensitively, same as `key`.
 export const EXERCISE_CATEGORIES = [
   { key: 'Mobilization',           label: 'Mobilization',           icon: 'Wind',  badgeClass: 'bg-sky-50 text-sky-700',       dotClass: 'bg-sky-500' },
-  { key: 'Correctives',            label: 'Correctives',            icon: 'Heart', badgeClass: 'bg-sp-green-100 text-sp-green-800', dotClass: 'bg-sp-green-500' },
+  // slotLabel — when a category's either/or pairs (see utils/programIds'
+  // altGroup) should read as "Corrective 1", "Corrective 2" rather than the
+  // generic "Choose one," this is the singular noun to number. Only set
+  // where that's actually wanted; every other category's either/or pairs
+  // keep the plain "Choose one" treatment.
+  { key: 'Correctives',            label: 'Correctives',            slotLabel: 'Corrective', icon: 'Heart', badgeClass: 'bg-sp-green-100 text-sp-green-800', dotClass: 'bg-sp-green-500' },
   { key: 'Movement Activation',    label: 'Movement Activation',    icon: 'Zap',   badgeClass: 'bg-amber-50 text-amber-700',   dotClass: 'bg-amber-500' },
   // shortLabel is what the athlete's daily schedule shows — "Hybrid Day
   // Plyos" vs. "High-Intent Day Plyos" vs. "Recovery Day Plyos" is a

@@ -40,8 +40,8 @@ const FIELD_GROUPS = [
   {
     title: 'Program Planning',
     fields: [
-      { key: 'mode',                label: 'Mode',            type: 'select', options: ['College Remote Athlete', 'In-house'] },
-      { key: 'programLengthWeeks',  label: 'Program Length',  type: 'select', options: ['4 Weeks', '8 Weeks', '12 Weeks'] },
+      { key: 'mode',                label: 'Mode',            type: 'select', options: ['In-House', 'Remote'] },
+      { key: 'programLengthWeeks',  label: 'Program Length',  type: 'select', options: ['4 weeks', '8 weeks', '12 weeks'] },
       { key: 'trainingPhase',       label: 'Training Phase',  type: 'select', options: ['On-Ramp', 'In-Season', 'Off-Season'] },
     ],
   },

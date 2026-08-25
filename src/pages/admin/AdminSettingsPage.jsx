@@ -514,7 +514,7 @@ function appendAssessment(e) {
       'ankleDorsiflexionLeft', 'ankleDorsiflexionRight', 'shoulderFlexion', 'tSpineRotation',
       'tSpineExtension', 'tSpineFlexion', 'pecTest', 'elbowPainType', 'flexorForearmTightness',
       'ribFlare', 'scapControl', 'postureFeet', 'posturePelvis', 'postureUpperBody', 'otherNotes',
-      'mode', 'programLengthWeeks', 'trainingPhase'
+      'mode', 'trainingPhase', 'programLengthWeeks'
     ];
 
     const row = columns.map(key => e.parameter[key] || '');

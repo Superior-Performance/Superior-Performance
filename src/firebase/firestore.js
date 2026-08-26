@@ -63,6 +63,22 @@ export const updateLiveProgram = (programId, data) =>
 export const getAllPrograms = () =>
   getDocs(query(collection(db, 'programs'), orderBy('createdAt', 'desc')))
 
+// Every program document tied to this specific athlete — active, inactive,
+// and drafts alike (unlike getProgramForAthlete, which is active-only). Used
+// by the athlete detail page so it isn't fetching every other athlete's
+// programs just to find this one's — see getGeneralPrograms for the other
+// half of that page's picture.
+export const getProgramsForAthlete = (athleteId) =>
+  getDocs(query(collection(db, 'programs'), where('athleteId', '==', athleteId)))
+
+// Reusable template programs not yet tied to any athlete — the library on
+// the Programs page and the assignable pool on each athlete's Program tab.
+// No orderBy here on purpose: pairing an equality filter with orderBy on a
+// different field needs a composite index, and this collection is small
+// enough that sorting client-side after the fetch is simpler than managing one.
+export const getGeneralPrograms = () =>
+  getDocs(query(collection(db, 'programs'), where('athleteId', '==', null)))
+
 export const deleteProgram = (programId) =>
   deleteDoc(doc(db, 'programs', programId))
 

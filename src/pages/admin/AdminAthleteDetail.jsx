@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
-  getUser, getAllPrograms, getAssessment, saveAssessment,
+  getUser, getAssessment, saveAssessment,
   updateUser, deleteUser, getProgramForAthlete, updateProgram,
   updateLiveProgram, migrateCompletionKeys,
-  createProgram, getSettings,
+  createProgram, getSettings, getProgramsForAthlete, getGeneralPrograms,
 } from '../../firebase/firestore'
 import { getDataLogs } from '../../firebase/firestore'
 import { ensureExerciseIds, completionKey, legacyCompletionKey, makeExerciseId } from '../../utils/programIds'
-import { ArrowLeft, Save, Zap, Dumbbell, MessageCircle, Pencil, Trash2, X, Sparkles, KeyRound, XCircle, FileSpreadsheet, Download, ChevronDown, GraduationCap } from 'lucide-react'
+import { ArrowLeft, Save, Zap, Dumbbell, MessageCircle, Pencil, Trash2, X, Sparkles, KeyRound, XCircle, FileSpreadsheet, Download, ChevronDown, GraduationCap, Search } from 'lucide-react'
 import { sendPasswordResetEmail } from 'firebase/auth'
 import { auth } from '../../firebase/config'
 import toast from 'react-hot-toast'
@@ -142,6 +142,12 @@ export default function AdminAthleteDetail() {
   const [editName, setEditName]     = useState('')
   const [editEmail, setEditEmail]   = useState('')
   const [togglingType, setTogglingType] = useState(false)
+  // Program tab shows one program type at a time (a sub-tab) instead of all
+  // four stacked, and "Assign Existing" is a search modal instead of an
+  // always-open list — both purely to keep this page from ballooning as an
+  // athlete (or the assignable library) accumulates programs over a season.
+  const [programTypeTab, setProgramTypeTab] = useState('correctives')
+  const [showAssignModal, setShowAssignModal] = useState(false)
 
   useEffect(() => {
     load()
@@ -151,11 +157,12 @@ export default function AdminAthleteDetail() {
     setLoading(true)
     setLoadError(null)
     try {
-      const [userSnap, progSnap, assessSnap, allProgs, logsSnap] = await Promise.all([
+      const [userSnap, progSnap, assessSnap, ownProgs, generalProgs, logsSnap] = await Promise.all([
         getUser(uid),
         getProgramForAthlete(uid),
         getAssessment(uid),
-        getAllPrograms(),
+        getProgramsForAthlete(uid),
+        getGeneralPrograms(),
         getDataLogs(uid),
       ])
       setAthlete(userSnap.exists() ? { id: uid, ...userSnap.data() } : null)
@@ -171,7 +178,7 @@ export default function AdminAthleteDetail() {
       } else {
         setAssessment({})
       }
-      setPrograms(allProgs.docs.map(d => ({ id: d.id, ...d.data() })))
+      setPrograms(mergePrograms(ownProgs, generalProgs))
       setLogs(logsSnap.docs.map(d => ({ id: d.id, ...d.data() })))
     } catch (err) {
       console.error('Failed to load athlete detail:', err)
@@ -179,6 +186,21 @@ export default function AdminAthleteDetail() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // This page only ever needs two slices of the programs collection — this
+  // athlete's own (active/inactive/draft alike) and the unassigned general
+  // library — never every other athlete's programs too. See
+  // getProgramsForAthlete/getGeneralPrograms in firestore.js.
+  function mergePrograms(ownSnap, generalSnap) {
+    const own = ownSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+    const general = generalSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+    return [...own, ...general]
+  }
+
+  async function refreshPrograms() {
+    const [ownProgs, generalProgs] = await Promise.all([getProgramsForAthlete(uid), getGeneralPrograms()])
+    setPrograms(mergePrograms(ownProgs, generalProgs))
   }
 
   async function saveAssessmentScores() {
@@ -415,8 +437,7 @@ export default function AdminAthleteDetail() {
       active:     false,
     })
 
-    const allProgs = await getAllPrograms()
-    setPrograms(allProgs.docs.map(d => ({ id: d.id, ...d.data() })))
+    await refreshPrograms()
   }
 
   // The coach's Sheet splits its exercise output across several tabs now —
@@ -589,6 +610,13 @@ export default function AdminAthleteDetail() {
       // date — a reusable template's original date has no bearing on when
       // *this* athlete is actually starting it. Adjustable after in the editor.
       await createProgram({ ...templateData, startDate: new Date().toISOString().slice(0, 10), athleteId: uid, active: true })
+      // A draft's job is done once it's been published — archive it so it
+      // drops out of "Drafts Awaiting Review" for good instead of sitting
+      // there forever. Reusable templates (active === true) are never
+      // touched here; they stay assignable to the next athlete.
+      if (target.active === false) {
+        await updateProgram(target.id, { archived: true })
+      }
       const snap = await getProgramForAthlete(uid)
       const nextActive = {}
       snap.docs.forEach(d => {
@@ -597,8 +625,7 @@ export default function AdminAthleteDetail() {
       })
       setActivePrograms(nextActive)
       await syncProgramTypesFlag(nextActive)
-      const allProgs = await getAllPrograms()
-      setPrograms(allProgs.docs.map(d => ({ id: d.id, ...d.data() })))
+      await refreshPrograms()
       toast.success('Program assigned — this athlete has their own copy, separate from the original.')
     } catch {
       toast.error('Assignment failed.')
@@ -609,8 +636,7 @@ export default function AdminAthleteDetail() {
 
   async function saveDraftWeeks(programId, weeks, startDate) {
     await updateProgram(programId, { weeks, totalWeeks: weeks.length, startDate })
-    const allProgs = await getAllPrograms()
-    setPrograms(allProgs.docs.map(d => ({ id: d.id, ...d.data() })))
+    await refreshPrograms()
   }
 
   /**
@@ -680,6 +706,23 @@ export default function AdminAthleteDetail() {
       </Link>
       <p className="text-gray-500">Athlete not found. They may have been deleted.</p>
     </div>
+  )
+
+  // Program tab shows one type at a time (programTypeTab) instead of all
+  // four stacked — see the state declaration up top for why.
+  const currentTypeLabel = PROGRAM_TYPES.find(t => t.key === programTypeTab)?.label || programTypeTab
+  const currentTypeProgram = activePrograms[programTypeTab]
+  const draftsForType = programs.filter(p =>
+    p.athleteId === uid && p.active === false && !p.archived && (p.programType || 'correctives') === programTypeTab
+  )
+  // Only unassigned templates or this athlete's own (non-draft) programs
+  // belong here — a program already active for a DIFFERENT athlete must
+  // never show up as assignable, or "Assign" would silently steal it.
+  const assignableForType = programs.filter(p =>
+    (p.programType || 'correctives') === programTypeTab &&
+    p.id !== currentTypeProgram?.id &&
+    (!p.athleteId || p.athleteId === uid) &&
+    !(p.active === false && p.athleteId === uid)
   )
 
   return (
@@ -889,113 +932,117 @@ export default function AdminAthleteDetail() {
         </div>
       )}
 
-      {/* Program tab — one section per concurrent program type */}
+      {/* Program tab — one program type at a time via a sub-tab, plus an
+          on-demand search modal for assigning instead of an always-open
+          list, so this stays readable no matter how much history an
+          athlete (or the assignable library) accumulates over a season. */}
       {tab === 'program' && (
-        <div className="space-y-8">
-          {PROGRAM_TYPES.map(({ key, label }) => {
-            const current = activePrograms[key]
-            const drafts = programs.filter(p => p.athleteId === uid && p.active === false && (p.programType || 'correctives') === key)
-            // Only unassigned templates or this athlete's own (non-draft) programs
-            // belong here — a program already active for a DIFFERENT athlete must
-            // never show up as assignable, or "Assign" would silently steal it.
-            const assignable = programs.filter(p =>
-              (p.programType || 'correctives') === key &&
-              p.id !== current?.id &&
-              (!p.athleteId || p.athleteId === uid) &&
-              !(p.active === false && p.athleteId === uid)
-            )
-            return (
-              <div key={key} className="space-y-4">
-                <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider">{label}</h2>
+        <div className="space-y-4">
+          {/* Type sub-tabs — a green dot marks types with an active program */}
+          <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
+            {PROGRAM_TYPES.map(({ key: k, label: l }) => (
+              <button
+                key={k}
+                onClick={() => setProgramTypeTab(k)}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition ${
+                  programTypeTab === k ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {l}
+                {activePrograms[k] && <span className="w-1.5 h-1.5 rounded-full bg-sp-green-500 flex-shrink-0" />}
+              </button>
+            ))}
+          </div>
 
-                {/* Current program of this type */}
-                <div className="bg-white rounded-2xl border border-gray-200 p-5">
-                  {current ? (
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-gray-900">{current.name}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {current.weeks?.length || 0} weeks ·{' '}
-                          {(current.weeks || []).reduce((s, wk) => s + (wk.days || []).reduce((t, d) => t + (d.exercises?.length || 0), 0), 0)} exercises
-                          {current.lastEditedAt && (
-                            <> · edited {format(current.lastEditedAt.toDate?.() ?? current.lastEditedAt, 'MMM d')}</>
-                          )}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="px-2.5 py-1 bg-sp-green-100 text-sp-green-800 text-xs font-medium rounded-full">Active</span>
-                        <button
-                          onClick={() => openLiveProgram(current)}
-                          disabled={saving}
-                          className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 disabled:opacity-60 transition"
-                        >
-                          <Pencil size={13} /> View / Edit
-                        </button>
-                        <button
-                          onClick={() => removeProgram(key)}
-                          disabled={saving}
-                          className="flex items-center gap-1.5 px-3 py-1.5 border border-red-200 text-red-500 text-xs font-medium rounded-lg hover:bg-red-50 transition"
-                        >
-                          <XCircle size={13} /> Remove
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-gray-400 text-sm">No {label.toLowerCase()} program assigned.</p>
-                  )}
-                </div>
-
-                {/* Drafts awaiting review for this type — not visible to the
-                    athlete until published from the editor below */}
-                {drafts.length > 0 && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
-                    <h3 className="font-semibold text-amber-900 mb-3 text-sm">Drafts Awaiting Review</h3>
-                    <div className="space-y-2">
-                      {drafts.map((p) => (
-                        <div key={p.id} className="flex items-center justify-between py-2 border-b border-amber-100 last:border-0">
-                          <div>
-                            <p className="text-sm font-medium text-gray-800">{p.name}</p>
-                            <p className="text-xs text-gray-500">{p.weeks?.length || 0} weeks · not visible to the athlete yet</p>
-                          </div>
-                          <button
-                            onClick={() => setEditingDraft(p)}
-                            className="text-xs px-3 py-1.5 bg-amber-100 text-amber-800 font-medium rounded-lg hover:bg-amber-200 transition"
-                          >
-                            Review
-                          </button>
-                        </div>
-                      ))}
-                    </div>
+          {/* Current program — one compact row */}
+          <div className="bg-white rounded-2xl border border-gray-200 px-5 py-4">
+            {currentTypeProgram ? (
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 bg-sp-green-100 text-sp-green-800 text-[10px] font-semibold uppercase tracking-wide rounded-full flex-shrink-0">Active</span>
+                    <p className="font-medium text-gray-900 truncate">{currentTypeProgram.name}</p>
                   </div>
-                )}
-
-                {/* Assign an existing program of this type */}
-                <div className="bg-white rounded-2xl border border-gray-200 p-5">
-                  <h3 className="font-semibold text-gray-900 mb-3 text-sm">Assign Existing</h3>
-                  <div className="space-y-2">
-                    {assignable.map((p) => (
-                      <div key={p.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-                        <div>
-                          <p className="text-sm font-medium text-gray-800">{p.name}</p>
-                          <p className="text-xs text-gray-400">{p.weeks?.length || 0} weeks</p>
-                        </div>
-                        <button
-                          onClick={() => assignProgram(p.id)}
-                          disabled={saving}
-                          className="text-xs px-3 py-1.5 bg-sp-green-50 text-sp-green-600 font-medium rounded-lg hover:bg-sp-green-100 transition"
-                        >
-                          Assign
-                        </button>
-                      </div>
-                    ))}
-                    {assignable.length === 0 && (
-                      <p className="text-gray-400 text-sm">No {label.toLowerCase()} programs yet. Create one in <Link to="/admin/programs" className="text-sp-green-500 underline">Programs</Link>.</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {currentTypeProgram.weeks?.length || 0} weeks
+                    {currentTypeProgram.lastEditedAt && (
+                      <> · edited {format(currentTypeProgram.lastEditedAt.toDate?.() ?? currentTypeProgram.lastEditedAt, 'MMM d')}</>
                     )}
-                  </div>
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button
+                    onClick={() => openLiveProgram(currentTypeProgram)}
+                    disabled={saving}
+                    className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 disabled:opacity-60 transition"
+                  >
+                    <Pencil size={13} /> Edit
+                  </button>
+                  <button
+                    onClick={() => removeProgram(programTypeTab)}
+                    disabled={saving}
+                    className="p-1.5 text-gray-300 hover:text-red-500 transition"
+                    title="Remove"
+                    aria-label="Remove program"
+                  >
+                    <XCircle size={16} />
+                  </button>
                 </div>
               </div>
-            )
-          })}
+            ) : (
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-gray-400 text-sm">No {currentTypeLabel.toLowerCase()} program assigned.</p>
+                <button
+                  onClick={() => setShowAssignModal(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-sp-green-50 text-sp-green-600 text-xs font-semibold rounded-lg hover:bg-sp-green-100 transition flex-shrink-0"
+                >
+                  <Search size={13} /> Assign Program
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Drafts awaiting review — collapses away entirely once empty, and
+              a published draft is archived so it never comes back here */}
+          {draftsForType.length > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4">
+              <h3 className="font-semibold text-amber-900 mb-2.5 text-xs uppercase tracking-wide">Drafts Awaiting Review</h3>
+              <div className="space-y-2">
+                {draftsForType.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between gap-3">
+                    <p className="text-sm text-gray-800 truncate">{p.name}</p>
+                    <button
+                      onClick={() => setEditingDraft(p)}
+                      className="flex-shrink-0 text-xs px-3 py-1.5 bg-amber-100 text-amber-800 font-medium rounded-lg hover:bg-amber-200 transition"
+                    >
+                      Review
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Swapping in a different program is always one click away, even
+              with one already active — no need to Remove first */}
+          {currentTypeProgram && (
+            <button
+              onClick={() => setShowAssignModal(true)}
+              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-sp-green-600 transition"
+            >
+              <Search size={14} /> Assign a different {currentTypeLabel.toLowerCase()} program
+            </button>
+          )}
+
+          {showAssignModal && (
+            <AssignProgramModal
+              typeLabel={currentTypeLabel}
+              programs={assignableForType}
+              saving={saving}
+              onAssign={(id) => { setShowAssignModal(false); assignProgram(id) }}
+              onClose={() => setShowAssignModal(false)}
+            />
+          )}
         </div>
       )}
 
@@ -1112,6 +1159,67 @@ export default function AdminAthleteDetail() {
           </table>
         </div>
       )}
+    </div>
+  )
+}
+
+// Search-and-assign picker, opened from the Program tab instead of an
+// always-visible list — keeps the athlete page compact as the assignable
+// library (general templates + this athlete's own past programs) grows.
+function AssignProgramModal({ typeLabel, programs, saving, onAssign, onClose }) {
+  const [search, setSearch] = useState('')
+  const filtered = programs.filter(p => p.name?.toLowerCase().includes(search.toLowerCase()))
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-xl max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+          <h2 className="text-lg font-bold">Assign {typeLabel} Program</h2>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition"><X size={18} /></button>
+        </div>
+        <div className="px-5 py-3 border-b border-gray-100 flex-shrink-0">
+          <div className="relative">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              autoFocus
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search programs…"
+              className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
+            />
+          </div>
+        </div>
+        <div className="overflow-y-auto flex-1 px-5 py-3">
+          {filtered.length === 0 ? (
+            <p className="text-gray-400 text-sm py-6 text-center">
+              {programs.length === 0
+                ? <>No {typeLabel.toLowerCase()} programs yet. Create one in <Link to="/admin/programs" className="text-sp-green-500 underline">Programs</Link>.</>
+                : 'No matches.'}
+            </p>
+          ) : (
+            <div className="space-y-1">
+              {filtered.map((p) => (
+                <div key={p.id} className="flex items-center justify-between gap-3 py-2 border-b border-gray-50 last:border-0">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
+                    <p className="text-xs text-gray-400">
+                      {p.weeks?.length || 0} weeks{!p.athleteId && ' · General'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => onAssign(p.id)}
+                    disabled={saving}
+                    className="flex-shrink-0 text-xs px-3 py-1.5 bg-sp-green-50 text-sp-green-600 font-medium rounded-lg hover:bg-sp-green-100 disabled:opacity-60 transition"
+                  >
+                    Assign
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

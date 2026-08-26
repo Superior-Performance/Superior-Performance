@@ -1,11 +1,15 @@
 import { useEffect, useState, useRef } from 'react'
-import { getAllPrograms, createProgram, updateProgram, deleteProgram } from '../../firebase/firestore'
-import { Plus, Upload, Trash2, Copy, Pencil, X, FileSpreadsheet, LayoutList, AlertTriangle } from 'lucide-react'
+import {
+  getGeneralPrograms, getAllAthletes, getProgramsForAthlete,
+  createProgram, updateProgram, deleteProgram,
+} from '../../firebase/firestore'
+import { Plus, Upload, Trash2, Copy, Pencil, X, FileSpreadsheet, LayoutList, AlertTriangle, Search, ChevronDown, Users } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import Papa from 'papaparse'
 import EmptyState from '../../components/EmptyState'
 import ProgramEditorModal from '../../components/ProgramEditorModal'
-import { PROGRAM_TYPES } from '../../constants/programTypes'
+import { PROGRAM_TYPES, programTypeInfo } from '../../constants/programTypes'
 import { makeExerciseId } from '../../utils/programIds'
 
 /**
@@ -55,8 +59,17 @@ function parseCsvToProgram(rows) {
 }
 
 export default function AdminProgramsPage() {
-  const [programs, setPrograms]   = useState([])
+  // General (unassigned template) programs — the page's primary, searchable
+  // list. Athlete-specific programs are never fetched in bulk here — see
+  // athleteProgramsCache below — so this page's read cost stays flat no
+  // matter how many athletes or how much program history piles up.
+  const [generalPrograms, setGeneralPrograms] = useState([])
+  const [athletes, setAthletes]   = useState([])
   const [loading, setLoading]     = useState(true)
+  const [generalSearch, setGeneralSearch] = useState('')
+  const [athleteSearch, setAthleteSearch] = useState('')
+  const [expandedAthlete, setExpandedAthlete] = useState(null) // uid or null
+  const [athleteProgramsCache, setAthleteProgramsCache] = useState({}) // uid -> { loading, programs }
   const [showForm, setShowForm]   = useState(false)
   const [programName, setProgramName] = useState('')
   const [programType, setProgramType] = useState('throwing')
@@ -68,16 +81,50 @@ export default function AdminProgramsPage() {
   const [deletingProgram, setDeletingProgram] = useState(null)
   const fileRef = useRef()
 
-  useEffect(() => { fetchPrograms() }, [])
+  useEffect(() => { fetchAll() }, [])
 
-  async function fetchPrograms() {
+  async function fetchAll() {
     setLoading(true)
     try {
-      const snap = await getAllPrograms()
-      setPrograms(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      const [genSnap, athSnap] = await Promise.all([getGeneralPrograms(), getAllAthletes()])
+      setGeneralPrograms(genSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0)))
+      setAthletes(athSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.name || '').localeCompare(b.name || '')))
     } finally {
       setLoading(false)
     }
+  }
+
+  async function fetchGeneralOnly() {
+    const snap = await getGeneralPrograms()
+    setGeneralPrograms(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0)))
+  }
+
+  // Athlete-owned programs are only ever fetched for the one athlete row
+  // being opened, and cached after that so re-collapsing/re-expanding
+  // doesn't re-read. Archived drafts (already published — see
+  // AdminAthleteDetail) are filtered out so this doesn't fill back up with
+  // history that's no longer relevant.
+  async function toggleAthlete(uid) {
+    if (expandedAthlete === uid) { setExpandedAthlete(null); return }
+    setExpandedAthlete(uid)
+    if (athleteProgramsCache[uid]) return
+    setAthleteProgramsCache(prev => ({ ...prev, [uid]: { loading: true, programs: [] } }))
+    const snap = await getProgramsForAthlete(uid)
+    const progs = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(p => !p.archived)
+      .sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0))
+    setAthleteProgramsCache(prev => ({ ...prev, [uid]: { loading: false, programs: progs } }))
+  }
+
+  function invalidateAthleteCache(uid) {
+    if (!uid) return
+    setAthleteProgramsCache(prev => {
+      if (!(uid in prev)) return prev
+      const next = { ...prev }
+      delete next[uid]
+      return next
+    })
   }
 
   function handleCsvImport(e) {
@@ -118,7 +165,7 @@ export default function AdminProgramsPage() {
       setProgramType('throwing')
       setStartDate(new Date().toISOString().slice(0, 10))
       setCsvWeeks(null)
-      await fetchPrograms()
+      await fetchGeneralOnly()
       // Jump straight into the editor so the coach can start adding content
       // without leaving this page to assign it to an athlete first.
       setEditingProgram({ id: ref.id, name, weeks, programType, startDate, active: true, athleteId: null })
@@ -129,9 +176,10 @@ export default function AdminProgramsPage() {
     }
   }
 
-  async function saveProgramWeeks(programId, weeks, startDate) {
+  async function saveProgramWeeks(programId, weeks, startDate, athleteId) {
     await updateProgram(programId, { weeks, totalWeeks: weeks.length, startDate })
-    fetchPrograms()
+    if (athleteId) invalidateAthleteCache(athleteId)
+    else await fetchGeneralOnly()
   }
 
   async function duplicateProgram(prog) {
@@ -144,7 +192,7 @@ export default function AdminProgramsPage() {
         active: true,
       })
       toast.success('Program duplicated!')
-      fetchPrograms()
+      fetchGeneralOnly()
     } catch {
       toast.error('Could not duplicate program.')
     }
@@ -156,18 +204,21 @@ export default function AdminProgramsPage() {
       await deleteProgram(deletingProgram.id)
       toast.success('Program deleted.')
       setDeletingProgram(null)
-      fetchPrograms()
+      await fetchGeneralOnly()
     } catch {
       toast.error('Could not delete program.')
     }
   }
 
+  const filteredGeneral = generalPrograms.filter(p => p.name?.toLowerCase().includes(generalSearch.toLowerCase()))
+  const filteredAthletes = athletes.filter(a => a.name?.toLowerCase().includes(athleteSearch.toLowerCase()) || a.email?.toLowerCase().includes(athleteSearch.toLowerCase()))
+
   return (
-    <div className="p-8">
+    <div className="p-8 max-w-4xl">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Programs</h1>
-          <p className="text-gray-500 text-sm mt-0.5">{programs.length} total</p>
+          <p className="text-gray-500 text-sm mt-0.5">{generalPrograms.length} general · {athletes.length} athletes</p>
         </div>
         <button
           onClick={() => setShowForm(true)}
@@ -179,59 +230,113 @@ export default function AdminProgramsPage() {
       </div>
 
       {/* CSV import hint */}
-      <div className="bg-blue-50 rounded-xl p-4 mb-6 flex items-start gap-3">
-        <FileSpreadsheet size={18} className="text-blue-500 flex-shrink-0 mt-0.5" />
-        <div className="text-sm text-blue-700">
-          <p className="font-medium mb-0.5">Import from Google Sheets</p>
-          <p className="text-blue-500">Export your Google Sheet as CSV and import it when creating a program. Expected columns: <code className="bg-blue-100 px-1 rounded text-xs">Week, Day, Title, Exercise, Sets, Reps, Load, Notes, Category</code> (Category is optional)</p>
-        </div>
+      <div className="bg-blue-50 rounded-xl p-3.5 mb-6 flex items-start gap-3">
+        <FileSpreadsheet size={16} className="text-blue-500 flex-shrink-0 mt-0.5" />
+        <p className="text-xs text-blue-700">
+          <span className="font-medium">Import from Google Sheets: </span>
+          export your Sheet as CSV and import it when creating a program. Expected columns:{' '}
+          <code className="bg-blue-100 px-1 rounded">Week, Day, Title, Exercise, Sets, Reps, Load, Notes, Category</code> (Category optional)
+        </p>
       </div>
 
-      {/* Programs list */}
       {loading ? (
         <div className="flex justify-center py-16"><Spinner /></div>
-      ) : programs.length === 0 ? (
-        <EmptyState icon={LayoutList} title="No programs yet" subtitle="Create your first one to get started." compact />
       ) : (
-        <div className="space-y-3">
-          {programs.map((prog) => (
-            <div key={prog.id} className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-              <div
-                className="group flex items-center px-5 py-4 cursor-pointer hover:bg-gray-50 transition"
-                onClick={() => setEditingProgram(prog)}
-              >
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold text-gray-900">{prog.name}</p>
-                    <span className="px-2 py-0.5 bg-gray-100 text-gray-500 text-[10px] font-semibold uppercase tracking-wide rounded-full">
-                      {PROGRAM_TYPES.find(t => t.key === (prog.programType || 'correctives'))?.label || 'Correctives'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {prog.weeks?.length || 0} weeks · {prog.active ? 'Active' : 'Inactive'}
-                    {prog.athleteId && <span className="ml-1.5 text-sp-green-500">· Assigned</span>}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); duplicateProgram(prog) }}
-                    className="p-2 text-gray-400 hover:text-sp-green-600 hover:bg-gray-100 rounded-lg transition"
-                    title="Duplicate"
-                  >
-                    <Copy size={15} />
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setDeletingProgram(prog) }}
-                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-gray-100 rounded-lg transition"
-                    title="Delete"
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-                <Pencil size={14} className="text-gray-300 ml-2 flex-shrink-0" />
-              </div>
+        <div className="space-y-8">
+          {/* General programs — the reusable library */}
+          <div>
+            <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">General Programs</h2>
+            <div className="relative mb-3">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={generalSearch}
+                onChange={(e) => setGeneralSearch(e.target.value)}
+                placeholder="Search general programs…"
+                className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-white"
+              />
             </div>
-          ))}
+
+            {generalPrograms.length === 0 ? (
+              <EmptyState icon={LayoutList} title="No general programs yet" subtitle="Create a reusable template to get started." compact />
+            ) : filteredGeneral.length === 0 ? (
+              <p className="text-sm text-gray-400 py-4 text-center">No matches.</p>
+            ) : (
+              <div className="space-y-2">
+                {filteredGeneral.map((prog) => (
+                  <div key={prog.id} className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                    <div
+                      className="group flex items-center px-5 py-3.5 cursor-pointer hover:bg-gray-50 transition"
+                      onClick={() => setEditingProgram(prog)}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-gray-900 truncate">{prog.name}</p>
+                          <span className="flex-shrink-0 px-2 py-0.5 bg-gray-100 text-gray-500 text-[10px] font-semibold uppercase tracking-wide rounded-full">
+                            {PROGRAM_TYPES.find(t => t.key === (prog.programType || 'correctives'))?.shortLabel || 'Correctives'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {prog.weeks?.length || 0} weeks · {prog.active ? 'Active' : 'Inactive'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); duplicateProgram(prog) }}
+                          className="p-2 text-gray-400 hover:text-sp-green-600 hover:bg-gray-100 rounded-lg transition"
+                          title="Duplicate"
+                        >
+                          <Copy size={15} />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setDeletingProgram(prog) }}
+                          className="p-2 text-gray-400 hover:text-red-500 hover:bg-gray-100 rounded-lg transition"
+                          title="Delete"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                      <Pencil size={14} className="text-gray-300 ml-2 flex-shrink-0" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Athlete programs — grouped per athlete instead of one flat list,
+              each athlete's own programs loaded only when opened */}
+          <div>
+            <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Athlete Programs</h2>
+            <div className="relative mb-3">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={athleteSearch}
+                onChange={(e) => setAthleteSearch(e.target.value)}
+                placeholder="Search athletes…"
+                className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-white"
+              />
+            </div>
+
+            {athletes.length === 0 ? (
+              <EmptyState icon={Users} title="No athletes yet" compact />
+            ) : filteredAthletes.length === 0 ? (
+              <p className="text-sm text-gray-400 py-4 text-center">No matches.</p>
+            ) : (
+              <div className="space-y-2">
+                {filteredAthletes.map((a) => (
+                  <AthleteProgramsRow
+                    key={a.id}
+                    athlete={a}
+                    expanded={expandedAthlete === a.id}
+                    onToggle={() => toggleAthlete(a.id)}
+                    cacheEntry={athleteProgramsCache[a.id]}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -330,13 +435,16 @@ export default function AdminProgramsPage() {
       )}
 
       {/* Program editor — used both right after creation and when reopening
-          an existing program from the list. Template mode (no `onPublish`)
-          since programs here aren't tied to an athlete yet. */}
+          an existing GENERAL program from the list. Template mode (no
+          `onPublish`) since programs here aren't tied to an athlete yet.
+          Athlete-owned programs open from their own profile instead, where
+          the live-edit safety machinery (stable exercise ids, completion-key
+          migration) already lives — see AdminAthleteDetail. */}
       {editingProgram && (
         <ProgramEditorModal
           program={editingProgram}
           onClose={() => setEditingProgram(null)}
-          onSave={(weeks, startDate) => saveProgramWeeks(editingProgram.id, weeks, startDate)}
+          onSave={(weeks, startDate) => saveProgramWeeks(editingProgram.id, weeks, startDate, editingProgram.athleteId)}
         />
       )}
 
@@ -350,11 +458,7 @@ export default function AdminProgramsPage() {
               </div>
               <div>
                 <h2 className="text-base font-bold text-gray-900">Delete "{deletingProgram.name}"?</h2>
-                <p className="text-sm text-gray-500 mt-1">
-                  {deletingProgram.athleteId && deletingProgram.active
-                    ? 'This program is currently assigned to an athlete — deleting it removes it from their schedule immediately.'
-                    : 'This cannot be undone.'}
-                </p>
+                <p className="text-sm text-gray-500 mt-1">This cannot be undone.</p>
               </div>
             </div>
             <div className="flex gap-3">
@@ -362,6 +466,69 @@ export default function AdminProgramsPage() {
               <button onClick={handleDeleteProgram} className="flex-1 py-2.5 bg-red-500 text-white rounded-xl text-sm font-semibold hover:bg-red-600 transition">Delete</button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// One athlete's row in the "Athlete Programs" accordion — collapsed by
+// default, so 100+ athletes reads as 100+ short rows rather than every one
+// of their programs listed flat. Programs load lazily on first expand (see
+// toggleAthlete) and only cover viewing/status; actual editing happens on
+// the athlete's own profile, where the live-program safety logic lives.
+function AthleteProgramsRow({ athlete, expanded, onToggle, cacheEntry }) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition"
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-8 h-8 rounded-full bg-sp-green-100 text-sp-green-600 flex items-center justify-center font-bold text-sm flex-shrink-0">
+            {athlete.name?.charAt(0) || '?'}
+          </div>
+          <div className="text-left min-w-0">
+            <p className="font-medium text-gray-900 text-sm truncate">{athlete.name}</p>
+            <div className="flex flex-wrap gap-1 mt-0.5">
+              {athlete.programTypes?.length ? athlete.programTypes.map(t => (
+                <span key={t} className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full ${programTypeInfo(t).badgeClass}`}>
+                  {programTypeInfo(t).shortLabel}
+                </span>
+              )) : (
+                <span className="text-[11px] text-gray-400">No active programs</span>
+              )}
+            </div>
+          </div>
+        </div>
+        <ChevronDown size={16} className={`text-gray-400 flex-shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+      </button>
+
+      {expanded && (
+        <div className="border-t border-gray-100 px-5 py-3">
+          {!cacheEntry || cacheEntry.loading ? (
+            <div className="py-3 flex justify-center"><Spinner sm /></div>
+          ) : cacheEntry.programs.length === 0 ? (
+            <p className="text-xs text-gray-400 py-1">No programs for this athlete yet.</p>
+          ) : (
+            <div className="space-y-1.5 mb-2">
+              {cacheEntry.programs.map((p) => (
+                <div key={p.id} className="flex items-center gap-2 py-1">
+                  <span className="flex-shrink-0 px-1.5 py-0.5 bg-gray-100 text-gray-500 text-[10px] font-semibold uppercase tracking-wide rounded-full">
+                    {PROGRAM_TYPES.find(t => t.key === (p.programType || 'correctives'))?.shortLabel || 'Correctives'}
+                  </span>
+                  <p className="text-sm text-gray-700 truncate flex-1 min-w-0">{p.name}</p>
+                  {!p.active && <span className="flex-shrink-0 text-[10px] text-amber-600 font-medium">Draft</span>}
+                </div>
+              ))}
+            </div>
+          )}
+          <Link
+            to={`/admin/athletes/${athlete.id}`}
+            className="inline-flex items-center gap-1 text-xs text-sp-green-600 hover:text-sp-green-700 font-medium transition"
+          >
+            Open athlete profile →
+          </Link>
         </div>
       )}
     </div>

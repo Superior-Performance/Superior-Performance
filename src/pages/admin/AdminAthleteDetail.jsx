@@ -760,46 +760,52 @@ export default function AdminAthleteDetail() {
         <ArrowLeft size={15} /> Athletes
       </Link>
 
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-sp-green-100 text-sp-green-600 flex items-center justify-center font-bold text-xl">
-            {athlete.name?.charAt(0)}
+      <div className="surface-brand relative overflow-hidden text-white rounded-2xl px-6 py-5 mb-6">
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ background: 'radial-gradient(circle at 90% 0%, rgba(46,158,99,0.3), transparent 60%)' }}
+        />
+        <div className="relative flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-white/10 text-sp-green-300 flex items-center justify-center font-bold text-xl flex-shrink-0">
+              {athlete.name?.charAt(0)}
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold">{athlete.name}</h1>
+              <p className="text-white/60 text-sm">{athlete.email}</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{athlete.name}</h1>
-            <p className="text-gray-500 text-sm">{athlete.email}</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link
+              to={`/admin/chat/${uid}`}
+              className="flex items-center gap-2 px-3.5 py-2 bg-white/10 hover:bg-white/15 rounded-xl text-sm font-medium transition"
+            >
+              <MessageCircle size={15} />
+              Message
+            </Link>
+            <button
+              onClick={sendResetEmail}
+              className="flex items-center gap-2 px-3.5 py-2 bg-white/10 hover:bg-white/15 rounded-xl text-sm font-medium transition"
+              title="Send password reset email"
+            >
+              <KeyRound size={15} />
+              Reset Password
+            </button>
+            <button
+              onClick={openEdit}
+              className="flex items-center gap-2 px-3.5 py-2 bg-white/10 hover:bg-white/15 rounded-xl text-sm font-medium transition"
+            >
+              <Pencil size={15} />
+              Edit
+            </button>
+            <button
+              onClick={() => setShowDelete(true)}
+              className="flex items-center gap-2 px-3.5 py-2 bg-red-500/15 text-red-300 hover:bg-red-500/25 rounded-xl text-sm font-medium transition"
+            >
+              <Trash2 size={15} />
+              Delete
+            </button>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link
-            to={`/admin/chat/${uid}`}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition"
-          >
-            <MessageCircle size={15} />
-            Message
-          </Link>
-          <button
-            onClick={sendResetEmail}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition"
-            title="Send password reset email"
-          >
-            <KeyRound size={15} />
-            Reset Password
-          </button>
-          <button
-            onClick={openEdit}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition"
-          >
-            <Pencil size={15} />
-            Edit
-          </button>
-          <button
-            onClick={() => setShowDelete(true)}
-            className="flex items-center gap-2 px-4 py-2 border border-red-200 text-red-600 rounded-xl text-sm font-medium hover:bg-red-50 transition"
-          >
-            <Trash2 size={15} />
-            Delete
-          </button>
         </div>
       </div>
 

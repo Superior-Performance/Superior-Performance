@@ -60,9 +60,14 @@ export default function AdminAthletesPage() {
     <div className="p-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Athletes</h1>
-          <p className="text-gray-500 text-sm mt-0.5">{athletes.length} total</p>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-sp-green-50 text-sp-green-600 flex items-center justify-center flex-shrink-0">
+            <Users size={20} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Athletes</h1>
+            <p className="text-gray-500 text-sm">{athletes.length} total</p>
+          </div>
         </div>
         <button
           onClick={() => setShowModal(true)}

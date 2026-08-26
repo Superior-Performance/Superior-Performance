@@ -216,9 +216,14 @@ export default function AdminProgramsPage() {
   return (
     <div className="p-8 max-w-4xl">
       <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Programs</h1>
-          <p className="text-gray-500 text-sm mt-0.5">{generalPrograms.length} general · {athletes.length} athletes</p>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-sp-green-50 text-sp-green-600 flex items-center justify-center flex-shrink-0">
+            <LayoutList size={20} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Programs</h1>
+            <p className="text-gray-500 text-sm">{generalPrograms.length} general · {athletes.length} athletes</p>
+          </div>
         </div>
         <button
           onClick={() => setShowForm(true)}
@@ -230,12 +235,12 @@ export default function AdminProgramsPage() {
       </div>
 
       {/* CSV import hint */}
-      <div className="bg-blue-50 rounded-xl p-3.5 mb-6 flex items-start gap-3">
-        <FileSpreadsheet size={16} className="text-blue-500 flex-shrink-0 mt-0.5" />
-        <p className="text-xs text-blue-700">
+      <div className="bg-sp-green-50 rounded-xl p-3.5 mb-6 flex items-start gap-3">
+        <FileSpreadsheet size={16} className="text-sp-green-600 flex-shrink-0 mt-0.5" />
+        <p className="text-xs text-sp-green-800">
           <span className="font-medium">Import from Google Sheets: </span>
           export your Sheet as CSV and import it when creating a program. Expected columns:{' '}
-          <code className="bg-blue-100 px-1 rounded">Week, Day, Title, Exercise, Sets, Reps, Load, Notes, Category</code> (Category optional)
+          <code className="bg-sp-green-100 px-1 rounded">Week, Day, Title, Exercise, Sets, Reps, Load, Notes, Category</code> (Category optional)
         </p>
       </div>
 

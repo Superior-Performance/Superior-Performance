@@ -15,7 +15,11 @@ import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 import ProgramEditorModal from '../../components/ProgramEditorModal'
 import ToggleSwitch from '../../components/ToggleSwitch'
-import { PROGRAM_TYPES } from '../../constants/programTypes'
+import { PROGRAM_TYPES, DAY_TYPES, matchDayType } from '../../constants/programTypes'
+
+// Each day type's stable position in the draft's day grid — see
+// createDraftFromRows below.
+const DAY_TYPE_DAYNUM = Object.fromEntries(DAY_TYPES.map((dt, i) => [dt.key, i + 1]))
 
 // Mirrors the "Assessment Intake" Google Sheet column-for-column (minus
 // Athlete Name, which the app already tracks) so the saved doc can be handed
@@ -215,9 +219,10 @@ export default function AdminAthleteDetail() {
   // coach needs to flip quickly (an athlete heading off to campus, or back)
   // without clicking through a form. Athletes in this mode aren't on a
   // per-week calendar at all — they pick from a fixed set of day types
-  // (Recovery/High-Intent/Hybrid 1/Hybrid 2, tagged per day in the program
-  // editor) that apply across the whole program, not any specific week —
-  // see the isRemote branch in SchedulePage.
+  // (High Intent/Medium/Recovery, tagged per day — usually auto-detected
+  // from the Outputs sheet's Day column, see createDraftFromRows) that
+  // apply across the whole program, not any specific week — see the
+  // isRemote branch in SchedulePage.
   async function toggleAthleteType(nextIsRemote) {
     const nextType = nextIsRemote ? 'remote' : 'in_house'
     setTogglingType(true)
@@ -323,9 +328,18 @@ export default function AdminAthleteDetail() {
     const weeksMap = {}
     rows.forEach(row => {
       const weekNums = parseWeekOrDayRange(row['Week'])
-      const dayNums  = row['Day'] !== undefined && row['Day'] !== ''
-        ? parseWeekOrDayRange(row['Day'])
-        : [1]
+      // College Remote Athletes' rows put a day-type label ("High Intent
+      // Day", "Medium Day", "Recovery Day") directly in the Day column
+      // instead of a weekday name. parseWeekOrDayRange can't parse that as
+      // a number, so it'd otherwise fall back to [1] for every row —
+      // silently collapsing all three day types into one Day 1. Detect it
+      // and give each type its own stable day bucket, tagged automatically
+      // so the athlete's day-type picker (see SchedulePage) works right
+      // after the pull instead of needing the coach to re-tag it by hand.
+      const dayTypeKey = matchDayType(row['Day'])
+      const dayNums = dayTypeKey
+        ? [DAY_TYPE_DAYNUM[dayTypeKey]]
+        : (row['Day'] !== undefined && row['Day'] !== '' ? parseWeekOrDayRange(row['Day']) : [1])
       const dayOptional = /\(optional\)/i.test(String(row['Day'] ?? ''))
       weekNums.forEach(wk => {
         if (!weeksMap[wk]) weeksMap[wk] = { weekNum: wk, days: {} }
@@ -335,6 +349,7 @@ export default function AdminAthleteDetail() {
               dayNum: day,
               optional: dayOptional,
               exercises: [],
+              ...(dayTypeKey ? { dayType: dayTypeKey } : {}),
             }
           }
           const category = row['Category'] || row['Type'] || ''
@@ -727,9 +742,10 @@ export default function AdminAthleteDetail() {
             <p className="font-semibold text-gray-900 text-sm">College Remote Athlete Mode</p>
             <p className="text-xs text-gray-400 mt-0.5 max-w-md">
               For athletes without a fixed schedule to plan around in advance. Instead of a
-              per-week calendar, they pick the day type — Recovery, High-Intent, Hybrid 1, or
-              Hybrid 2 — that fits their session and see that day's pre-throw, throw, mobility,
-              and lift content together. Tag each day's type from the program editor.
+              per-week calendar, they pick the day type — High Intent, Medium, or Recovery —
+              that fits their session and see that day's pre-throw, throw, mobility, and lift
+              content together. Tagged automatically when the Outputs sheet's Day column names
+              the type; use the program editor's Day Type dropdown to set it by hand otherwise.
             </p>
           </div>
         </div>

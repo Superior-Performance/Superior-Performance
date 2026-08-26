@@ -47,21 +47,41 @@ export const EXERCISE_CATEGORIES = [
 
 export const CATCH_PLAY_INFO = { key: 'Catch Play', label: 'Catch Play', icon: 'CircleDot', badgeClass: 'bg-indigo-50 text-indigo-700', dotClass: 'bg-indigo-500' }
 
-// College Remote Athlete Mode's four fixed day types (see AdminAthleteDetail
+// College Remote Athlete Mode's three fixed day types (see AdminAthleteDetail
 // and SchedulePage). A day in ANY of the athlete's active programs
-// (correctives/pre-throw, throwing, mobility, lifting) can be tagged with
-// one of these via ProgramEditorModal's Day Type dropdown — the athlete
-// then picks a type and sees every program's content tagged with it,
-// merged together, regardless of which week it lives in.
+// (correctives/pre-throw, throwing, mobility, lifting) can carry one of
+// these as its `dayType` — the athlete then picks a type and sees every
+// program's content tagged with it, merged together, regardless of which
+// week it lives in.
+//
+// The coach's Outputs sheet encodes this by putting the label itself
+// ("High Intent Day", "Medium Day", "Recovery Day") straight into a row's
+// Day column instead of a weekday name — see matchDayType below, used by
+// AdminAthleteDetail's pull so this gets tagged automatically rather than
+// requiring the coach to re-set it by hand in ProgramEditorModal after
+// every re-pull.
 export const DAY_TYPES = [
-  { key: 'recovery',    label: 'Recovery Day',    icon: 'Moon' },
-  { key: 'high_intent', label: 'High-Intent Day', icon: 'Flame' },
-  { key: 'hybrid_1',    label: 'Hybrid Day 1',    icon: 'Zap' },
-  { key: 'hybrid_2',    label: 'Hybrid Day 2',    icon: 'Zap' },
+  { key: 'high_intent', label: 'High Intent Day', icon: 'Flame', aliases: ['High-Intent Day'] },
+  { key: 'medium',       label: 'Medium Day',      icon: 'Zap' },
+  { key: 'recovery',     label: 'Recovery Day',    icon: 'Moon' },
 ]
 
 export function dayTypeInfo(key) {
   return DAY_TYPES.find(t => t.key === key) || null
+}
+
+// Matches a raw "Day" column value from the Outputs sheet against the day
+// type labels, case/whitespace-insensitively. Returns the day type key, or
+// null if it doesn't look like a day-type label (a real weekday name,
+// "Day 1", "-", a date range, etc. all return null so the normal week/day
+// parsing handles them instead).
+export function matchDayType(raw) {
+  const trimmed = String(raw || '').trim().toLowerCase()
+  if (!trimmed) return null
+  const found = DAY_TYPES.find(dt =>
+    dt.label.toLowerCase() === trimmed || (dt.aliases || []).some(a => a.toLowerCase() === trimmed)
+  )
+  return found ? found.key : null
 }
 
 const GENERAL_INFO = { key: 'General', label: 'General', icon: 'ListChecks', badgeClass: 'bg-gray-100 text-gray-600', dotClass: 'bg-gray-400' }

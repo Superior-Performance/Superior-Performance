@@ -57,16 +57,16 @@ export default function AdminAthletesPage() {
   )
 
   return (
-    <div className="p-8">
+    <div className="p-8 bg-sp-ink-900 min-h-full">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-sp-green-50 text-sp-green-600 flex items-center justify-center flex-shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-sp-green-500/15 text-sp-green-400 flex items-center justify-center flex-shrink-0">
             <Users size={20} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Athletes</h1>
-            <p className="text-gray-500 text-sm">{athletes.length} total</p>
+            <h1 className="text-2xl font-bold text-white">Athletes</h1>
+            <p className="text-sp-ink-300 text-sm">{athletes.length} total</p>
           </div>
         </div>
         <button
@@ -80,13 +80,13 @@ export default function AdminAthletesPage() {
 
       {/* Search */}
       <div className="relative mb-5">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-sp-ink-300" />
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search athletes…"
-          className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-white"
+          className="w-full pl-9 pr-4 py-2.5 border border-sp-ink-600 rounded-xl text-sm text-sp-ink-50 placeholder-sp-ink-300 focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-sp-ink-800"
         />
       </div>
 
@@ -94,49 +94,50 @@ export default function AdminAthletesPage() {
       {loading ? (
         <div className="flex justify-center py-16"><Spinner /></div>
       ) : filtered.length === 0 ? (
-        <EmptyState icon={Users} title="No athletes found" subtitle="Add your first athlete to get started." compact />
+        <EmptyState icon={Users} title="No athletes found" subtitle="Add your first athlete to get started." compact dark />
       ) : (
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Program</th>
+              <tr className="border-b border-sp-ink-600 bg-white/[0.03]">
+                <th className="text-left px-5 py-3 text-xs font-semibold text-sp-ink-300 uppercase tracking-wider">Name</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-sp-ink-300 uppercase tracking-wider">Email</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-sp-ink-300 uppercase tracking-wider">Program</th>
                 <th className="px-5 py-3" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-sp-ink-600/60">
               {filtered.map((a) => (
                 <tr
                   key={a.id}
                   onClick={() => navigate(`/admin/athletes/${a.id}`)}
-                  className="hover:bg-gray-50 transition cursor-pointer"
+                  className="hover:bg-white/[0.04] transition cursor-pointer"
                 >
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-sp-green-100 text-sp-green-600 flex items-center justify-center font-bold text-sm">
+                      <div className="w-8 h-8 rounded-full bg-sp-green-500/20 text-sp-green-400 flex items-center justify-center font-bold text-sm">
                         {a.name?.charAt(0) || '?'}
                       </div>
-                      <span className="font-medium text-gray-900 hover:text-sp-green-600 transition">{a.name}</span>
+                      <span className="font-medium text-white hover:text-sp-green-400 transition">{a.name}</span>
                     </div>
                   </td>
-                  <td className="px-5 py-3.5 text-gray-500">{a.email}</td>
+                  <td className="px-5 py-3.5 text-sp-ink-300">{a.email}</td>
                   <td className="px-5 py-3.5">
                     {a.programTypes?.length ? (
-                      <div className="flex flex-wrap gap-1">
+                      <div className="flex flex-wrap gap-2">
                         {a.programTypes.map(t => (
-                          <span key={t} className={`px-2 py-1 text-xs font-medium rounded-full ${programTypeInfo(t).badgeClass}`}>
+                          <span key={t} className="inline-flex items-center gap-1.5 text-xs font-medium text-sp-ink-100">
+                            <span className={`w-1.5 h-1.5 rounded-full ${programTypeInfo(t).dotClass}`} />
                             {programTypeInfo(t).shortLabel}
                           </span>
                         ))}
                       </div>
                     ) : (
-                      <span className="px-2 py-1 bg-gray-100 text-gray-400 text-xs font-medium rounded-full">None</span>
+                      <span className="text-xs text-sp-ink-300/60">None</span>
                     )}
                   </td>
                   <td className="px-5 py-3.5 text-right">
-                    <span className="inline-flex items-center gap-1 text-sp-green-500 text-sm font-medium">
+                    <span className="inline-flex items-center gap-1 text-sp-green-400 text-sm font-medium">
                       View <ChevronRight size={14} />
                     </span>
                   </td>
@@ -153,8 +154,8 @@ export default function AdminAthletesPage() {
           <form onSubmit={handleCreate} className="space-y-4">
             {/* Role toggle */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Role</label>
-              <div className="flex rounded-xl border border-gray-200 overflow-hidden">
+              <label className="block text-sm font-medium text-sp-ink-100 mb-1.5">Role</label>
+              <div className="flex rounded-xl border border-sp-ink-600 overflow-hidden">
                 {['athlete', 'admin'].map(r => (
                   <button
                     key={r}
@@ -163,7 +164,7 @@ export default function AdminAthletesPage() {
                     className={`flex-1 py-2.5 text-sm font-semibold capitalize transition ${
                       role === r
                         ? 'bg-sp-green-500 text-white'
-                        : 'bg-white text-gray-500 hover:bg-gray-50'
+                        : 'bg-sp-ink-800 text-sp-ink-300 hover:bg-white/5'
                     }`}
                   >
                     {r}
@@ -175,7 +176,7 @@ export default function AdminAthletesPage() {
             <Field label="Email" type="email" value={email} onChange={setEmail} placeholder="john@email.com" required />
             <Field label="Temporary Password" type="password" value={password} onChange={setPassword} placeholder="Min 6 characters" required minLength={6} />
             <div className="flex gap-3 pt-2">
-              <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
+              <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-2.5 border border-sp-ink-600 text-sp-ink-100 rounded-xl text-sm font-medium hover:bg-white/5 transition">Cancel</button>
               <button type="submit" disabled={saving} className="btn-brand flex-1 py-2.5 rounded-xl text-sm flex items-center justify-center gap-2">
                 {saving && <Spinner sm />} {saving ? 'Creating…' : `Create ${role === 'admin' ? 'Admin' : 'Athlete'}`}
               </button>
@@ -190,11 +191,11 @@ export default function AdminAthletesPage() {
 function Field({ label, value, onChange, ...props }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      <label className="block text-sm font-medium text-sp-ink-100 mb-1">{label}</label>
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
+        className="w-full px-3.5 py-2.5 border border-sp-ink-600 rounded-xl text-sm text-sp-ink-50 placeholder-sp-ink-300 bg-sp-ink-900 focus:outline-none focus:ring-2 focus:ring-sp-green-500"
         {...props}
       />
     </div>
@@ -203,11 +204,11 @@ function Field({ label, value, onChange, ...props }) {
 
 function Modal({ title, children, onClose }) {
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl">
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+      <div className="bg-sp-ink-800 border border-sp-ink-600 rounded-2xl w-full max-w-md p-6 shadow-xl">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-bold">{title}</h2>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition"><X size={18} /></button>
+          <h2 className="text-lg font-bold text-white">{title}</h2>
+          <button onClick={onClose} className="p-1 hover:bg-white/10 text-sp-ink-300 rounded-lg transition"><X size={18} /></button>
         </div>
         {children}
       </div>

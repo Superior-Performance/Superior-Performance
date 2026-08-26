@@ -707,19 +707,19 @@ export default function AdminAthleteDetail() {
     await load()
   }
 
-  if (loading) return <div className="flex justify-center py-20"><div className="w-8 h-8 border-2 border-sp-green-500 border-t-transparent rounded-full animate-spin" /></div>
+  if (loading) return <div className="flex justify-center py-20 bg-sp-ink-900 min-h-full"><div className="w-8 h-8 border-2 border-sp-green-500 border-t-transparent rounded-full animate-spin" /></div>
 
   if (loadError) return (
-    <div className="p-8">
-      <Link to="/admin/athletes" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-5 transition">
+    <div className="p-8 bg-sp-ink-900 min-h-full">
+      <Link to="/admin/athletes" className="inline-flex items-center gap-1.5 text-sm text-sp-ink-300 hover:text-white mb-5 transition">
         <ArrowLeft size={15} /> Athletes
       </Link>
-      <div className="bg-red-50 border border-red-200 rounded-2xl p-6 max-w-lg">
-        <p className="font-semibold text-red-700 mb-1">Couldn't load this athlete</p>
-        <p className="text-sm text-red-600 mb-4">{loadError}</p>
+      <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-6 max-w-lg">
+        <p className="font-semibold text-red-300 mb-1">Couldn't load this athlete</p>
+        <p className="text-sm text-red-400/80 mb-4">{loadError}</p>
         <button
           onClick={load}
-          className="px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700 transition"
+          className="px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-500 transition"
         >
           Try again
         </button>
@@ -728,11 +728,11 @@ export default function AdminAthleteDetail() {
   )
 
   if (!athlete) return (
-    <div className="p-8">
-      <Link to="/admin/athletes" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-5 transition">
+    <div className="p-8 bg-sp-ink-900 min-h-full">
+      <Link to="/admin/athletes" className="inline-flex items-center gap-1.5 text-sm text-sp-ink-300 hover:text-white mb-5 transition">
         <ArrowLeft size={15} /> Athletes
       </Link>
-      <p className="text-gray-500">Athlete not found. They may have been deleted.</p>
+      <p className="text-sp-ink-300">Athlete not found. They may have been deleted.</p>
     </div>
   )
 
@@ -754,9 +754,9 @@ export default function AdminAthleteDetail() {
   )
 
   return (
-    <div className="p-8 max-w-4xl">
+    <div className="p-8 max-w-4xl bg-sp-ink-900 min-h-full">
       {/* Back + header */}
-      <Link to="/admin/athletes" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-5 transition">
+      <Link to="/admin/athletes" className="inline-flex items-center gap-1.5 text-sm text-sp-ink-300 hover:text-white mb-5 transition">
         <ArrowLeft size={15} /> Athletes
       </Link>
 
@@ -810,14 +810,14 @@ export default function AdminAthleteDetail() {
       </div>
 
       {/* College Remote Athlete Mode */}
-      <div className="flex items-center justify-between gap-4 bg-white rounded-2xl border border-gray-200 px-5 py-4 mb-6">
+      <div className="flex items-center justify-between gap-4 bg-sp-ink-800 rounded-2xl border border-sp-ink-600 px-5 py-4 mb-6">
         <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-full bg-sp-green-100 text-sp-green-600 flex items-center justify-center flex-shrink-0">
+          <div className="w-9 h-9 rounded-full bg-sp-green-500/15 text-sp-green-400 flex items-center justify-center flex-shrink-0">
             <GraduationCap size={17} />
           </div>
           <div>
-            <p className="font-semibold text-gray-900 text-sm">College Remote Athlete Mode</p>
-            <p className="text-xs text-gray-400 mt-0.5 max-w-md">
+            <p className="font-semibold text-white text-sm">College Remote Athlete Mode</p>
+            <p className="text-xs text-sp-ink-300 mt-0.5 max-w-md">
               For athletes without a fixed schedule to plan around in advance. Instead of a
               per-week calendar, they pick the day type — High Intent, Hybrid, Synergy, or Recovery —
               that fits their session and see that day's pre-throw, throw, mobility, and lift
@@ -835,13 +835,13 @@ export default function AdminAthleteDetail() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-fit">
+      <div className="flex gap-1 mb-6 bg-sp-ink-800 border border-sp-ink-600 rounded-xl p-1 w-fit">
         {[['assessment','Assessment'],['program','Program'],['logs','Data Logs']].map(([k,l]) => (
           <button
             key={k}
             onClick={() => setTab(k)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              tab === k ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
+              tab === k ? 'bg-sp-ink-600 text-white' : 'text-sp-ink-300 hover:text-white'
             }`}
           >
             {l}
@@ -851,17 +851,17 @@ export default function AdminAthleteDetail() {
 
       {/* Assessment tab */}
       {tab === 'assessment' && (
-        <div className="bg-white rounded-2xl border border-gray-200 p-6">
+        <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 p-6">
           <div className="flex items-center justify-between mb-5">
             <div>
-              <h2 className="font-semibold text-gray-900">Assessment Intake</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Matches the Assessment Intake Google Sheet field-for-field.</p>
+              <h2 className="font-semibold text-white">Assessment Intake</h2>
+              <p className="text-xs text-sp-ink-300 mt-0.5">Matches the Assessment Intake Google Sheet field-for-field.</p>
             </div>
             <div className="flex items-center gap-2 flex-wrap justify-end">
               <button
                 onClick={saveAssessmentScores}
                 disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 border border-gray-200 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-50 disabled:opacity-60 transition"
+                className="flex items-center gap-2 px-4 py-2 border border-sp-ink-600 text-sp-ink-100 text-sm font-semibold rounded-xl hover:bg-white/5 disabled:opacity-60 transition"
               >
                 <Save size={14} />
                 {saving ? 'Saving…' : 'Save'}
@@ -869,7 +869,7 @@ export default function AdminAthleteDetail() {
               <button
                 onClick={sendToIntakeSheet}
                 disabled={sendingToSheet}
-                className="flex items-center gap-2 px-4 py-2 border border-gray-200 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-50 disabled:opacity-60 transition"
+                className="flex items-center gap-2 px-4 py-2 border border-sp-ink-600 text-sp-ink-100 text-sm font-semibold rounded-xl hover:bg-white/5 disabled:opacity-60 transition"
               >
                 <FileSpreadsheet size={14} />
                 {sendingToSheet ? 'Logging…' : 'Log to Intake Sheet'}
@@ -888,55 +888,55 @@ export default function AdminAthleteDetail() {
                 {showGenerateMenu && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setShowGenerateMenu(false)} />
-                    <div className="absolute right-0 mt-2 w-96 bg-white rounded-xl border border-gray-200 shadow-lg z-20 overflow-hidden">
+                    <div className="absolute right-0 mt-2 w-96 bg-sp-ink-800 rounded-xl border border-sp-ink-600 shadow-lg z-20 overflow-hidden">
                       <button
                         onClick={() => { setShowGenerateMenu(false); pullOutputsFromSheet() }}
-                        className="w-full text-left px-4 py-3 hover:bg-gray-50 transition flex items-start gap-3"
+                        className="w-full text-left px-4 py-3 hover:bg-white/5 transition flex items-start gap-3"
                       >
-                        <Download size={15} className="text-gray-400 flex-shrink-0 mt-0.5" />
+                        <Download size={15} className="text-sp-ink-300 flex-shrink-0 mt-0.5" />
                         <div>
-                          <p className="text-sm font-medium text-gray-900">Pull from Pre-Throw Outputs</p>
-                          <p className="text-xs text-gray-400 mt-0.5">Mobilization, Correctives and Movement Activation merged into one program, by category.</p>
+                          <p className="text-sm font-medium text-white">Pull from Pre-Throw Outputs</p>
+                          <p className="text-xs text-sp-ink-300 mt-0.5">Mobilization, Correctives and Movement Activation merged into one program, by category.</p>
                         </div>
                       </button>
                       <button
                         onClick={() => { setShowGenerateMenu(false); pullThrowingOutputsFromSheet() }}
-                        className="w-full text-left px-4 py-3 hover:bg-gray-50 transition flex items-start gap-3 border-t border-gray-50"
+                        className="w-full text-left px-4 py-3 hover:bg-white/5 transition flex items-start gap-3 border-t border-sp-ink-600/60"
                       >
-                        <Download size={15} className="text-gray-400 flex-shrink-0 mt-0.5" />
+                        <Download size={15} className="text-sp-ink-300 flex-shrink-0 mt-0.5" />
                         <div>
-                          <p className="text-sm font-medium text-gray-900">Pull from Throwing/Post-Throw Outputs</p>
-                          <p className="text-xs text-gray-400 mt-0.5">Catch Play/Post-Throw plus the plyo routines, merged into one throwing program, by category.</p>
+                          <p className="text-sm font-medium text-white">Pull from Throwing/Post-Throw Outputs</p>
+                          <p className="text-xs text-sp-ink-300 mt-0.5">Catch Play/Post-Throw plus the plyo routines, merged into one throwing program, by category.</p>
                         </div>
                       </button>
                       <button
                         onClick={() => { setShowGenerateMenu(false); pullLiftingOutputsFromSheet() }}
-                        className="w-full text-left px-4 py-3 hover:bg-gray-50 transition flex items-start gap-3 border-t border-gray-50"
+                        className="w-full text-left px-4 py-3 hover:bg-white/5 transition flex items-start gap-3 border-t border-sp-ink-600/60"
                       >
-                        <Download size={15} className="text-gray-400 flex-shrink-0 mt-0.5" />
+                        <Download size={15} className="text-sp-ink-300 flex-shrink-0 mt-0.5" />
                         <div>
-                          <p className="text-sm font-medium text-gray-900">Pull from Lifting Outputs</p>
-                          <p className="text-xs text-gray-400 mt-0.5">Reads the Lifting Outputs tab (with video URLs) as their lifting program.</p>
+                          <p className="text-sm font-medium text-white">Pull from Lifting Outputs</p>
+                          <p className="text-xs text-sp-ink-300 mt-0.5">Reads the Lifting Outputs tab (with video URLs) as their lifting program.</p>
                         </div>
                       </button>
                       <button
                         onClick={() => { setShowGenerateMenu(false); pullMobilityOutputsFromSheet() }}
-                        className="w-full text-left px-4 py-3 hover:bg-gray-50 transition flex items-start gap-3 border-t border-gray-50"
+                        className="w-full text-left px-4 py-3 hover:bg-white/5 transition flex items-start gap-3 border-t border-sp-ink-600/60"
                       >
-                        <Download size={15} className="text-gray-400 flex-shrink-0 mt-0.5" />
+                        <Download size={15} className="text-sp-ink-300 flex-shrink-0 mt-0.5" />
                         <div>
-                          <p className="text-sm font-medium text-gray-900">Pull from Mobility Outputs</p>
-                          <p className="text-xs text-gray-400 mt-0.5">Reads the Mobility Outputs tab as their mobility program.</p>
+                          <p className="text-sm font-medium text-white">Pull from Mobility Outputs</p>
+                          <p className="text-xs text-sp-ink-300 mt-0.5">Reads the Mobility Outputs tab as their mobility program.</p>
                         </div>
                       </button>
                       <button
                         onClick={() => { setShowGenerateMenu(false); pullAllOutputsFromSheet() }}
-                        className="w-full text-left px-4 py-3 hover:bg-sp-green-50 transition flex items-start gap-3 border-t border-gray-100"
+                        className="w-full text-left px-4 py-3 hover:bg-sp-green-500/10 transition flex items-start gap-3 border-t border-sp-ink-600"
                       >
-                        <Sparkles size={15} className="text-sp-green-500 flex-shrink-0 mt-0.5" />
+                        <Sparkles size={15} className="text-sp-green-400 flex-shrink-0 mt-0.5" />
                         <div>
-                          <p className="text-sm font-medium text-gray-900">Pull All (combined)</p>
-                          <p className="text-xs text-gray-400 mt-0.5">Runs all four pulls above in one click — each still lands as its own program, since an athlete keeps one active program per type.</p>
+                          <p className="text-sm font-medium text-white">Pull All (combined)</p>
+                          <p className="text-xs text-sp-ink-300 mt-0.5">Runs all four pulls above in one click — each still lands as its own program, since an athlete keeps one active program per type.</p>
                         </div>
                       </button>
                     </div>
@@ -948,8 +948,8 @@ export default function AdminAthleteDetail() {
 
           <div className="space-y-6">
             {FIELD_GROUPS.map(({ title, fields }) => (
-              <div key={title} className="pt-5 border-t border-gray-100 first:pt-0 first:border-0">
-                <h3 className="font-semibold text-gray-800 mb-3 text-sm">{title}</h3>
+              <div key={title} className="pt-5 border-t border-sp-ink-600/60 first:pt-0 first:border-0">
+                <h3 className="font-semibold text-sp-ink-100 mb-3 text-sm">{title}</h3>
                 <div className="grid grid-cols-2 gap-4">
                   {fields.map((field) => (
                     <AssessmentField
@@ -973,13 +973,13 @@ export default function AdminAthleteDetail() {
       {tab === 'program' && (
         <div className="space-y-4">
           {/* Type sub-tabs — a green dot marks types with an active program */}
-          <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
+          <div className="flex gap-1 bg-sp-ink-800 border border-sp-ink-600 rounded-xl p-1 w-fit">
             {PROGRAM_TYPES.map(({ key: k, label: l }) => (
               <button
                 key={k}
                 onClick={() => setProgramTypeTab(k)}
                 className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition ${
-                  programTypeTab === k ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
+                  programTypeTab === k ? 'bg-sp-ink-600 text-white' : 'text-sp-ink-300 hover:text-white'
                 }`}
               >
                 {l}
@@ -989,15 +989,15 @@ export default function AdminAthleteDetail() {
           </div>
 
           {/* Current program — one compact row */}
-          <div className="bg-white rounded-2xl border border-gray-200 px-5 py-4">
+          <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 px-5 py-4">
             {currentTypeProgram ? (
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 bg-sp-green-100 text-sp-green-800 text-[10px] font-semibold uppercase tracking-wide rounded-full flex-shrink-0">Active</span>
-                    <p className="font-medium text-gray-900 truncate">{currentTypeProgram.name}</p>
+                    <span className="px-2 py-0.5 bg-sp-green-500/15 text-sp-green-300 text-[10px] font-semibold uppercase tracking-wide rounded-full flex-shrink-0">Active</span>
+                    <p className="font-medium text-white truncate">{currentTypeProgram.name}</p>
                   </div>
-                  <p className="text-xs text-gray-400 mt-0.5">
+                  <p className="text-xs text-sp-ink-300 mt-0.5">
                     {currentTypeProgram.weeks?.length || 0} weeks
                     {currentTypeProgram.lastEditedAt && (
                       <> · edited {format(currentTypeProgram.lastEditedAt.toDate?.() ?? currentTypeProgram.lastEditedAt, 'MMM d')}</>
@@ -1008,14 +1008,14 @@ export default function AdminAthleteDetail() {
                   <button
                     onClick={() => openLiveProgram(currentTypeProgram)}
                     disabled={saving}
-                    className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 disabled:opacity-60 transition"
+                    className="flex items-center gap-1.5 px-3 py-1.5 border border-sp-ink-600 text-sp-ink-100 text-xs font-medium rounded-lg hover:bg-white/5 disabled:opacity-60 transition"
                   >
                     <Pencil size={13} /> Edit
                   </button>
                   <button
                     onClick={() => removeProgram(programTypeTab)}
                     disabled={saving}
-                    className="p-1.5 text-gray-300 hover:text-red-500 transition"
+                    className="p-1.5 text-sp-ink-300/60 hover:text-red-400 transition"
                     title="Remove"
                     aria-label="Remove program"
                   >
@@ -1025,10 +1025,10 @@ export default function AdminAthleteDetail() {
               </div>
             ) : (
               <div className="flex items-center justify-between gap-3">
-                <p className="text-gray-400 text-sm">No {currentTypeLabel.toLowerCase()} program assigned.</p>
+                <p className="text-sp-ink-300 text-sm">No {currentTypeLabel.toLowerCase()} program assigned.</p>
                 <button
                   onClick={() => setShowAssignModal(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-sp-green-50 text-sp-green-600 text-xs font-semibold rounded-lg hover:bg-sp-green-100 transition flex-shrink-0"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-sp-green-500/15 text-sp-green-300 text-xs font-semibold rounded-lg hover:bg-sp-green-500/25 transition flex-shrink-0"
                 >
                   <Search size={13} /> Assign Program
                 </button>
@@ -1039,23 +1039,23 @@ export default function AdminAthleteDetail() {
           {/* Drafts awaiting review — collapses away entirely once empty, and
               a published draft is archived so it never comes back here */}
           {draftsForType.length > 0 && (
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4">
-              <h3 className="font-semibold text-amber-900 mb-2.5 text-xs uppercase tracking-wide">Drafts Awaiting Review</h3>
+            <div className="bg-amber-500/10 border border-amber-500/25 rounded-2xl px-5 py-4">
+              <h3 className="font-semibold text-amber-300 mb-2.5 text-xs uppercase tracking-wide">Drafts Awaiting Review</h3>
               <div className="space-y-2">
                 {draftsForType.map((p) => (
                   <div key={p.id} className="flex items-center justify-between gap-3">
-                    <p className="text-sm text-gray-800 truncate">{p.name}</p>
+                    <p className="text-sm text-sp-ink-100 truncate">{p.name}</p>
                     <div className="flex items-center gap-1 flex-shrink-0">
                       <button
                         onClick={() => setEditingDraft(p)}
-                        className="text-xs px-3 py-1.5 bg-amber-100 text-amber-800 font-medium rounded-lg hover:bg-amber-200 transition"
+                        className="text-xs px-3 py-1.5 bg-amber-500/20 text-amber-300 font-medium rounded-lg hover:bg-amber-500/30 transition"
                       >
                         Review
                       </button>
                       <button
                         onClick={() => discardDraft(p)}
                         disabled={saving}
-                        className="p-1.5 text-amber-700/50 hover:text-red-500 transition"
+                        className="p-1.5 text-amber-400/50 hover:text-red-400 transition"
                         title="Discard draft"
                         aria-label="Discard draft"
                       >
@@ -1073,7 +1073,7 @@ export default function AdminAthleteDetail() {
           {currentTypeProgram && (
             <button
               onClick={() => setShowAssignModal(true)}
-              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-sp-green-600 transition"
+              className="flex items-center gap-1.5 text-sm text-sp-ink-300 hover:text-sp-green-400 transition"
             >
               <Search size={14} /> Assign a different {currentTypeLabel.toLowerCase()} program
             </button>
@@ -1111,34 +1111,34 @@ export default function AdminAthleteDetail() {
 
       {/* Edit modal */}
       {showEdit && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-sp-ink-800 border border-sp-ink-600 rounded-2xl w-full max-w-md p-6 shadow-xl">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-bold">Edit Athlete</h2>
-              <button onClick={() => setShowEdit(false)} className="p-1 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
+              <h2 className="text-lg font-bold text-white">Edit Athlete</h2>
+              <button onClick={() => setShowEdit(false)} className="p-1 hover:bg-white/10 text-sp-ink-300 rounded-lg"><X size={18} /></button>
             </div>
             <form onSubmit={handleEdit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                <label className="block text-sm font-medium text-sp-ink-100 mb-1">Full Name</label>
                 <input
                   required
                   value={editName}
                   onChange={e => setEditName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
+                  className="w-full px-3.5 py-2.5 border border-sp-ink-600 rounded-xl text-sm text-sp-ink-50 bg-sp-ink-900 focus:outline-none focus:ring-2 focus:ring-sp-green-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email (display only)</label>
+                <label className="block text-sm font-medium text-sp-ink-100 mb-1">Email (display only)</label>
                 <input
                   type="email"
                   value={editEmail}
                   onChange={e => setEditEmail(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
+                  className="w-full px-3.5 py-2.5 border border-sp-ink-600 rounded-xl text-sm text-sp-ink-50 bg-sp-ink-900 focus:outline-none focus:ring-2 focus:ring-sp-green-500"
                 />
-                <p className="text-xs text-gray-400 mt-1">Note: this updates the display name only, not their login email.</p>
+                <p className="text-xs text-sp-ink-300 mt-1">Note: this updates the display name only, not their login email.</p>
               </div>
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setShowEdit(false)} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
+                <button type="button" onClick={() => setShowEdit(false)} className="flex-1 py-2.5 border border-sp-ink-600 text-sp-ink-100 rounded-xl text-sm font-medium hover:bg-white/5 transition">Cancel</button>
                 <button type="submit" disabled={saving} className="btn-brand flex-1 py-2.5 rounded-xl text-sm">
                   {saving ? 'Saving…' : 'Save Changes'}
                 </button>
@@ -1150,17 +1150,17 @@ export default function AdminAthleteDetail() {
 
       {/* Delete confirmation modal */}
       {showDelete && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-sp-ink-800 border border-sp-ink-600 rounded-2xl w-full max-w-sm p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-gray-900">Delete Athlete?</h2>
-              <button onClick={() => setShowDelete(false)} className="p-1 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
+              <h2 className="text-lg font-bold text-white">Delete Athlete?</h2>
+              <button onClick={() => setShowDelete(false)} className="p-1 hover:bg-white/10 text-sp-ink-300 rounded-lg"><X size={18} /></button>
             </div>
-            <p className="text-sm text-gray-500 mb-5">
-              This will permanently remove <span className="font-semibold text-gray-800">{athlete.name}</span> and all their data. This cannot be undone.
+            <p className="text-sm text-sp-ink-300 mb-5">
+              This will permanently remove <span className="font-semibold text-white">{athlete.name}</span> and all their data. This cannot be undone.
             </p>
             <div className="flex gap-3">
-              <button onClick={() => setShowDelete(false)} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
+              <button onClick={() => setShowDelete(false)} className="flex-1 py-2.5 border border-sp-ink-600 text-sp-ink-100 rounded-xl text-sm font-medium hover:bg-white/5 transition">Cancel</button>
               <button onClick={handleDelete} disabled={saving} className="flex-1 py-2.5 bg-red-500 text-white rounded-xl text-sm font-semibold hover:bg-red-600 disabled:opacity-60 transition">
                 {saving ? 'Deleting…' : 'Delete'}
               </button>
@@ -1171,34 +1171,34 @@ export default function AdminAthleteDetail() {
 
       {/* Logs tab */}
       {tab === 'logs' && (
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Value</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Exercise</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
+              <tr className="bg-white/[0.03] border-b border-sp-ink-600">
+                <th className="text-left px-5 py-3 text-xs font-semibold text-sp-ink-300 uppercase tracking-wider">Type</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-sp-ink-300 uppercase tracking-wider">Value</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-sp-ink-300 uppercase tracking-wider">Exercise</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-sp-ink-300 uppercase tracking-wider">Date</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-sp-ink-600/60">
               {logs.map(log => (
-                <tr key={log.id} className="hover:bg-gray-50">
+                <tr key={log.id} className="hover:bg-white/[0.04]">
                   <td className="px-5 py-3">
                     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${
-                      log.type === 'velo' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'
+                      log.type === 'velo' ? 'bg-amber-500/15 text-amber-300' : 'bg-sky-500/15 text-sky-300'
                     }`}>
                       {log.type === 'velo' ? <Zap size={11} /> : <Dumbbell size={11} />}
                       {log.type === 'velo' ? 'Velocity' : 'Weight'}
                     </span>
                   </td>
-                  <td className="px-5 py-3 font-medium">{log.value} {log.type === 'velo' ? 'mph' : 'lbs'}</td>
-                  <td className="px-5 py-3 text-gray-500">{log.exercise || '—'}</td>
-                  <td className="px-5 py-3 text-gray-400">{log.date ? format(new Date(log.date), 'MMM d, yyyy') : '—'}</td>
+                  <td className="px-5 py-3 font-medium text-white">{log.value} {log.type === 'velo' ? 'mph' : 'lbs'}</td>
+                  <td className="px-5 py-3 text-sp-ink-300">{log.exercise || '—'}</td>
+                  <td className="px-5 py-3 text-sp-ink-300">{log.date ? format(new Date(log.date), 'MMM d, yyyy') : '—'}</td>
                 </tr>
               ))}
               {logs.length === 0 && (
-                <tr><td colSpan={4} className="px-5 py-8 text-center text-gray-400">No data logged yet.</td></tr>
+                <tr><td colSpan={4} className="px-5 py-8 text-center text-sp-ink-300">No data logged yet.</td></tr>
               )}
             </tbody>
           </table>
@@ -1216,46 +1216,46 @@ function AssignProgramModal({ typeLabel, programs, saving, onAssign, onClose }) 
   const filtered = programs.filter(p => p.name?.toLowerCase().includes(search.toLowerCase()))
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl w-full max-w-md shadow-xl max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
-          <h2 className="text-lg font-bold">Assign {typeLabel} Program</h2>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition"><X size={18} /></button>
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-sp-ink-800 border border-sp-ink-600 rounded-2xl w-full max-w-md shadow-xl max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-sp-ink-600 flex-shrink-0">
+          <h2 className="text-lg font-bold text-white">Assign {typeLabel} Program</h2>
+          <button onClick={onClose} className="p-1 hover:bg-white/10 text-sp-ink-300 rounded-lg transition"><X size={18} /></button>
         </div>
-        <div className="px-5 py-3 border-b border-gray-100 flex-shrink-0">
+        <div className="px-5 py-3 border-b border-sp-ink-600 flex-shrink-0">
           <div className="relative">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-sp-ink-300" />
             <input
               autoFocus
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search programs…"
-              className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
+              className="w-full pl-9 pr-3 py-2 border border-sp-ink-600 rounded-xl text-sm text-sp-ink-50 placeholder-sp-ink-300 bg-sp-ink-900 focus:outline-none focus:ring-2 focus:ring-sp-green-500"
             />
           </div>
         </div>
         <div className="overflow-y-auto flex-1 px-5 py-3">
           {filtered.length === 0 ? (
-            <p className="text-gray-400 text-sm py-6 text-center">
+            <p className="text-sp-ink-300 text-sm py-6 text-center">
               {programs.length === 0
-                ? <>No {typeLabel.toLowerCase()} programs yet. Create one in <Link to="/admin/programs" className="text-sp-green-500 underline">Programs</Link>.</>
+                ? <>No {typeLabel.toLowerCase()} programs yet. Create one in <Link to="/admin/programs" className="text-sp-green-400 underline">Programs</Link>.</>
                 : 'No matches.'}
             </p>
           ) : (
             <div className="space-y-1">
               {filtered.map((p) => (
-                <div key={p.id} className="flex items-center justify-between gap-3 py-2 border-b border-gray-50 last:border-0">
+                <div key={p.id} className="flex items-center justify-between gap-3 py-2 border-b border-sp-ink-600/60 last:border-0">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-sm font-medium text-white truncate">{p.name}</p>
+                    <p className="text-xs text-sp-ink-300">
                       {p.weeks?.length || 0} weeks{!p.athleteId && ' · General'}
                     </p>
                   </div>
                   <button
                     onClick={() => onAssign(p.id)}
                     disabled={saving}
-                    className="flex-shrink-0 text-xs px-3 py-1.5 bg-sp-green-50 text-sp-green-600 font-medium rounded-lg hover:bg-sp-green-100 disabled:opacity-60 transition"
+                    className="flex-shrink-0 text-xs px-3 py-1.5 bg-sp-green-500/15 text-sp-green-300 font-medium rounded-lg hover:bg-sp-green-500/25 disabled:opacity-60 transition"
                   >
                     Assign
                   </button>
@@ -1276,11 +1276,11 @@ function AssessmentField({ field, value, onChange }) {
   if (type === 'select') {
     return (
       <div className={wrapClass}>
-        <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
+        <label className="block text-xs font-medium text-sp-ink-300 mb-1">{label}</label>
         <select
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-white"
+          className="w-full px-3.5 py-2.5 border border-sp-ink-600 rounded-xl text-sm text-sp-ink-50 focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-sp-ink-900"
         >
           <option value="">— Select —</option>
           {options.map(opt => (
@@ -1293,13 +1293,13 @@ function AssessmentField({ field, value, onChange }) {
 
   return (
     <div className={wrapClass}>
-      <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
+      <label className="block text-xs font-medium text-sp-ink-300 mb-1">{label}</label>
       <input
         type={type === 'number' ? 'number' : type === 'date' ? 'date' : 'text'}
         step={type === 'number' ? '0.1' : undefined}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
+        className="w-full px-3.5 py-2.5 border border-sp-ink-600 rounded-xl text-sm text-sp-ink-50 placeholder-sp-ink-300 bg-sp-ink-900 focus:outline-none focus:ring-2 focus:ring-sp-green-500"
         placeholder={type === 'text' ? '' : '—'}
       />
     </div>

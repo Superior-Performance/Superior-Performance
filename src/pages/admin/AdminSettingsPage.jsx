@@ -102,28 +102,28 @@ export default function AdminSettingsPage() {
   }
 
   return (
-    <div className="p-8 max-w-2xl">
+    <div className="p-8 max-w-2xl bg-sp-ink-900 min-h-full">
       <div className="flex items-center gap-3 mb-8">
-        <div className="w-10 h-10 rounded-xl bg-sp-green-50 text-sp-green-600 flex items-center justify-center">
+        <div className="w-10 h-10 rounded-xl bg-sp-green-500/15 text-sp-green-400 flex items-center justify-center">
           <Settings size={20} />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-          <p className="text-gray-500 text-sm">Configure integrations for Superior Performance</p>
+          <h1 className="text-2xl font-bold text-white">Settings</h1>
+          <p className="text-sp-ink-300 text-sm">Configure integrations for Superior Performance</p>
         </div>
       </div>
 
       {/* Google Sheets Integration */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-6">
+      <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 p-6">
         <div className="flex items-start justify-between mb-1">
-          <h2 className="font-semibold text-gray-900">Google Sheets Algorithm</h2>
+          <h2 className="font-semibold text-white">Google Sheets Algorithm</h2>
           {scriptUrl && (
-            <span className="flex items-center gap-1 text-xs text-sp-green-600 font-medium">
+            <span className="flex items-center gap-1 text-xs text-sp-green-400 font-medium">
               <CheckCircle size={13} /> Connected
             </span>
           )}
         </div>
-        <p className="text-sm text-gray-500 mb-6">
+        <p className="text-sm text-sp-ink-300 mb-6">
           Paste your Google Apps Script web app URL here. When you click "Generate Program from Sheet"
           on any athlete, their assessment scores will be sent to your Sheet, the algorithm will run,
           and the output program will be imported automatically.
@@ -131,7 +131,7 @@ export default function AdminSettingsPage() {
 
         <form onSubmit={handleSave} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            <label className="block text-sm font-medium text-sp-ink-100 mb-1.5">
               Apps Script Web App URL
             </label>
             <input
@@ -139,7 +139,7 @@ export default function AdminSettingsPage() {
               value={scriptUrl}
               onChange={e => setScriptUrl(e.target.value)}
               placeholder="https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec"
-              className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500 font-mono"
+              className="w-full px-3.5 py-2.5 border border-sp-ink-600 rounded-xl text-sm text-sp-ink-50 placeholder-sp-ink-300 bg-sp-ink-900 focus:outline-none focus:ring-2 focus:ring-sp-green-500 font-mono"
             />
           </div>
           <button
@@ -153,23 +153,23 @@ export default function AdminSettingsPage() {
         </form>
 
         {/* Setup guide */}
-        <div className="mt-8 pt-6 border-t border-gray-100">
-          <h3 className="text-sm font-semibold text-gray-700 mb-4">How to set up your Google Sheet</h3>
-          <ol className="space-y-3 text-sm text-gray-500">
+        <div className="mt-8 pt-6 border-t border-sp-ink-600">
+          <h3 className="text-sm font-semibold text-sp-ink-100 mb-4">How to set up your Google Sheet</h3>
+          <ol className="space-y-3 text-sm text-sp-ink-300">
             <li className="flex gap-3">
-              <span className="w-5 h-5 rounded-full bg-sp-green-100 text-sp-green-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
-              <span>Create a new Google Sheet. Add a tab called <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">Inputs</code> and a tab called <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">Output</code>.</span>
+              <span className="w-5 h-5 rounded-full bg-sp-green-500/20 text-sp-green-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
+              <span>Create a new Google Sheet. Add a tab called <code className="bg-white/10 px-1.5 py-0.5 rounded text-xs font-mono">Inputs</code> and a tab called <code className="bg-white/10 px-1.5 py-0.5 rounded text-xs font-mono">Output</code>.</span>
             </li>
             <li className="flex gap-3">
-              <span className="w-5 h-5 rounded-full bg-sp-green-100 text-sp-green-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
+              <span className="w-5 h-5 rounded-full bg-sp-green-500/20 text-sp-green-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
               <span>In the <strong>Inputs</strong> tab, put labels in column A and input values in column B, rows 2–9 (Grip Strength, Shoulder ER, Shoulder IR, Hip Mobility, Baseline Velo, Arm Strength, Sprint Time, Body Weight).</span>
             </li>
             <li className="flex gap-3">
-              <span className="w-5 h-5 rounded-full bg-sp-green-100 text-sp-green-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
-              <span>In the <strong>Output</strong> tab, row 1 must be headers: <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">Week, Day, Category, Exercise, Sets, Reps, Intensity, Notes</code>. Your algorithm populates rows 2+ using formulas referencing the Inputs tab. <strong>Category</strong> is per-exercise, not per-day — a single day can mix rows tagged <code className="bg-gray-100 px-1 rounded text-xs font-mono">Mobilization</code>, <code className="bg-gray-100 px-1 rounded text-xs font-mono">Correctives</code>, <code className="bg-gray-100 px-1 rounded text-xs font-mono">Movement Activation</code>, and one of <code className="bg-gray-100 px-1 rounded text-xs font-mono">Hybrid Day Plyos</code> / <code className="bg-gray-100 px-1 rounded text-xs font-mono">High-Intent Day Plyos</code> / <code className="bg-gray-100 px-1 rounded text-xs font-mono">Recovery Day Plyos</code> — the athlete sees each as its own clickable tile for that day. Other text still works, it just won't get a matching color or icon.</span>
+              <span className="w-5 h-5 rounded-full bg-sp-green-500/20 text-sp-green-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
+              <span>In the <strong>Output</strong> tab, row 1 must be headers: <code className="bg-white/10 px-1.5 py-0.5 rounded text-xs font-mono">Week, Day, Category, Exercise, Sets, Reps, Intensity, Notes</code>. Your algorithm populates rows 2+ using formulas referencing the Inputs tab. <strong>Category</strong> is per-exercise, not per-day — a single day can mix rows tagged <code className="bg-white/10 px-1 rounded text-xs font-mono">Mobilization</code>, <code className="bg-white/10 px-1 rounded text-xs font-mono">Correctives</code>, <code className="bg-white/10 px-1 rounded text-xs font-mono">Movement Activation</code>, and one of <code className="bg-white/10 px-1 rounded text-xs font-mono">Hybrid Day Plyos</code> / <code className="bg-white/10 px-1 rounded text-xs font-mono">High-Intent Day Plyos</code> / <code className="bg-white/10 px-1 rounded text-xs font-mono">Recovery Day Plyos</code> — the athlete sees each as its own clickable tile for that day. Other text still works, it just won't get a matching color or icon.</span>
             </li>
             <li className="flex gap-3">
-              <span className="w-5 h-5 rounded-full bg-sp-green-100 text-sp-green-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">4</span>
+              <span className="w-5 h-5 rounded-full bg-sp-green-500/20 text-sp-green-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">4</span>
               <span>In your Sheet, go to <strong>Extensions → Apps Script</strong>, paste the script from below, then click <strong>Deploy → New deployment → Web app</strong>. Set "Who has access" to <em>Anyone</em>. Copy the URL and paste it above.</span>
             </li>
           </ol>
@@ -177,14 +177,14 @@ export default function AdminSettingsPage() {
           {/* Apps Script code */}
           <div className="mt-5">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Apps Script Code</p>
+              <p className="text-xs font-semibold text-sp-ink-300 uppercase tracking-wider">Apps Script Code</p>
               <button
                 type="button"
                 onClick={() => {
                   navigator.clipboard.writeText(APPS_SCRIPT_CODE)
                   toast.success('Copied to clipboard!')
                 }}
-                className="text-xs text-sp-green-500 hover:text-sp-green-600 font-medium"
+                className="text-xs text-sp-green-400 hover:text-sp-green-300 font-medium"
               >
                 Copy
               </button>
@@ -197,16 +197,16 @@ export default function AdminSettingsPage() {
       </div>
 
       {/* Assessment Intake Sheet */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-6 mt-5">
+      <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 p-6 mt-5">
         <div className="flex items-start justify-between mb-1">
-          <h2 className="font-semibold text-gray-900">Assessment Intake Sheet</h2>
+          <h2 className="font-semibold text-white">Assessment Intake Sheet</h2>
           {assessmentScriptUrl && (
-            <span className="flex items-center gap-1 text-xs text-sp-green-600 font-medium">
+            <span className="flex items-center gap-1 text-xs text-sp-green-400 font-medium">
               <CheckCircle size={13} /> Connected
             </span>
           )}
         </div>
-        <p className="text-sm text-gray-500 mb-6">
+        <p className="text-sm text-sp-ink-300 mb-6">
           Paste the Apps Script web app URL for your Assessment Intake sheet here. When you click
           "Log to Intake Sheet" on any athlete, their full assessment gets appended as a new row —
           same fields, same order, same dropdown values as the sheet itself. The same script also
@@ -218,7 +218,7 @@ export default function AdminSettingsPage() {
 
         <form onSubmit={handleSaveAssessmentUrl} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            <label className="block text-sm font-medium text-sp-ink-100 mb-1.5">
               Apps Script Web App URL
             </label>
             <input
@@ -226,7 +226,7 @@ export default function AdminSettingsPage() {
               value={assessmentScriptUrl}
               onChange={e => setAssessmentScriptUrl(e.target.value)}
               placeholder="https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec"
-              className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500 font-mono"
+              className="w-full px-3.5 py-2.5 border border-sp-ink-600 rounded-xl text-sm text-sp-ink-50 placeholder-sp-ink-300 bg-sp-ink-900 focus:outline-none focus:ring-2 focus:ring-sp-green-500 font-mono"
             />
           </div>
           <button
@@ -240,52 +240,52 @@ export default function AdminSettingsPage() {
         </form>
 
         {/* Setup guide */}
-        <div className="mt-8 pt-6 border-t border-gray-100">
-          <h3 className="text-sm font-semibold text-gray-700 mb-4">How to connect this to your sheet</h3>
-          <ol className="space-y-3 text-sm text-gray-500">
+        <div className="mt-8 pt-6 border-t border-sp-ink-600">
+          <h3 className="text-sm font-semibold text-sp-ink-100 mb-4">How to connect this to your sheet</h3>
+          <ol className="space-y-3 text-sm text-sp-ink-300">
             <li className="flex gap-3">
-              <span className="w-5 h-5 rounded-full bg-sp-green-100 text-sp-green-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
-              <span>Open your Assessment Intake sheet, confirm the tab is named exactly <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">Assessment Intake</code> (the script looks it up by that name).</span>
+              <span className="w-5 h-5 rounded-full bg-sp-green-500/20 text-sp-green-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
+              <span>Open your Assessment Intake sheet, confirm the tab is named exactly <code className="bg-white/10 px-1.5 py-0.5 rounded text-xs font-mono">Assessment Intake</code> (the script looks it up by that name).</span>
             </li>
             <li className="flex gap-3">
-              <span className="w-5 h-5 rounded-full bg-sp-green-100 text-sp-green-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
+              <span className="w-5 h-5 rounded-full bg-sp-green-500/20 text-sp-green-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
               <span>Go to <strong>Extensions → Apps Script</strong>, delete any existing code, and paste the script below.</span>
             </li>
             <li className="flex gap-3">
-              <span className="w-5 h-5 rounded-full bg-sp-green-100 text-sp-green-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
+              <span className="w-5 h-5 rounded-full bg-sp-green-500/20 text-sp-green-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
               <span>Click <strong>Deploy → New deployment → Web app</strong>. Set "Who has access" to <em>Anyone</em>. Copy the resulting URL and paste it above.</span>
             </li>
             <li className="flex gap-3">
-              <span className="w-5 h-5 rounded-full bg-sp-green-100 text-sp-green-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">4</span>
+              <span className="w-5 h-5 rounded-full bg-sp-green-500/20 text-sp-green-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">4</span>
               <span>On any athlete's Assessment tab, fill in what you have and click <strong>Log to Intake Sheet</strong> — it appends one row to the bottom of the sheet, same as filling it in by hand.</span>
             </li>
             <li className="flex gap-3">
-              <span className="w-5 h-5 rounded-full bg-sp-green-100 text-sp-green-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">5</span>
+              <span className="w-5 h-5 rounded-full bg-sp-green-500/20 text-sp-green-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">5</span>
               <span>
-                Add a tab named exactly <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">Program Output</code> with header row{' '}
-                <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">Athlete Name, Week, Day, Category, Exercise, Sets, Reps, Intensity, Notes</code>.
+                Add a tab named exactly <code className="bg-white/10 px-1.5 py-0.5 rounded text-xs font-mono">Program Output</code> with header row{' '}
+                <code className="bg-white/10 px-1.5 py-0.5 rounded text-xs font-mono">Athlete Name, Week, Day, Category, Exercise, Sets, Reps, Intensity, Notes</code>.
                 This holds each athlete's correctives &amp; mobility program — one row per exercise, same athlete name as their assessment row.
-                Use <strong>Category</strong> to tag each exercise as <code className="bg-gray-100 px-1 rounded text-xs font-mono">Mobilization</code>, <code className="bg-gray-100 px-1 rounded text-xs font-mono">Correctives</code>, <code className="bg-gray-100 px-1 rounded text-xs font-mono">Movement Activation</code>, or the day's plyo routine (<code className="bg-gray-100 px-1 rounded text-xs font-mono">Hybrid Day Plyos</code>, <code className="bg-gray-100 px-1 rounded text-xs font-mono">High-Intent Day Plyos</code>, or <code className="bg-gray-100 px-1 rounded text-xs font-mono">Recovery Day Plyos</code>) — the athlete sees each as its own clickable tile.
+                Use <strong>Category</strong> to tag each exercise as <code className="bg-white/10 px-1 rounded text-xs font-mono">Mobilization</code>, <code className="bg-white/10 px-1 rounded text-xs font-mono">Correctives</code>, <code className="bg-white/10 px-1 rounded text-xs font-mono">Movement Activation</code>, or the day's plyo routine (<code className="bg-white/10 px-1 rounded text-xs font-mono">Hybrid Day Plyos</code>, <code className="bg-white/10 px-1 rounded text-xs font-mono">High-Intent Day Plyos</code>, or <code className="bg-white/10 px-1 rounded text-xs font-mono">Recovery Day Plyos</code>) — the athlete sees each as its own clickable tile.
               </span>
             </li>
             <li className="flex gap-3">
-              <span className="w-5 h-5 rounded-full bg-sp-green-100 text-sp-green-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">6</span>
+              <span className="w-5 h-5 rounded-full bg-sp-green-500/20 text-sp-green-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">6</span>
               <span>
-                Add a second tab named exactly <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">Lifting Output</code> with the same header row. This holds each athlete's lifting program, same format, same rules.
+                Add a second tab named exactly <code className="bg-white/10 px-1.5 py-0.5 rounded text-xs font-mono">Lifting Output</code> with the same header row. This holds each athlete's lifting program, same format, same rules.
               </span>
             </li>
             <li className="flex gap-3">
-              <span className="w-5 h-5 rounded-full bg-sp-green-100 text-sp-green-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">7</span>
+              <span className="w-5 h-5 rounded-full bg-sp-green-500/20 text-sp-green-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">7</span>
               <span>
-                Prefer one tab that already includes Catch Play instead of splitting it out? Add a tab named exactly <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">Pre-Throw Outputs</code> with header row{' '}
-                <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">Athlete Name, Week, Day, Type, Exercise, Sets, Reps, Intensity, Notes, Video URL</code>.
-                <strong> Type</strong> works exactly like Category above, plus one more value: <code className="bg-gray-100 px-1 rounded text-xs font-mono">Catch Play</code> for that week's throwing work — it lands as its own tile right alongside Mobilization, Correctives, Movement Activation and the plyo routine, all in the same program.
-                <strong> Day</strong> can be a plain number for a remote athlete's one flexible session a week, or a weekday name (<code className="bg-gray-100 px-1 rounded text-xs font-mono">Monday</code>, <code className="bg-gray-100 px-1 rounded text-xs font-mono">Friday (optional)</code>) for an in-house athlete's set training days — leave it blank and everything lands on one day, same as before.
+                Prefer one tab that already includes Catch Play instead of splitting it out? Add a tab named exactly <code className="bg-white/10 px-1.5 py-0.5 rounded text-xs font-mono">Pre-Throw Outputs</code> with header row{' '}
+                <code className="bg-white/10 px-1.5 py-0.5 rounded text-xs font-mono">Athlete Name, Week, Day, Type, Exercise, Sets, Reps, Intensity, Notes, Video URL</code>.
+                <strong> Type</strong> works exactly like Category above, plus one more value: <code className="bg-white/10 px-1 rounded text-xs font-mono">Catch Play</code> for that week's throwing work — it lands as its own tile right alongside Mobilization, Correctives, Movement Activation and the plyo routine, all in the same program.
+                <strong> Day</strong> can be a plain number for a remote athlete's one flexible session a week, or a weekday name (<code className="bg-white/10 px-1 rounded text-xs font-mono">Monday</code>, <code className="bg-white/10 px-1 rounded text-xs font-mono">Friday (optional)</code>) for an in-house athlete's set training days — leave it blank and everything lands on one day, same as before.
                 <strong> Video URL</strong> is optional — paste a link per exercise and the athlete gets a "Watch video" button in an in-app player, nothing to leave the app for.
               </span>
             </li>
             <li className="flex gap-3">
-              <span className="w-5 h-5 rounded-full bg-sp-green-100 text-sp-green-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">8</span>
+              <span className="w-5 h-5 rounded-full bg-sp-green-500/20 text-sp-green-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">8</span>
               <span>
                 On that athlete's Assessment tab, click <strong>Pull Correctives from Sheet</strong>, <strong>Pull Lifting from Sheet</strong>, or <strong>Pull from Pre-Throw Outputs</strong> — each reads its own tab and creates a draft for review, independent of the others.
                 Throwing programs can also work the old way: build a handful of shared templates in the <strong>Programs</strong> page and assign them to whichever athletes fit, from the Throwing section of their Program tab — those still show up alongside the correctives categories as a <strong>Catch Play</strong> tile too, no extra setup needed.
@@ -296,14 +296,14 @@ export default function AdminSettingsPage() {
           {/* Apps Script code */}
           <div className="mt-5">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Apps Script Code</p>
+              <p className="text-xs font-semibold text-sp-ink-300 uppercase tracking-wider">Apps Script Code</p>
               <button
                 type="button"
                 onClick={() => {
                   navigator.clipboard.writeText(ASSESSMENT_APPS_SCRIPT_CODE)
                   toast.success('Copied to clipboard!')
                 }}
-                className="text-xs text-sp-green-500 hover:text-sp-green-600 font-medium"
+                className="text-xs text-sp-green-400 hover:text-sp-green-300 font-medium"
               >
                 Copy
               </button>
@@ -316,16 +316,16 @@ export default function AdminSettingsPage() {
       </div>
 
       {/* Landing Page Inquiry Form */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-6 mt-5">
+      <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 p-6 mt-5">
         <div className="flex items-start justify-between mb-1">
-          <h2 className="font-semibold text-gray-900">Landing Page Inquiry Form</h2>
+          <h2 className="font-semibold text-white">Landing Page Inquiry Form</h2>
           {inquiryScriptUrl && (
-            <span className="flex items-center gap-1 text-xs text-sp-green-600 font-medium">
+            <span className="flex items-center gap-1 text-xs text-sp-green-400 font-medium">
               <CheckCircle size={13} /> Connected
             </span>
           )}
         </div>
-        <p className="text-sm text-gray-500 mb-6">
+        <p className="text-sm text-sp-ink-300 mb-6">
           Paste the Apps Script web app URL here to turn on the "Inquire" form on the public landing
           page. Every submission gets emailed straight to{' '}
           <strong>superiorperformance.sp@gmail.com</strong> — nothing is stored in the app.
@@ -333,7 +333,7 @@ export default function AdminSettingsPage() {
 
         <form onSubmit={handleSaveInquiryUrl} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            <label className="block text-sm font-medium text-sp-ink-100 mb-1.5">
               Apps Script Web App URL
             </label>
             <input
@@ -341,7 +341,7 @@ export default function AdminSettingsPage() {
               value={inquiryScriptUrl}
               onChange={e => setInquiryScriptUrl(e.target.value)}
               placeholder="https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec"
-              className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500 font-mono"
+              className="w-full px-3.5 py-2.5 border border-sp-ink-600 rounded-xl text-sm text-sp-ink-50 placeholder-sp-ink-300 bg-sp-ink-900 focus:outline-none focus:ring-2 focus:ring-sp-green-500 font-mono"
             />
           </div>
           <button
@@ -355,23 +355,23 @@ export default function AdminSettingsPage() {
         </form>
 
         {/* Setup guide */}
-        <div className="mt-8 pt-6 border-t border-gray-100">
-          <h3 className="text-sm font-semibold text-gray-700 mb-4">How to set this up</h3>
-          <ol className="space-y-3 text-sm text-gray-500">
+        <div className="mt-8 pt-6 border-t border-sp-ink-600">
+          <h3 className="text-sm font-semibold text-sp-ink-100 mb-4">How to set this up</h3>
+          <ol className="space-y-3 text-sm text-sp-ink-300">
             <li className="flex gap-3">
-              <span className="w-5 h-5 rounded-full bg-sp-green-100 text-sp-green-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
-              <span>Go to <a href="https://script.google.com" target="_blank" rel="noreferrer" className="text-sp-green-600 underline">script.google.com</a> and start a blank project — this one doesn't need a spreadsheet, it only sends mail.</span>
+              <span className="w-5 h-5 rounded-full bg-sp-green-500/20 text-sp-green-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
+              <span>Go to <a href="https://script.google.com" target="_blank" rel="noreferrer" className="text-sp-green-400 underline">script.google.com</a> and start a blank project — this one doesn't need a spreadsheet, it only sends mail.</span>
             </li>
             <li className="flex gap-3">
-              <span className="w-5 h-5 rounded-full bg-sp-green-100 text-sp-green-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
+              <span className="w-5 h-5 rounded-full bg-sp-green-500/20 text-sp-green-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
               <span>Delete the placeholder code and paste the script below. Sign in with whichever Google account you want sending these — the address it's deployed under doesn't matter, it always emails <strong>superiorperformance.sp@gmail.com</strong>.</span>
             </li>
             <li className="flex gap-3">
-              <span className="w-5 h-5 rounded-full bg-sp-green-100 text-sp-green-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
+              <span className="w-5 h-5 rounded-full bg-sp-green-500/20 text-sp-green-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
               <span>Click <strong>Deploy → New deployment → Web app</strong>. Set "Who has access" to <em>Anyone</em>. The first time, Google will ask you to authorize the script to send mail on your behalf — approve it.</span>
             </li>
             <li className="flex gap-3">
-              <span className="w-5 h-5 rounded-full bg-sp-green-100 text-sp-green-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">4</span>
+              <span className="w-5 h-5 rounded-full bg-sp-green-500/20 text-sp-green-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">4</span>
               <span>Copy the resulting URL and paste it above, then Save. The "Inquire" button on the landing page will start working immediately — no redeploy needed.</span>
             </li>
           </ol>
@@ -379,14 +379,14 @@ export default function AdminSettingsPage() {
           {/* Apps Script code */}
           <div className="mt-5">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Apps Script Code</p>
+              <p className="text-xs font-semibold text-sp-ink-300 uppercase tracking-wider">Apps Script Code</p>
               <button
                 type="button"
                 onClick={() => {
                   navigator.clipboard.writeText(INQUIRY_APPS_SCRIPT_CODE)
                   toast.success('Copied to clipboard!')
                 }}
-                className="text-xs text-sp-green-500 hover:text-sp-green-600 font-medium"
+                className="text-xs text-sp-green-400 hover:text-sp-green-300 font-medium"
               >
                 Copy
               </button>
@@ -399,12 +399,12 @@ export default function AdminSettingsPage() {
       </div>
 
       {/* Change password */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-6 mt-5">
+      <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 p-6 mt-5">
         <div className="flex items-center gap-2 mb-1">
-          <Lock size={16} className="text-gray-400" />
-          <h2 className="font-semibold text-gray-900">Change Password</h2>
+          <Lock size={16} className="text-sp-ink-300" />
+          <h2 className="font-semibold text-white">Change Password</h2>
         </div>
-        <p className="text-sm text-gray-500 mb-5">Signed in as <span className="font-medium text-gray-700">{userProfile?.email}</span></p>
+        <p className="text-sm text-sp-ink-300 mb-5">Signed in as <span className="font-medium text-sp-ink-100">{userProfile?.email}</span></p>
         <form onSubmit={handlePasswordChange} className="space-y-4">
           <PwField label="Current Password" value={current} onChange={setCurrent} />
           <PwField label="New Password"     value={next}    onChange={setNext}    minLength={6} />
@@ -426,13 +426,13 @@ export default function AdminSettingsPage() {
 function PwField({ label, value, onChange, ...props }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      <label className="block text-sm font-medium text-sp-ink-100 mb-1">{label}</label>
       <input
         type="password"
         required
         value={value}
         onChange={e => onChange(e.target.value)}
-        className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
+        className="w-full px-3.5 py-2.5 border border-sp-ink-600 rounded-xl text-sm text-sp-ink-50 bg-sp-ink-900 focus:outline-none focus:ring-2 focus:ring-sp-green-500"
         {...props}
       />
     </div>

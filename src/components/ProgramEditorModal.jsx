@@ -206,40 +206,40 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
     (s, wk) => s + (wk.days || []).reduce((t, d) => t + (d.exercises?.length || 0), 0), 0)
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+      <div className="bg-sp-ink-800 border border-sp-ink-600 rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-sp-ink-600 flex-shrink-0">
           <div>
-            <h2 className="text-lg font-bold text-gray-900">{program.name}</h2>
+            <h2 className="text-lg font-bold text-white">{program.name}</h2>
             {live ? (
-              <p className="text-xs text-sp-green-600 font-medium mt-0.5">
+              <p className="text-xs text-sp-green-400 font-medium mt-0.5">
                 Live — the athlete is following this program right now
               </p>
             ) : isTemplate ? (
-              <p className="text-xs text-gray-400 font-medium mt-0.5">
+              <p className="text-xs text-sp-ink-300 font-medium mt-0.5">
                 Not assigned to an athlete yet
               </p>
             ) : (
-              <p className="text-xs text-amber-600 font-medium mt-0.5">
+              <p className="text-xs text-amber-400 font-medium mt-0.5">
                 Draft — not visible to the athlete yet
               </p>
             )}
           </div>
-          <button onClick={handleClose} className="p-1.5 hover:bg-gray-100 rounded-lg transition"><X size={18} /></button>
+          <button onClick={handleClose} className="p-1.5 hover:bg-white/10 text-sp-ink-300 rounded-lg transition"><X size={18} /></button>
         </div>
 
         {live && (
-          <div className="flex items-start gap-2.5 px-6 py-3 bg-amber-50 border-b border-amber-100 flex-shrink-0">
-            <AlertTriangle size={15} className="text-amber-500 flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-amber-800">
+          <div className="flex items-start gap-2.5 px-6 py-3 bg-amber-500/10 border-b border-amber-500/20 flex-shrink-0">
+            <AlertTriangle size={15} className="text-amber-400 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-200">
               Changes go live as soon as you save. Exercises the athlete has already
               completed stay ticked off — deleting or reordering won't disturb them.
             </p>
           </div>
         )}
 
-        <div className="flex items-center gap-2.5 px-6 py-3 border-b border-gray-100 flex-shrink-0">
-          <label htmlFor="program-start-date" className="text-xs font-semibold text-gray-600 flex-shrink-0">
+        <div className="flex items-center gap-2.5 px-6 py-3 border-b border-sp-ink-600 flex-shrink-0">
+          <label htmlFor="program-start-date" className="text-xs font-semibold text-sp-ink-200 flex-shrink-0">
             Start date
           </label>
           <input
@@ -247,21 +247,21 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
             type="date"
             value={startDate}
             onChange={e => changeStartDate(e.target.value)}
-            className="px-2.5 py-1 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-sp-green-500"
+            className="px-2.5 py-1 border border-sp-ink-600 rounded-lg text-xs text-sp-ink-50 bg-sp-ink-900 focus:outline-none focus:ring-2 focus:ring-sp-green-500"
           />
-          <p className="text-[11px] text-gray-400">Day 1 of Week 1 — controls the dates the athlete sees.</p>
+          <p className="text-[11px] text-sp-ink-300">Day 1 of Week 1 — controls the dates the athlete sees.</p>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
           {weeks.map((week, wi) => (
             <div key={wi}>
               <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                <p className="text-xs font-bold text-sp-ink-300 uppercase tracking-wider">
                   Week {week.weekNum ?? wi + 1}
                 </p>
                 <button
                   onClick={() => removeWeek(wi)}
-                  className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-red-500 transition"
+                  className="flex items-center gap-1 text-[11px] text-sp-ink-300/70 hover:text-red-400 transition"
                 >
                   <Trash2 size={12} /> Delete week
                 </button>
@@ -269,29 +269,29 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
 
               <div className="space-y-4">
                 {week.days?.map((day, di) => (
-                  <div key={di} className="bg-gray-50 rounded-xl p-4">
+                  <div key={di} className="bg-sp-ink-900/60 border border-sp-ink-600/50 rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <span className="text-sm font-semibold text-gray-800 flex-shrink-0">
+                      <span className="text-sm font-semibold text-sp-ink-50 flex-shrink-0">
                         Day {day.dayNum ?? di + 1}
                       </span>
                       <input
                         value={day.category || day.title || ''}
                         onChange={e => updateDayField(wi, di, day.title !== undefined && day.category === undefined ? 'title' : 'category', e.target.value)}
                         placeholder="Focus (e.g. Long Toss)"
-                        className="flex-1 px-2.5 py-1 border border-gray-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-sp-green-500"
+                        className="flex-1 px-2.5 py-1 border border-sp-ink-600 rounded-lg text-xs text-sp-ink-50 placeholder-sp-ink-300 bg-sp-ink-800 focus:outline-none focus:ring-2 focus:ring-sp-green-500"
                       />
                       <select
                         value={day.dayType || ''}
                         onChange={e => updateDayField(wi, di, 'dayType', e.target.value)}
                         title="Day Type — for College Remote Athlete Mode, matches this day across every program type"
-                        className="flex-shrink-0 w-36 px-2 py-1 border border-gray-200 rounded-lg text-xs bg-white text-gray-500 focus:outline-none focus:ring-2 focus:ring-sp-green-500"
+                        className="flex-shrink-0 w-36 px-2 py-1 border border-sp-ink-600 rounded-lg text-xs bg-sp-ink-800 text-sp-ink-300 focus:outline-none focus:ring-2 focus:ring-sp-green-500"
                       >
                         <option value="">No day type</option>
                         {DAY_TYPES.map(dt => <option key={dt.key} value={dt.key}>{dt.label}</option>)}
                       </select>
                       <button
                         onClick={() => removeDay(wi, di)}
-                        className="p-1.5 text-gray-300 hover:text-red-500 transition flex-shrink-0"
+                        className="p-1.5 text-sp-ink-300/60 hover:text-red-400 transition flex-shrink-0"
                         aria-label="Delete day"
                       >
                         <Trash2 size={14} />
@@ -305,31 +305,31 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
                         const info = exerciseCategoryInfo(group.key)
                         const Icon = CATEGORY_ICONS[info.icon] || ListChecks
                         return (
-                          <div key={group.key} className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                          <div key={group.key} className="bg-sp-ink-800 border border-sp-ink-600 rounded-lg overflow-hidden">
                             <button
                               type="button"
                               onClick={() => setOpenGroup(prev => ({ ...prev, [groupKey]: prev[groupKey] === group.key ? null : group.key }))}
-                              className="w-full flex items-center justify-between gap-2 px-3 py-2 hover:bg-gray-50 transition"
+                              className="w-full flex items-center justify-between gap-2 px-3 py-2 hover:bg-white/5 transition"
                             >
                               <div className="flex items-center gap-2 min-w-0">
-                                <span className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 ${info.badgeClass}`}>
+                                <span className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 text-white ${info.dotClass}`}>
                                   <Icon size={11} />
                                 </span>
-                                <span className="text-[11px] font-bold uppercase tracking-wide text-gray-700 truncate">{group.key}</span>
-                                <span className="text-[11px] text-gray-400 flex-shrink-0">{group.items.length}</span>
+                                <span className="text-[11px] font-bold uppercase tracking-wide text-sp-ink-100 truncate">{group.key}</span>
+                                <span className="text-[11px] text-sp-ink-300 flex-shrink-0">{group.items.length}</span>
                               </div>
-                              {isOpen ? <ChevronUp size={14} className="text-gray-300 flex-shrink-0" /> : <ChevronDown size={14} className="text-gray-300 flex-shrink-0" />}
+                              {isOpen ? <ChevronUp size={14} className="text-sp-ink-300 flex-shrink-0" /> : <ChevronDown size={14} className="text-sp-ink-300 flex-shrink-0" />}
                             </button>
 
                             {isOpen && (
-                              <div className="p-2 space-y-2 border-t border-gray-100 bg-gray-50/50">
+                              <div className="p-2 space-y-2 border-t border-sp-ink-600/60 bg-sp-ink-900/40">
                                 {groupIntoSlots(group.items).map(slot => (
                                   <div
                                     key={slot.altGroup || slot.items[0].ei}
-                                    className={slot.items.length > 1 ? 'border border-sp-green-200 rounded-lg p-2 space-y-2 bg-sp-green-50/40' : ''}
+                                    className={slot.items.length > 1 ? 'border border-sp-green-500/30 rounded-lg p-2 space-y-2 bg-sp-green-500/10' : ''}
                                   >
                                     {slot.items.length > 1 && (
-                                      <p className="text-[10px] font-bold uppercase tracking-wide text-sp-green-700">Either/or — athlete picks one</p>
+                                      <p className="text-[10px] font-bold uppercase tracking-wide text-sp-green-300">Either/or — athlete picks one</p>
                                     )}
                                     {slot.items.map(({ ex, ei }, pos) => (
                                       <ExerciseFields
@@ -346,7 +346,7 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
                                 ))}
                                 <button
                                   onClick={() => addExercise(wi, di, group.rawCategory)}
-                                  className="flex items-center gap-1.5 text-xs text-sp-green-600 font-medium hover:text-sp-green-700 transition"
+                                  className="flex items-center gap-1.5 text-xs text-sp-green-400 font-medium hover:text-sp-green-300 transition"
                                 >
                                   <Plus size={13} /> Add exercise
                                 </button>
@@ -356,13 +356,13 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
                         )
                       })}
                       {(!day.exercises || day.exercises.length === 0) && (
-                        <p className="text-xs text-gray-400">No exercises.</p>
+                        <p className="text-xs text-sp-ink-300">No exercises.</p>
                       )}
                     </div>
 
                     <button
                       onClick={() => { addExercise(wi, di); setOpenGroup(prev => ({ ...prev, [`${wi}_${di}`]: 'General' })) }}
-                      className="flex items-center gap-1.5 text-xs text-gray-500 font-medium mt-3 hover:text-sp-green-600 transition"
+                      className="flex items-center gap-1.5 text-xs text-sp-ink-300 font-medium mt-3 hover:text-sp-green-400 transition"
                     >
                       <Plus size={13} /> Add exercise (new category)
                     </button>
@@ -371,7 +371,7 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
 
                 <button
                   onClick={() => addDay(wi)}
-                  className="flex items-center gap-1.5 text-xs text-gray-500 font-medium hover:text-sp-green-600 transition"
+                  className="flex items-center gap-1.5 text-xs text-sp-ink-300 font-medium hover:text-sp-green-400 transition"
                 >
                   <Plus size={13} /> Add day to week {week.weekNum ?? wi + 1}
                 </button>
@@ -380,24 +380,24 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
           ))}
 
           {weeks.length === 0 && (
-            <p className="text-sm text-gray-400 text-center py-8">This program has no weeks yet.</p>
+            <p className="text-sm text-sp-ink-300 text-center py-8">This program has no weeks yet.</p>
           )}
 
           <button
             onClick={addWeek}
-            className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-gray-200 rounded-xl text-sm font-medium text-gray-500 hover:border-sp-green-300 hover:text-sp-green-600 transition"
+            className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-sp-ink-600 rounded-xl text-sm font-medium text-sp-ink-300 hover:border-sp-green-500/50 hover:text-sp-green-400 transition"
           >
             <CalendarPlus size={15} /> Add week
           </button>
         </div>
 
-        <div className="flex items-center gap-3 px-6 py-4 border-t border-gray-100 flex-shrink-0">
-          <p className="text-xs text-gray-400 flex-shrink-0 mr-auto">
+        <div className="flex items-center gap-3 px-6 py-4 border-t border-sp-ink-600 flex-shrink-0">
+          <p className="text-xs text-sp-ink-300 flex-shrink-0 mr-auto">
             {weeks.length} week{weeks.length === 1 ? '' : 's'} · {totalExercises} exercise{totalExercises === 1 ? '' : 's'}
           </p>
           <button
             onClick={handleClose}
-            className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition"
+            className="px-4 py-2.5 border border-sp-ink-600 text-sp-ink-100 rounded-xl text-sm font-medium hover:bg-white/5 transition"
           >
             Cancel
           </button>
@@ -424,7 +424,7 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
               <button
                 onClick={handleSave}
                 disabled={saving || publishing}
-                className="px-4 py-2.5 border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 disabled:opacity-60 transition"
+                className="px-4 py-2.5 border border-sp-ink-600 text-sp-ink-100 rounded-xl text-sm font-semibold hover:bg-white/5 disabled:opacity-60 transition"
               >
                 {saving ? 'Saving…' : 'Save Draft'}
               </button>
@@ -449,15 +449,15 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
 // pair — see addAltOption/unlinkAltOptions above.
 function ExerciseFields({ ex, label, onChange, onRemove, onAddOption, onUnlink }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-2 space-y-1.5">
+    <div className="bg-sp-ink-800 border border-sp-ink-600 rounded-lg p-2 space-y-1.5">
       <div className="flex items-center gap-2">
         {label && (
-          <span className="flex-shrink-0 text-[10px] font-bold uppercase tracking-wide text-sp-green-700 w-14">{label}</span>
+          <span className="flex-shrink-0 text-[10px] font-bold uppercase tracking-wide text-sp-green-300 w-14">{label}</span>
         )}
         <select
           value={ex.category || ''}
           onChange={e => onChange('category', e.target.value)}
-          className="flex-shrink-0 w-36 px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-white text-gray-500"
+          className="flex-shrink-0 w-36 px-2 py-1.5 border border-sp-ink-600 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-sp-ink-900 text-sp-ink-200"
         >
           <option value="">No category</option>
           {EXERCISE_CATEGORIES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
@@ -467,11 +467,11 @@ function ExerciseFields({ ex, label, onChange, onRemove, onAddOption, onUnlink }
           value={ex.name || ''}
           onChange={e => onChange('name', e.target.value)}
           placeholder="Exercise"
-          className="flex-1 px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-white"
+          className="flex-1 px-2.5 py-1.5 border border-sp-ink-600 rounded-lg text-xs text-sp-ink-50 placeholder-sp-ink-300 focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-sp-ink-900"
         />
         <button
           onClick={onRemove}
-          className="flex-shrink-0 p-1.5 text-gray-300 hover:text-red-500 transition"
+          className="flex-shrink-0 p-1.5 text-sp-ink-300/60 hover:text-red-400 transition"
           aria-label="Remove exercise"
         >
           <Trash2 size={14} />
@@ -482,40 +482,40 @@ function ExerciseFields({ ex, label, onChange, onRemove, onAddOption, onUnlink }
           value={ex.sets || ''}
           onChange={e => onChange('sets', e.target.value)}
           placeholder="Sets"
-          className="col-span-2 px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-white"
+          className="col-span-2 px-2 py-1.5 border border-sp-ink-600 rounded-lg text-xs text-sp-ink-50 placeholder-sp-ink-300 focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-sp-ink-900"
         />
         <input
           value={ex.reps || ''}
           onChange={e => onChange('reps', e.target.value)}
           placeholder="Reps"
-          className="col-span-2 px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-white"
+          className="col-span-2 px-2 py-1.5 border border-sp-ink-600 rounded-lg text-xs text-sp-ink-50 placeholder-sp-ink-300 focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-sp-ink-900"
         />
         <input
           value={ex.intensity || ex.load || ''}
           onChange={e => onChange('intensity', e.target.value)}
           placeholder="Intensity"
-          className="col-span-3 px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-white"
+          className="col-span-3 px-2.5 py-1.5 border border-sp-ink-600 rounded-lg text-xs text-sp-ink-50 placeholder-sp-ink-300 focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-sp-ink-900"
         />
         <input
           value={ex.notes || ''}
           onChange={e => onChange('notes', e.target.value)}
           placeholder="Notes"
-          className="col-span-5 px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-white"
+          className="col-span-5 px-2.5 py-1.5 border border-sp-ink-600 rounded-lg text-xs text-sp-ink-50 placeholder-sp-ink-300 focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-sp-ink-900"
         />
       </div>
       <input
         value={ex.videoUrl || ''}
         onChange={e => onChange('videoUrl', e.target.value)}
         placeholder="Video URL (optional)"
-        className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-white text-gray-500"
+        className="w-full px-2.5 py-1.5 border border-sp-ink-600 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-sp-ink-900 text-sp-ink-200 placeholder-sp-ink-300"
       />
       {(onAddOption || onUnlink) && (
         onAddOption ? (
-          <button onClick={onAddOption} className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-sp-green-600 transition">
+          <button onClick={onAddOption} className="flex items-center gap-1 text-[11px] text-sp-ink-300/70 hover:text-sp-green-400 transition">
             <Link2 size={11} /> Add alt option
           </button>
         ) : (
-          <button onClick={onUnlink} className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-red-500 transition">
+          <button onClick={onUnlink} className="flex items-center gap-1 text-[11px] text-sp-ink-300/70 hover:text-red-400 transition">
             <Unlink size={11} /> Unlink options
           </button>
         )

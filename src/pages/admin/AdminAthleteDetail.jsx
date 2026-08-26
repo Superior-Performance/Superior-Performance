@@ -4,7 +4,7 @@ import {
   getUser, getAssessment, saveAssessment,
   updateUser, deleteUser, getProgramForAthlete, updateProgram,
   updateLiveProgram, migrateCompletionKeys,
-  createProgram, getSettings, getProgramsForAthlete, getGeneralPrograms,
+  createProgram, deleteProgram, getSettings, getProgramsForAthlete, getGeneralPrograms,
 } from '../../firebase/firestore'
 import { getDataLogs } from '../../firebase/firestore'
 import { ensureExerciseIds, completionKey, legacyCompletionKey, makeExerciseId } from '../../utils/programIds'
@@ -425,6 +425,16 @@ export default function AdminAthleteDetail() {
         days: Object.values(w.days).sort((a, b) => a.dayNum - b.dayNum),
       }))
 
+    // Re-pulling replaces any of this type's previous not-yet-reviewed
+    // drafts instead of stacking a new one alongside them — otherwise every
+    // "Generate Program" click while iterating on the sheet leaves another
+    // untouched draft behind, and Drafts Awaiting Review never actually
+    // empties out even though each one really did get superseded.
+    const staleDrafts = programs.filter(p =>
+      p.athleteId === uid && p.active === false && !p.archived && (p.programType || 'correctives') === programType
+    )
+    await Promise.all(staleDrafts.map(p => deleteProgram(p.id)))
+
     await createProgram({
       name:       programName,
       athleteId:  uid,
@@ -637,6 +647,24 @@ export default function AdminAthleteDetail() {
   async function saveDraftWeeks(programId, weeks, startDate) {
     await updateProgram(programId, { weeks, totalWeeks: weeks.length, startDate })
     await refreshPrograms()
+  }
+
+  // Manual cleanup for drafts that piled up before re-pulling started
+  // auto-clearing the previous attempt (see createDraftFromRows) — a
+  // one-off attempt the coach never reviewed, or one from before that fix
+  // shipped, isn't going anywhere on its own otherwise.
+  async function discardDraft(draft) {
+    if (!confirm(`Discard "${draft.name}"? This can't be undone.`)) return
+    setSaving(true)
+    try {
+      await deleteProgram(draft.id)
+      await refreshPrograms()
+      toast.success('Draft discarded.')
+    } catch {
+      toast.error('Could not discard draft.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   /**
@@ -1011,12 +1039,23 @@ export default function AdminAthleteDetail() {
                 {draftsForType.map((p) => (
                   <div key={p.id} className="flex items-center justify-between gap-3">
                     <p className="text-sm text-gray-800 truncate">{p.name}</p>
-                    <button
-                      onClick={() => setEditingDraft(p)}
-                      className="flex-shrink-0 text-xs px-3 py-1.5 bg-amber-100 text-amber-800 font-medium rounded-lg hover:bg-amber-200 transition"
-                    >
-                      Review
-                    </button>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button
+                        onClick={() => setEditingDraft(p)}
+                        className="text-xs px-3 py-1.5 bg-amber-100 text-amber-800 font-medium rounded-lg hover:bg-amber-200 transition"
+                      >
+                        Review
+                      </button>
+                      <button
+                        onClick={() => discardDraft(p)}
+                        disabled={saving}
+                        className="p-1.5 text-amber-700/50 hover:text-red-500 transition"
+                        title="Discard draft"
+                        aria-label="Discard draft"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

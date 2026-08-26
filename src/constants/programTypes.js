@@ -47,7 +47,7 @@ export const EXERCISE_CATEGORIES = [
 
 export const CATCH_PLAY_INFO = { key: 'Catch Play', label: 'Catch Play', icon: 'CircleDot', badgeClass: 'bg-indigo-50 text-indigo-700', dotClass: 'bg-indigo-500' }
 
-// College Remote Athlete Mode's three fixed day types (see AdminAthleteDetail
+// College Remote Athlete Mode's four fixed day types (see AdminAthleteDetail
 // and SchedulePage). A day in ANY of the athlete's active programs
 // (correctives/pre-throw, throwing, mobility, lifting) can carry one of
 // these as its `dayType` — the athlete then picks a type and sees every
@@ -55,15 +55,19 @@ export const CATCH_PLAY_INFO = { key: 'Catch Play', label: 'Catch Play', icon: '
 // week it lives in.
 //
 // The coach's Outputs sheet encodes this by putting the label itself
-// ("High Intent Day", "Medium Day", "Recovery Day") straight into a row's
-// Day column instead of a weekday name — see matchDayType below, used by
+// ("High Intent Day", "Recovery Day", etc.) straight into a row's Day
+// column instead of a weekday name — see matchDayType below, used by
 // AdminAthleteDetail's pull so this gets tagged automatically rather than
 // requiring the coach to re-set it by hand in ProgramEditorModal after
-// every re-pull.
+// every re-pull. `key` stays 'medium' for the Hybrid entry (renamed from
+// "Medium Day") so already-pulled programs' stored dayType values keep
+// matching — only `label`/`aliases` changed, plus "Medium Day" is kept as
+// an alias since that's still what the sheet's Day column says today.
 export const DAY_TYPES = [
   { key: 'high_intent', label: 'High Intent Day', icon: 'Flame', aliases: ['High-Intent Day'] },
-  { key: 'medium',       label: 'Medium Day',      icon: 'Zap' },
-  { key: 'recovery',     label: 'Recovery Day',    icon: 'Moon' },
+  { key: 'medium',      label: 'Hybrid Day',       icon: 'Zap',  aliases: ['Medium Day'] },
+  { key: 'synergy',     label: 'Synergy Day',      icon: 'Sparkles' },
+  { key: 'recovery',    label: 'Recovery Day',     icon: 'Moon' },
 ]
 
 export function dayTypeInfo(key) {

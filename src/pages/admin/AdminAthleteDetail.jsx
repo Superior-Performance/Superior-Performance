@@ -219,7 +219,7 @@ export default function AdminAthleteDetail() {
   // coach needs to flip quickly (an athlete heading off to campus, or back)
   // without clicking through a form. Athletes in this mode aren't on a
   // per-week calendar at all — they pick from a fixed set of day types
-  // (High Intent/Medium/Recovery, tagged per day — usually auto-detected
+  // (High Intent/Hybrid/Synergy/Recovery, tagged per day — usually auto-detected
   // from the Outputs sheet's Day column, see createDraftFromRows) that
   // apply across the whole program, not any specific week — see the
   // isRemote branch in SchedulePage.
@@ -742,7 +742,7 @@ export default function AdminAthleteDetail() {
             <p className="font-semibold text-gray-900 text-sm">College Remote Athlete Mode</p>
             <p className="text-xs text-gray-400 mt-0.5 max-w-md">
               For athletes without a fixed schedule to plan around in advance. Instead of a
-              per-week calendar, they pick the day type — High Intent, Medium, or Recovery —
+              per-week calendar, they pick the day type — High Intent, Hybrid, Synergy, or Recovery —
               that fits their session and see that day's pre-throw, throw, mobility, and lift
               content together. Tagged automatically when the Outputs sheet's Day column names
               the type; use the program editor's Day Type dropdown to set it by hand otherwise.

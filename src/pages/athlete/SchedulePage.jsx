@@ -17,7 +17,7 @@ import { isExerciseComplete, keyForWrite, groupIntoSlots, buildSlots, isSlotComp
 import { computeStreak } from '../../utils/programSchedule'
 
 const CATEGORY_ICONS = { Wind, Heart, Zap, Flame, CircleDot, ListChecks }
-const DAY_TYPE_ICONS = { Moon, Flame, Zap }
+const DAY_TYPE_ICONS = { Moon, Flame, Zap, Sparkles }
 
 // The one day (first found, in week order) in this program tagged with the
 // given College Remote Athlete day type — see ProgramEditorModal's Day

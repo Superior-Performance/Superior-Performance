@@ -50,6 +50,21 @@
   }
 }
 
+/* Browser autofill (esp. Chrome/Safari on a field that looks like a URL,
+   e.g. the Program Editor's Video URL box) force-paints its own black
+   text/background via -webkit-text-fill-color regardless of author `color`,
+   which is invisible against a dark field. Scoped to .admin-shell only —
+   the landing/login pages are still on the old light palette. */
+.admin-shell input:-webkit-autofill,
+.admin-shell input:-webkit-autofill:hover,
+.admin-shell input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #F5F7F8;
+  -webkit-box-shadow: 0 0 0px 1000px #0E1113 inset;
+  box-shadow: 0 0 0px 1000px #0E1113 inset;
+  caret-color: #F5F7F8;
+  transition: background-color 600000s ease-in-out 0s;
+}
+
 /* Smooth scrolling for mobile */
 .scroll-smooth {
   -webkit-overflow-scrolling: touch;

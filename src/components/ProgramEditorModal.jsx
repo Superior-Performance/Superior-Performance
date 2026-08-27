@@ -647,6 +647,7 @@ function ExerciseFields({ ex, label, onChange, onRemove, onAddOption, onUnlink, 
         value={ex.videoUrl || ''}
         onChange={e => onChange('videoUrl', e.target.value)}
         placeholder="Video URL (optional)"
+        autoComplete="off"
         className="w-full px-2.5 py-1.5 border border-sp-ink-600 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-sp-ink-900 text-sp-ink-200 placeholder-sp-ink-300"
       />
       {(onAddOption || onUnlink) && (

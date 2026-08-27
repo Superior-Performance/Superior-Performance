@@ -16,7 +16,7 @@ export default function AdminLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
-    <div className="md:flex h-screen bg-sp-ink-900 [color-scheme:dark]">
+    <div className="admin-shell md:flex h-screen bg-sp-ink-900 [color-scheme:dark]">
       {/* Mobile top bar */}
       <div className="md:hidden surface-brand relative overflow-hidden flex items-center justify-between px-4 h-14 text-white">
         <div className="relative flex items-center gap-2.5">

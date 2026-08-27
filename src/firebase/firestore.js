@@ -82,6 +82,31 @@ export const getGeneralPrograms = () =>
 export const deleteProgram = (programId) =>
   deleteDoc(doc(db, 'programs', programId))
 
+// ── Exercise library ─────────────────────────────────────────────────────────
+// exerciseLibrary/{id} — { name, category, sets, reps, intensity, notes,
+// videoUrl, updatedAt }. Powers the Program Editor's autofill suggestions:
+// id is a deterministic slug of name+category (see utils/exerciseLibrary),
+// so re-saving the same drill just overwrites its entry with the latest
+// values rather than piling up duplicates. Grows organically as programs are
+// saved — see AdminSettingsPage for the one-time backfill from existing programs.
+export const getExerciseLibrary = () =>
+  getDocs(collection(db, 'exerciseLibrary'))
+
+// entries: [{ id, data }]. Chunked under Firestore's 500-write batch limit
+// so a large backfill across every existing program doesn't fail outright.
+export const upsertExerciseLibraryEntries = async (entries) => {
+  if (!entries || entries.length === 0) return
+  const chunks = []
+  for (let i = 0; i < entries.length; i += 450) chunks.push(entries.slice(i, i + 450))
+  for (const chunk of chunks) {
+    const batch = writeBatch(db)
+    chunk.forEach(({ id, data }) => {
+      batch.set(doc(db, 'exerciseLibrary', id), { ...data, updatedAt: serverTimestamp() }, { merge: true })
+    })
+    await batch.commit()
+  }
+}
+
 // ── Data Logs ────────────────────────────────────────────────────────────────
 export const addDataLog = (uid, entry) =>
   addDoc(collection(db, 'dataLogs', uid, 'entries'), {

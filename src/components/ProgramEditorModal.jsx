@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X, Plus, Trash2, CheckCircle2, AlertTriangle, CalendarPlus, ChevronDown, ChevronUp, Link2, Unlink, Wind, Heart, Zap, Flame, CircleDot, ListChecks } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { makeExerciseId, groupIntoSlots } from '../utils/programIds'
+import { libraryEntryId, buildLibraryEntries, matchLibraryEntries } from '../utils/exerciseLibrary'
+import { getExerciseLibrary, upsertExerciseLibraryEntries } from '../firebase/firestore'
 import { EXERCISE_CATEGORIES, exerciseCategoryInfo, categoryRank, DAY_TYPES } from '../constants/programTypes'
 
 const CATEGORY_ICONS = { Wind, Heart, Zap, Flame, CircleDot, ListChecks }
@@ -87,6 +89,15 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
   // that day instead of the editor turning into one long exercise list.
   // Keyed by `${wi}_${di}` -> the open group's key, or undefined.
   const [openGroup, setOpenGroup] = useState({})
+  // Exercise-name autofill suggestions — every drill ever saved across every
+  // program, so typing "Band Pull" in a brand new program can still surface
+  // the version already fleshed out elsewhere. Fetched once per editor open;
+  // see saveToLibrary for how it grows as programs are saved.
+  const [library, setLibrary] = useState([])
+
+  useEffect(() => {
+    getExerciseLibrary().then(snap => setLibrary(snap.docs.map(d => d.data()))).catch(() => {})
+  }, [])
 
   // Every mutation funnels through here so `dirty` can't drift out of sync.
   // Pass `syncSpec` ({ wi, di, category }) when the mutation touches a
@@ -180,6 +191,41 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
     }), { wi, di, category })
   }
 
+  // Applies a whole picked library entry (name + sets/reps/intensity/notes/
+  // video URL, and category if the exercise didn't already have one) in one
+  // mutation, rather than one field at a time — see ExerciseFields' autofill
+  // dropdown below.
+  function applyAutofill(wi, di, ei, fields) {
+    const category = fields.category ?? weeks[wi]?.days?.[di]?.exercises?.[ei]?.category
+    mutate(prev => prev.map((week, w) => w !== wi ? week : {
+      ...week,
+      days: week.days.map((day, d) => d !== di ? day : {
+        ...day,
+        exercises: day.exercises.map((ex, e) => e !== ei ? ex : { ...ex, ...fields }),
+      }),
+    }), { wi, di, category })
+  }
+
+  // Upserts every named exercise in this program into the shared library so
+  // future autofill suggestions (in this program or any other) pick up
+  // whatever was just typed here. Best-effort — a failure here shouldn't
+  // block or fail the program save itself.
+  async function saveToLibrary(weeksToSave) {
+    try {
+      const entries = buildLibraryEntries(weeksToSave)
+      const list = Object.entries(entries).map(([id, data]) => ({ id, data }))
+      if (list.length === 0) return
+      await upsertExerciseLibraryEntries(list)
+      setLibrary(prev => {
+        const byId = Object.fromEntries(prev.map(e => [libraryEntryId(e.name, e.category), e]))
+        list.forEach(({ id, data }) => { byId[id] = data })
+        return Object.values(byId)
+      })
+    } catch (err) {
+      console.error('Could not update exercise library:', err)
+    }
+  }
+
   // ── Structure ──────────────────────────────────────────────────────────────
 
   function updateDayField(wi, di, field, value) {
@@ -224,6 +270,7 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
     setSaving(true)
     try {
       await onSave(weeks, startDate)
+      await saveToLibrary(weeks)
       setDirty(false)
       toast.success(live ? 'Program updated — the athlete sees this now.' : isTemplate ? 'Program saved.' : 'Draft saved.')
       if (live) onClose()
@@ -238,6 +285,7 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
     setPublishing(true)
     try {
       await onSave(weeks, startDate)
+      await saveToLibrary(weeks)
       await onPublish()
       onClose()
     } catch {
@@ -390,6 +438,8 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
                                         onRemove={() => removeExercise(wi, di, ei)}
                                         onAddOption={ex.altGroup ? null : () => addAltOption(wi, di, ei)}
                                         onUnlink={ex.altGroup ? () => unlinkAltOptions(wi, di, ei) : null}
+                                        library={library}
+                                        onAutofill={(fields) => applyAutofill(wi, di, ei, fields)}
                                       />
                                     ))}
                                   </div>
@@ -497,7 +547,25 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
 // One exercise's editable fields. `label` ("Option A"/"Option B") and the
 // add/unlink handlers only apply when this exercise is part of an either/or
 // pair — see addAltOption/unlinkAltOptions above.
-function ExerciseFields({ ex, label, onChange, onRemove, onAddOption, onUnlink }) {
+function ExerciseFields({ ex, label, onChange, onRemove, onAddOption, onUnlink, library, onAutofill }) {
+  // Suggestions stay hidden until there's something to match against —
+  // matchLibraryEntries itself also floors at 2 typed characters.
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const suggestions = showSuggestions ? matchLibraryEntries(library, ex.category, ex.name) : []
+
+  function pickSuggestion(entry) {
+    onAutofill({
+      name: entry.name,
+      category: ex.category || entry.category,
+      sets: entry.sets,
+      reps: entry.reps,
+      intensity: entry.intensity,
+      notes: entry.notes,
+      videoUrl: entry.videoUrl,
+    })
+    setShowSuggestions(false)
+  }
+
   return (
     <div className="bg-sp-ink-800 border border-sp-ink-600 rounded-lg p-2 space-y-1.5">
       <div className="flex items-center gap-2">
@@ -513,12 +581,34 @@ function ExerciseFields({ ex, label, onChange, onRemove, onAddOption, onUnlink }
           {EXERCISE_CATEGORIES.map(c => <option key={c.key} value={c.key} className="bg-sp-ink-900 text-sp-ink-50">{c.label}</option>)}
           <option value="Catch Play" className="bg-sp-ink-900 text-sp-ink-50">Catch Play</option>
         </select>
-        <input
-          value={ex.name || ''}
-          onChange={e => onChange('name', e.target.value)}
-          placeholder="Exercise"
-          className="flex-1 px-2.5 py-1.5 border border-sp-ink-600 rounded-lg text-xs text-sp-ink-50 placeholder-sp-ink-300 focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-sp-ink-900"
-        />
+        <div className="relative flex-1">
+          <input
+            value={ex.name || ''}
+            onChange={e => { onChange('name', e.target.value); setShowSuggestions(true) }}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+            placeholder="Exercise"
+            autoComplete="off"
+            className="w-full px-2.5 py-1.5 border border-sp-ink-600 rounded-lg text-xs text-sp-ink-50 placeholder-sp-ink-300 focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-sp-ink-900"
+          />
+          {suggestions.length > 0 && (
+            <div className="absolute left-0 right-0 top-full mt-1 bg-sp-ink-900 border border-sp-ink-600 rounded-lg shadow-lg z-10 overflow-hidden">
+              {suggestions.map(entry => (
+                <button
+                  key={libraryEntryId(entry.name, entry.category)}
+                  type="button"
+                  onMouseDown={e => { e.preventDefault(); pickSuggestion(entry) }}
+                  className="w-full text-left px-2.5 py-1.5 text-xs hover:bg-white/5 transition flex items-center justify-between gap-2"
+                >
+                  <span className="text-sp-ink-50 truncate">{entry.name}</span>
+                  {(entry.sets || entry.reps) && (
+                    <span className="text-sp-ink-300 flex-shrink-0">{entry.sets}{entry.sets && entry.reps ? '×' : ''}{entry.reps}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <button
           onClick={onRemove}
           className="flex-shrink-0 p-1.5 text-sp-ink-300/60 hover:text-red-400 transition"

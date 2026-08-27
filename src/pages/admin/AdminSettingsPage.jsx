@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react'
-import { getSettings, saveSettings, getPublicSettings, savePublicSettings } from '../../firebase/firestore'
-import { Settings, Save, CheckCircle, Lock } from 'lucide-react'
+import {
+  getSettings, saveSettings, getPublicSettings, savePublicSettings,
+  getAllPrograms, getExerciseLibrary, upsertExerciseLibraryEntries,
+} from '../../firebase/firestore'
+import { buildLibraryEntries } from '../../utils/exerciseLibrary'
+import { Settings, Save, CheckCircle, Lock, Sparkles, ListChecks } from 'lucide-react'
 import {
   EmailAuthProvider,
   reauthenticateWithCredential,
@@ -19,6 +23,8 @@ export default function AdminSettingsPage() {
   const [saving, setSaving]       = useState(false)
   const [savingAssessment, setSavingAssessment] = useState(false)
   const [savingInquiry, setSavingInquiry] = useState(false)
+  const [libraryCount, setLibraryCount] = useState(null)
+  const [backfilling, setBackfilling]   = useState(false)
 
   // Password change
   const [current, setCurrent]   = useState('')
@@ -60,7 +66,35 @@ export default function AdminSettingsPage() {
       }
       setLoading(false)
     })
+    getExerciseLibrary().then(snap => setLibraryCount(snap.size)).catch(() => {})
   }, [])
+
+  // One-time (or occasional re-run) sweep of every existing program to seed
+  // the Program Editor's autofill library — otherwise it only starts
+  // filling in from programs saved after this feature shipped. Reads the
+  // whole programs collection deliberately, unlike the app's routine
+  // scoped queries — this is a manual maintenance action, not a page load.
+  // Newest program wins where the same drill appears more than once.
+  async function handleBackfillLibrary() {
+    setBackfilling(true)
+    try {
+      const snap = await getAllPrograms()
+      const docs = snap.docs
+        .map(d => d.data())
+        .sort((a, b) => (a.createdAt?.toMillis?.() ?? 0) - (b.createdAt?.toMillis?.() ?? 0))
+      const merged = {}
+      docs.forEach(p => Object.assign(merged, buildLibraryEntries(p.weeks)))
+      const list = Object.entries(merged).map(([id, data]) => ({ id, data }))
+      await upsertExerciseLibraryEntries(list)
+      setLibraryCount(list.length)
+      toast.success(`Backfilled ${list.length} exercises into the library.`)
+    } catch (err) {
+      console.error(err)
+      toast.error('Backfill failed.')
+    } finally {
+      setBackfilling(false)
+    }
+  }
 
   async function handleSave(e) {
     e.preventDefault()
@@ -396,6 +430,35 @@ export default function AdminSettingsPage() {
             </pre>
           </div>
         </div>
+      </div>
+
+      {/* Exercise library */}
+      <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 p-6 mt-5">
+        <div className="flex items-start justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <ListChecks size={16} className="text-sp-ink-300" />
+            <h2 className="font-semibold text-white">Exercise Library</h2>
+          </div>
+          {libraryCount !== null && (
+            <span className="text-xs text-sp-ink-300 font-medium">{libraryCount} drills</span>
+          )}
+        </div>
+        <p className="text-sm text-sp-ink-300 mb-5">
+          Powers autofill in the Program Editor — start typing an exercise name under
+          Mobilization, Correctives, or Movement Activation and it'll suggest matching drills
+          already used elsewhere, autofilling sets/reps/notes/video URL when you pick one. It
+          grows on its own every time a program is saved. Run this once to seed it from every
+          exercise already sitting in your existing programs — safe to run again any time,
+          it just re-syncs the newest version of each drill.
+        </p>
+        <button
+          onClick={handleBackfillLibrary}
+          disabled={backfilling}
+          className="btn-brand flex items-center gap-2 px-4 py-2.5 text-sm rounded-xl disabled:opacity-60"
+        >
+          <Sparkles size={14} />
+          {backfilling ? 'Backfilling…' : 'Backfill from Existing Programs'}
+        </button>
       </div>
 
       {/* Change password */}

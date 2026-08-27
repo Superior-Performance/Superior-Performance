@@ -66,6 +66,14 @@ service cloud.firestore {
       allow write: if isAdmin() || (isAuth() && request.auth.uid == uid);
     }
 
+    // Exercise library: coach-tooling data (name/category -> last-used
+    // sets/reps/notes/video URL) that powers the Program Editor's autofill
+    // suggestions. Admin-only — athletes never see or need this.
+    match /exerciseLibrary/{entryId} {
+      allow read:  if isAdmin();
+      allow write: if isAdmin();
+    }
+
     // App settings: admin-only, except settings/public — the landing page's
     // inquiry form needs to read its Apps Script URL while signed out. Nothing
     // sensitive lives there (an "Anyone can execute" script URL isn't a secret;

@@ -1282,9 +1282,9 @@ function AssessmentField({ field, value, onChange }) {
           onChange={(e) => onChange(e.target.value)}
           className="w-full px-3.5 py-2.5 border border-sp-ink-600 rounded-xl text-sm text-sp-ink-50 focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-sp-ink-900"
         >
-          <option value="">— Select —</option>
+          <option value="" className="bg-sp-ink-900 text-sp-ink-50">— Select —</option>
           {options.map(opt => (
-            <option key={opt} value={opt}>{opt}</option>
+            <option key={opt} value={opt} className="bg-sp-ink-900 text-sp-ink-50">{opt}</option>
           ))}
         </select>
       </div>

@@ -286,8 +286,8 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
                         title="Day Type — for College Remote Athlete Mode, matches this day across every program type"
                         className="flex-shrink-0 w-36 px-2 py-1 border border-sp-ink-600 rounded-lg text-xs bg-sp-ink-800 text-sp-ink-300 focus:outline-none focus:ring-2 focus:ring-sp-green-500"
                       >
-                        <option value="">No day type</option>
-                        {DAY_TYPES.map(dt => <option key={dt.key} value={dt.key}>{dt.label}</option>)}
+                        <option value="" className="bg-sp-ink-800 text-sp-ink-50">No day type</option>
+                        {DAY_TYPES.map(dt => <option key={dt.key} value={dt.key} className="bg-sp-ink-800 text-sp-ink-50">{dt.label}</option>)}
                       </select>
                       <button
                         onClick={() => removeDay(wi, di)}
@@ -459,9 +459,9 @@ function ExerciseFields({ ex, label, onChange, onRemove, onAddOption, onUnlink }
           onChange={e => onChange('category', e.target.value)}
           className="flex-shrink-0 w-36 px-2 py-1.5 border border-sp-ink-600 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-sp-ink-900 text-sp-ink-200"
         >
-          <option value="">No category</option>
-          {EXERCISE_CATEGORIES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
-          <option value="Catch Play">Catch Play</option>
+          <option value="" className="bg-sp-ink-900 text-sp-ink-50">No category</option>
+          {EXERCISE_CATEGORIES.map(c => <option key={c.key} value={c.key} className="bg-sp-ink-900 text-sp-ink-50">{c.label}</option>)}
+          <option value="Catch Play" className="bg-sp-ink-900 text-sp-ink-50">Catch Play</option>
         </select>
         <input
           value={ex.name || ''}

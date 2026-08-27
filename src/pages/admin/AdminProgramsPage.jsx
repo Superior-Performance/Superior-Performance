@@ -413,7 +413,7 @@ export default function AdminProgramsPage() {
                   onChange={(e) => setProgramType(e.target.value)}
                   className="w-full px-3.5 py-2.5 border border-sp-ink-600 rounded-xl text-sm text-sp-ink-50 bg-sp-ink-900 focus:outline-none focus:ring-2 focus:ring-sp-green-500"
                 >
-                  {PROGRAM_TYPES.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
+                  {PROGRAM_TYPES.map(t => <option key={t.key} value={t.key} className="bg-sp-ink-900 text-sp-ink-50">{t.label}</option>)}
                 </select>
                 <p className="text-xs text-sp-ink-300 mt-1">Each athlete can have one active program per type — assigning a new one of the same type replaces their current one, not the other types.</p>
               </div>

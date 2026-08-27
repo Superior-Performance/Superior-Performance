@@ -26,6 +26,41 @@ function buildDayGroups(day) {
   return groups.sort((a, b) => categoryRank(a.key) - categoryRank(b.key))
 }
 
+// Mirrors an edit to a Pre-Throwing category (Mobilization, Correctives,
+// Movement Activation, or any custom category typed under a "correctives"
+// program) onto every other day in the program that already has that same
+// category, so fixing a cue or adding a video URL on one day doesn't mean
+// retyping it into every other day the athlete does that corrective.
+// Matched purely by category presence — never introduces the category into
+// a day that didn't already have it, regardless of week or day type.
+// `category` blank ("General") is a no-op: only explicitly tagged
+// categories sync.
+function syncCategoryAcrossDays(weeksList, sourceWi, sourceDi, category) {
+  const trimmed = (category || '').trim()
+  if (!trimmed) return weeksList
+  const sourceDay = weeksList[sourceWi]?.days?.[sourceDi]
+  if (!sourceDay) return weeksList
+  const sourceItems = (sourceDay.exercises || []).filter(ex => (ex.category || '').trim() === trimmed)
+
+  return weeksList.map((week, w) => ({
+    ...week,
+    days: (week.days || []).map((day, d) => {
+      if (w === sourceWi && d === sourceDi) return day
+      const existingInCategory = (day.exercises || []).filter(ex => (ex.category || '').trim() === trimmed)
+      if (existingInCategory.length === 0) return day // never introduce the category to a day that lacked it
+
+      const otherExercises = (day.exercises || []).filter(ex => (ex.category || '').trim() !== trimmed)
+      // Keep each position's existing id (so the athlete's completion on
+      // this day stays attached to it) and only fall back to a fresh one
+      // when the source day now has more items in this category than this
+      // day previously did.
+      const synced = sourceItems.map((src, i) => ({ ...src, id: existingInCategory[i]?.id || makeExerciseId() }))
+
+      return { ...day, exercises: [...otherExercises, ...synced] }
+    }),
+  }))
+}
+
 /**
  * Review/edit surface for a program's weeks, days and exercises.
  *
@@ -54,8 +89,16 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
   const [openGroup, setOpenGroup] = useState({})
 
   // Every mutation funnels through here so `dirty` can't drift out of sync.
-  function mutate(fn) {
-    setWeeks(prev => fn(prev))
+  // Pass `syncSpec` ({ wi, di, category }) when the mutation touches a
+  // specific exercise's category — see syncCategoryAcrossDays above. Only
+  // "correctives" (Pre-Throwing) programs sync; the other program types
+  // don't share this either/or-across-days behavior.
+  function mutate(fn, syncSpec) {
+    setWeeks(prev => {
+      const next = fn(prev)
+      if (!syncSpec || program.programType !== 'correctives') return next
+      return syncCategoryAcrossDays(next, syncSpec.wi, syncSpec.di, syncSpec.category)
+    })
     setDirty(true)
   }
 
@@ -67,23 +110,28 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
   const blankExercise = (category = '') => ({ id: makeExerciseId(), name: '', sets: '', reps: '', intensity: '', notes: '', category, videoUrl: '' })
 
   function updateExercise(wi, di, ei, field, value) {
+    // If `category` itself is what's being edited, sync using the new
+    // value (the exercise now lives there); otherwise sync using its
+    // current category.
+    const category = field === 'category' ? value : weeks[wi]?.days?.[di]?.exercises?.[ei]?.category
     mutate(prev => prev.map((week, w) => w !== wi ? week : {
       ...week,
       days: week.days.map((day, d) => d !== di ? day : {
         ...day,
         exercises: day.exercises.map((ex, e) => e !== ei ? ex : { ...ex, [field]: value }),
       }),
-    }))
+    }), { wi, di, category })
   }
 
   function removeExercise(wi, di, ei) {
+    const category = weeks[wi]?.days?.[di]?.exercises?.[ei]?.category
     mutate(prev => prev.map((week, w) => w !== wi ? week : {
       ...week,
       days: week.days.map((day, d) => d !== di ? day : {
         ...day,
         exercises: day.exercises.filter((_, e) => e !== ei),
       }),
-    }))
+    }), { wi, di, category })
   }
 
   function addExercise(wi, di, category = '') {
@@ -93,13 +141,14 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
         ...day,
         exercises: [...(day.exercises || []), blankExercise(category)],
       }),
-    }))
+    }), { wi, di, category })
   }
 
   // Pairs an exercise with a fresh blank one as its either/or alternative —
   // the athlete picks whichever they actually did that day. Capped at two:
   // once paired, "Add option" disappears in favor of "Unlink".
   function addAltOption(wi, di, ei) {
+    const category = weeks[wi]?.days?.[di]?.exercises?.[ei]?.category
     mutate(prev => prev.map((week, w) => w !== wi ? week : {
       ...week,
       days: week.days.map((day, d) => d !== di ? day : {
@@ -113,10 +162,11 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
           return next
         })(),
       }),
-    }))
+    }), { wi, di, category })
   }
 
   function unlinkAltOptions(wi, di, ei) {
+    const category = weeks[wi]?.days?.[di]?.exercises?.[ei]?.category
     mutate(prev => prev.map((week, w) => w !== wi ? week : {
       ...week,
       days: week.days.map((day, d) => d !== di ? day : {
@@ -127,7 +177,7 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
           return day.exercises.map(ex => ex.altGroup === group ? { ...ex, altGroup: '' } : ex)
         })(),
       }),
-    }))
+    }), { wi, di, category })
   }
 
   // ── Structure ──────────────────────────────────────────────────────────────

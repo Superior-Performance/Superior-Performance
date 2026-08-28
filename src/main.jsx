@@ -18,7 +18,15 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           position="top-center"
           toastOptions={{
             duration: 3000,
-            style: { borderRadius: '12px', fontWeight: 500 },
+            style: {
+              background: '#1A1E22',
+              color: '#F5F7F8',
+              border: '1px solid #2A3036',
+              borderRadius: '12px',
+              fontWeight: 500,
+            },
+            success: { iconTheme: { primary: '#2E9E63', secondary: '#F5F7F8' } },
+            error:   { iconTheme: { primary: '#D9534F', secondary: '#F5F7F8' } },
           }}
         />
       </AuthProvider>

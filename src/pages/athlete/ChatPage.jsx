@@ -4,6 +4,7 @@ import { subscribeChat, sendMessage, markChatRead } from '../../firebase/realtim
 import { Send } from 'lucide-react'
 import { format, isToday, isYesterday } from 'date-fns'
 import EmptyState from '../../components/EmptyState'
+import toast from 'react-hot-toast'
 
 export default function ChatPage() {
   const { currentUser, userProfile } = useAuth()
@@ -37,8 +38,9 @@ export default function ChatPage() {
         role: 'athlete',
       })
       setText('')
-    } catch {
-      // silently fail; retry on next attempt
+    } catch (err) {
+      console.error('Athlete chat send failed:', err)
+      toast.error('Message could not be sent. Try again.')
     } finally {
       setSending(false)
     }

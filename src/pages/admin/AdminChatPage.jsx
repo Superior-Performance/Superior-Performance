@@ -43,7 +43,19 @@ export default function AdminChatPage() {
 
   async function handleSend(e) {
     e.preventDefault()
-    if (!text.trim() || !selected || sending) return
+    if (!text.trim() || sending) return
+    // Surfaced explicitly rather than silently no-op'ing — this is exactly
+    // what a "nothing happens when I hit send" report looks like from the
+    // outside, so it needs its own visible failure instead of folding into
+    // the same silent early-return as an empty textbox.
+    if (!selected) {
+      toast.error('No athlete selected — pick one from the list first.')
+      return
+    }
+    if (!currentUser) {
+      toast.error('Not signed in — try refreshing the page.')
+      return
+    }
     setSending(true)
     try {
       await sendMessage(selected, {
@@ -53,8 +65,9 @@ export default function AdminChatPage() {
         role: 'admin',
       })
       setText('')
-    } catch {
-      toast.error('Message could not be sent.')
+    } catch (err) {
+      console.error('Admin chat send failed:', err)
+      toast.error(`Message could not be sent${err?.code ? ` (${err.code})` : err?.message ? `: ${err.message}` : ''}.`)
     } finally {
       setSending(false)
     }

@@ -961,9 +961,9 @@ export default function AdminAthleteDetail() {
             </div>
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-4">
             {FIELD_GROUPS.map(({ title, fields }) => (
-              <div key={title} className="pt-5 border-t border-sp-ink-600/60 first:pt-0 first:border-0">
+              <div key={title} className="bg-sp-ink-900/40 border border-sp-ink-600/50 rounded-xl p-4">
                 <h3 className="font-semibold text-sp-ink-100 mb-3 text-sm">{title}</h3>
                 <div className="grid grid-cols-2 gap-4">
                   {fields.map((field) => (

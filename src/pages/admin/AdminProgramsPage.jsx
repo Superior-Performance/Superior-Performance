@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import Papa from 'papaparse'
 import EmptyState from '../../components/EmptyState'
+import Skeleton from '../../components/Skeleton'
 import ProgramEditorModal from '../../components/ProgramEditorModal'
 import { PROGRAM_TYPES, programTypeInfo } from '../../constants/programTypes'
 import { makeExerciseId } from '../../utils/programIds'
@@ -277,7 +278,32 @@ export default function AdminProgramsPage() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-16"><Spinner /></div>
+        <div className="space-y-8">
+          <div>
+            <Skeleton className="h-3 w-32 mb-3" />
+            <div className="space-y-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 px-5 py-3.5 flex items-center gap-3">
+                  <div className="flex-1 space-y-1.5">
+                    <Skeleton className="h-3.5 w-40" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <Skeleton className="h-3 w-32 mb-3" />
+            <div className="space-y-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 px-5 py-3 flex items-center gap-3">
+                  <Skeleton className="w-8 h-8 rounded-full flex-shrink-0" />
+                  <Skeleton className="h-3.5 w-28" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       ) : (
         <div className="space-y-8">
           {/* General programs — the reusable library */}

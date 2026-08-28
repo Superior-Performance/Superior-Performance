@@ -12,6 +12,7 @@ import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 import EmptyState from '../../components/EmptyState'
 import ProgressRing from '../../components/ProgressRing'
+import Skeleton from '../../components/Skeleton'
 import { programTypeInfo, exerciseCategoryInfo, categoryRank, DAY_TYPES, dayTypeInfo } from '../../constants/programTypes'
 import { isExerciseComplete, keyForWrite, groupIntoSlots, buildSlots, isSlotComplete } from '../../utils/programIds'
 import { computeStreak } from '../../utils/programSchedule'
@@ -220,7 +221,7 @@ export default function SchedulePage() {
     }
   }
 
-  if (loading) return <PageLoader />
+  if (loading) return <ScheduleSkeleton />
 
   if (programs.length === 0) {
     return (
@@ -933,10 +934,21 @@ function WeightField({ value, onSave }) {
   )
 }
 
-function PageLoader() {
+// Roughly mirrors the shape of a loaded day — streak card, program tabs,
+// a few category tiles — so the page doesn't flash blank before settling
+// into its real layout.
+function ScheduleSkeleton() {
   return (
-    <div className="flex justify-center items-center min-h-[calc(100vh-56px)] bg-sp-ink-900">
-      <div className="w-8 h-8 border-3 border-sp-green-500 border-t-transparent rounded-full animate-spin" />
+    <div className="min-h-[calc(100vh-56px)] bg-sp-ink-900 px-4 py-5 space-y-4">
+      <Skeleton className="h-28 rounded-2xl" />
+      <div className="flex gap-2">
+        <Skeleton className="h-9 w-24 rounded-xl" />
+        <Skeleton className="h-9 w-24 rounded-xl" />
+        <Skeleton className="h-9 w-24 rounded-xl" />
+      </div>
+      <Skeleton className="h-14 rounded-2xl" />
+      <Skeleton className="h-14 rounded-2xl" />
+      <Skeleton className="h-14 rounded-2xl" />
     </div>
   )
 }

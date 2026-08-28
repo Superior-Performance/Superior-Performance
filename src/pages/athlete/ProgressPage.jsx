@@ -8,6 +8,7 @@ import { buildSlots, isSlotComplete } from '../../utils/programIds'
 import { computeStreak } from '../../utils/programSchedule'
 import { TrendingUp, CheckCircle2, Lock, Dumbbell, Flame, Zap, Plus, X, Trophy } from 'lucide-react'
 import EmptyState from '../../components/EmptyState'
+import Skeleton from '../../components/Skeleton'
 import ProgressRing from '../../components/ProgressRing'
 import Sparkline from '../../components/Sparkline'
 import { programTypeInfo } from '../../constants/programTypes'
@@ -97,7 +98,7 @@ export default function ProgressPage() {
     }
   }
 
-  if (loading) return <PageLoader />
+  if (loading) return <ProgressSkeleton />
   if (programs.length === 0) return (
     <div className="min-h-[calc(100vh-56px)] bg-sp-ink-900">
       <EmptyState
@@ -509,8 +510,14 @@ function StatCard({ label, value, unit, cardClass, trend, trendColor }) {
   )
 }
 
-function PageLoader() {
-  return <div className="flex justify-center items-center min-h-[calc(100vh-56px)] bg-sp-ink-900">
-    <div className="w-8 h-8 border-2 border-sp-green-500 border-t-transparent rounded-full animate-spin" />
-  </div>
+// Mirrors the shape of a loaded page — streak header, week chart, by-program
+// breakdown — so it doesn't flash blank before settling into place.
+function ProgressSkeleton() {
+  return (
+    <div className="min-h-[calc(100vh-56px)] bg-sp-ink-900 px-4 py-5 space-y-4">
+      <Skeleton className="h-24 rounded-2xl" />
+      <Skeleton className="h-40 rounded-2xl" />
+      <Skeleton className="h-32 rounded-2xl" />
+    </div>
+  )
 }

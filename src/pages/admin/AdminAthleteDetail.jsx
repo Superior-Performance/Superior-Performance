@@ -15,6 +15,7 @@ import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 import ProgramEditorModal from '../../components/ProgramEditorModal'
 import ToggleSwitch from '../../components/ToggleSwitch'
+import Skeleton from '../../components/Skeleton'
 import { PROGRAM_TYPES, DAY_TYPES, matchDayType } from '../../constants/programTypes'
 
 // Each day type's stable position in the draft's day grid — see
@@ -707,7 +708,21 @@ export default function AdminAthleteDetail() {
     await load()
   }
 
-  if (loading) return <div className="flex justify-center py-20 bg-sp-ink-900 min-h-full"><div className="w-8 h-8 border-2 border-sp-green-500 border-t-transparent rounded-full animate-spin" /></div>
+  if (loading) return (
+    <div className="p-8 max-w-4xl bg-sp-ink-900 min-h-full">
+      <Skeleton className="h-4 w-20 mb-5" />
+      <div className="bg-sp-ink-800 border border-sp-ink-600 rounded-2xl px-6 py-5 mb-6 flex items-center gap-4">
+        <Skeleton className="w-12 h-12 rounded-full flex-shrink-0" />
+        <div className="space-y-2">
+          <Skeleton className="h-5 w-40" />
+          <Skeleton className="h-3.5 w-52" />
+        </div>
+      </div>
+      <Skeleton className="h-16 rounded-2xl mb-6" />
+      <Skeleton className="h-10 w-72 rounded-xl mb-6" />
+      <Skeleton className="h-48 rounded-2xl" />
+    </div>
+  )
 
   if (loadError) return (
     <div className="p-8 bg-sp-ink-900 min-h-full">

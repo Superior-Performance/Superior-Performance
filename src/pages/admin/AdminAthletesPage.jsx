@@ -5,6 +5,7 @@ import { createAthleteAuth } from '../../firebase/adminAuth'
 import { Users, Plus, Search, ChevronRight, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import EmptyState from '../../components/EmptyState'
+import Skeleton from '../../components/Skeleton'
 import { programTypeInfo } from '../../constants/programTypes'
 
 export default function AdminAthletesPage() {
@@ -92,7 +93,18 @@ export default function AdminAthletesPage() {
 
       {/* Table */}
       {loading ? (
-        <div className="flex justify-center py-16"><Spinner /></div>
+        <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 overflow-hidden divide-y divide-sp-ink-600/60">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 px-5 py-3.5">
+              <Skeleton className="w-8 h-8 rounded-full flex-shrink-0" />
+              <div className="flex-1 space-y-1.5">
+                <Skeleton className="h-3.5 w-32" />
+                <Skeleton className="h-3 w-44" />
+              </div>
+              <Skeleton className="h-5 w-16 rounded-full flex-shrink-0" />
+            </div>
+          ))}
+        </div>
       ) : filtered.length === 0 ? (
         <EmptyState icon={Users} title="No athletes found" subtitle="Add your first athlete to get started." compact dark />
       ) : (

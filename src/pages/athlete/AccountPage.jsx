@@ -41,21 +41,21 @@ export default function AccountPage() {
   }
 
   return (
-    <div className="px-4 py-6 max-w-md mx-auto">
+    <div className="px-4 py-6 max-w-md mx-auto min-h-[calc(100vh-136px)] bg-sp-ink-900">
       {/* Header */}
       <div className="mb-6">
-        <div className="w-14 h-14 rounded-full bg-sp-green-100 text-sp-green-600 flex items-center justify-center font-bold text-2xl mb-3">
+        <div className="w-14 h-14 rounded-full bg-sp-green-500/20 text-sp-green-400 flex items-center justify-center font-bold text-2xl mb-3">
           {userProfile?.name?.charAt(0) || '?'}
         </div>
-        <h1 className="text-xl font-bold text-gray-900">{userProfile?.name}</h1>
-        <p className="text-gray-400 text-sm">{userProfile?.email}</p>
+        <h1 className="text-xl font-bold text-white">{userProfile?.name}</h1>
+        <p className="text-sp-ink-300 text-sm">{userProfile?.email}</p>
       </div>
 
       {/* Change password */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-5">
+      <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 p-5">
         <div className="flex items-center gap-2 mb-5">
-          <Lock size={16} className="text-gray-400" />
-          <h2 className="font-semibold text-gray-900">Change Password</h2>
+          <Lock size={16} className="text-sp-ink-300" />
+          <h2 className="font-semibold text-white">Change Password</h2>
         </div>
         <form onSubmit={handleChange} className="space-y-4">
           <Field
@@ -102,11 +102,11 @@ export default function AccountPage() {
 function Field({ label, value, onChange, ...props }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      <label className="block text-sm font-medium text-sp-ink-100 mb-1">{label}</label>
       <input
         value={value}
         onChange={e => onChange(e.target.value)}
-        className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
+        className="w-full px-3.5 py-2.5 border border-sp-ink-600 rounded-xl text-sm text-sp-ink-50 placeholder-sp-ink-300 bg-sp-ink-900 focus:outline-none focus:ring-2 focus:ring-sp-green-500"
         {...props}
       />
     </div>

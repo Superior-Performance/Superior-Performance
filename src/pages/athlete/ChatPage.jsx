@@ -45,7 +45,7 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-136px)]">
+    <div className="flex flex-col h-[calc(100vh-136px)] bg-sp-ink-900">
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
         {messages.length === 0 && (
@@ -55,6 +55,7 @@ export default function ChatPage() {
               title="Chat with your coach"
               subtitle="Ask questions about your program, workouts, or anything else."
               compact
+              dark
             />
           </div>
         )}
@@ -69,7 +70,7 @@ export default function ChatPage() {
             <div key={msg.id}>
               {showDate && ts && (
                 <div className="flex justify-center my-3">
-                  <span className="text-[11px] text-gray-400 bg-gray-100 rounded-full px-3 py-1">
+                  <span className="text-[11px] text-sp-ink-300 bg-sp-ink-800 border border-sp-ink-600 rounded-full px-3 py-1">
                     {isToday(ts) ? 'Today' : isYesterday(ts) ? 'Yesterday' : format(ts, 'MMM d')}
                   </span>
                 </div>
@@ -77,17 +78,17 @@ export default function ChatPage() {
               <div className={`flex ${isMe ? 'justify-end' : 'justify-start'} mb-1`}>
                 <div className={`max-w-[78%] ${isMe ? 'items-end' : 'items-start'} flex flex-col`}>
                   {!isMe && msg.senderName && (
-                    <span className="text-[10px] text-gray-400 ml-1 mb-0.5">{msg.senderName}</span>
+                    <span className="text-[10px] text-sp-ink-300 ml-1 mb-0.5">{msg.senderName}</span>
                   )}
                   <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
                     isMe
                       ? 'bg-sp-green-500 text-white rounded-br-sm'
-                      : 'bg-white border border-gray-100 text-gray-900 rounded-bl-sm shadow-sm'
+                      : 'bg-sp-ink-800 border border-sp-ink-600 text-sp-ink-50 rounded-bl-sm'
                   }`}>
                     {msg.text}
                   </div>
                   {ts && (
-                    <span className="text-[9px] text-gray-300 mt-0.5 mx-1">
+                    <span className="text-[9px] text-sp-ink-300/70 mt-0.5 mx-1">
                       {format(ts, 'h:mm a')}
                     </span>
                   )}
@@ -102,14 +103,14 @@ export default function ChatPage() {
       {/* Input */}
       <form
         onSubmit={handleSend}
-        className="flex items-end gap-2 px-4 py-3 border-t border-gray-100 bg-white safe-bottom"
+        className="flex items-end gap-2 px-4 py-3 border-t border-sp-ink-600 bg-sp-ink-900 safe-bottom"
       >
         <input
           type="text"
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Ask your coach…"
-          className="flex-1 bg-gray-100 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500 resize-none"
+          className="flex-1 bg-sp-ink-800 border border-sp-ink-600 text-sp-ink-50 placeholder-sp-ink-300 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500 resize-none"
         />
         <button
           type="submit"

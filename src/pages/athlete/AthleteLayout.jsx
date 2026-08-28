@@ -21,7 +21,7 @@ export default function AthleteLayout() {
   const onRapsodo = location.pathname.includes('/rapsodo')
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
+    <div className="flex flex-col min-h-screen bg-sp-ink-900">
       {/* Top header */}
       <header className="surface-brand relative overflow-hidden text-white px-4 pt-safe-top">
         <div

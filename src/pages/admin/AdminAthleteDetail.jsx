@@ -16,6 +16,7 @@ import { format } from 'date-fns'
 import ProgramEditorModal from '../../components/ProgramEditorModal'
 import ToggleSwitch from '../../components/ToggleSwitch'
 import Skeleton from '../../components/Skeleton'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import { PROGRAM_TYPES, DAY_TYPES, matchDayType } from '../../constants/programTypes'
 
 // Each day type's stable position in the draft's day grid — see
@@ -149,6 +150,10 @@ export default function AdminAthleteDetail() {
   // athlete (or the assignable library) accumulates programs over a season.
   const [programTypeTab, setProgramTypeTab] = useState('correctives')
   const [showAssignModal, setShowAssignModal] = useState(false)
+  // Pending window.confirm()-style prompt — { title, message, onConfirmFn } |
+  // null. See ConfirmDialog for why this is state instead of a synchronous
+  // confirm() call.
+  const [confirmState, setConfirmState] = useState(null)
 
   useEffect(() => {
     load()
@@ -654,18 +659,23 @@ export default function AdminAthleteDetail() {
   // auto-clearing the previous attempt (see createDraftFromRows) — a
   // one-off attempt the coach never reviewed, or one from before that fix
   // shipped, isn't going anywhere on its own otherwise.
-  async function discardDraft(draft) {
-    if (!confirm(`Discard "${draft.name}"? This can't be undone.`)) return
-    setSaving(true)
-    try {
-      await deleteProgram(draft.id)
-      await refreshPrograms()
-      toast.success('Draft discarded.')
-    } catch {
-      toast.error('Could not discard draft.')
-    } finally {
-      setSaving(false)
-    }
+  function discardDraft(draft) {
+    setConfirmState({
+      title: `Discard "${draft.name}"?`,
+      message: "This can't be undone.",
+      onConfirmFn: async () => {
+        setSaving(true)
+        try {
+          await deleteProgram(draft.id)
+          await refreshPrograms()
+          toast.success('Draft discarded.')
+        } catch {
+          toast.error('Could not discard draft.')
+        } finally {
+          setSaving(false)
+        }
+      },
+    })
   }
 
   /**
@@ -1218,6 +1228,17 @@ export default function AdminAthleteDetail() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel="Discard"
+          danger
+          onCancel={() => setConfirmState(null)}
+          onConfirm={() => { confirmState.onConfirmFn(); setConfirmState(null) }}
+        />
       )}
     </div>
   )

@@ -3,6 +3,7 @@ import { X, Plus, Trash2, CheckCircle2, AlertTriangle, CalendarPlus, ChevronDown
 import toast from 'react-hot-toast'
 import { makeExerciseId, groupIntoSlots } from '../utils/programIds'
 import { libraryEntryId, buildLibraryEntries, matchLibraryEntries } from '../utils/exerciseLibrary'
+import ConfirmDialog from './ConfirmDialog'
 import { getExerciseLibrary, upsertExerciseLibraryEntries } from '../firebase/firestore'
 import { EXERCISE_CATEGORIES, exerciseCategoryInfo, categoryRank, DAY_TYPES } from '../constants/programTypes'
 
@@ -89,6 +90,10 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
   // that day instead of the editor turning into one long exercise list.
   // Keyed by `${wi}_${di}` -> the open group's key, or undefined.
   const [openGroup, setOpenGroup] = useState({})
+  // Pending window.confirm()-style prompt — { title, message, confirmLabel,
+  // danger, onConfirm } | null. See ConfirmDialog for why this is state
+  // instead of a synchronous confirm() call.
+  const [confirmState, setConfirmState] = useState(null)
   // Exercise-name autofill suggestions — every drill ever saved across every
   // program, so typing "Band Pull" in a brand new program can still surface
   // the version already fleshed out elsewhere. Fetched once per editor open;
@@ -244,11 +249,15 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
 
   function removeDay(wi, di) {
     const count = weeks[wi]?.days?.[di]?.exercises?.length || 0
-    if (count > 0 && !confirm(`Delete this day and its ${count} exercise${count === 1 ? '' : 's'}?`)) return
-    mutate(prev => prev.map((week, w) => w !== wi ? week : {
+    const doRemove = () => mutate(prev => prev.map((week, w) => w !== wi ? week : {
       ...week,
       days: week.days.filter((_, d) => d !== di),
     }))
+    if (count > 0) {
+      askConfirm('Delete this day?', `This also removes ${count} exercise${count === 1 ? '' : 's'} on it.`, doRemove)
+    } else {
+      doRemove()
+    }
   }
 
   function addWeek() {
@@ -260,8 +269,12 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
 
   function removeWeek(wi) {
     const count = (weeks[wi]?.days || []).reduce((s, d) => s + (d.exercises?.length || 0), 0)
-    if (count > 0 && !confirm(`Delete week ${wi + 1} and its ${count} exercise${count === 1 ? '' : 's'}?`)) return
-    mutate(prev => prev.filter((_, w) => w !== wi))
+    const doRemove = () => mutate(prev => prev.filter((_, w) => w !== wi))
+    if (count > 0) {
+      askConfirm(`Delete week ${wi + 1}?`, `This also removes ${count} exercise${count === 1 ? '' : 's'} on it.`, doRemove)
+    } else {
+      doRemove()
+    }
   }
 
   // ── Persistence ────────────────────────────────────────────────────────────
@@ -296,8 +309,15 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
   }
 
   function handleClose() {
-    if (dirty && !confirm('You have unsaved changes. Discard them?')) return
-    onClose()
+    if (dirty) {
+      askConfirm('Discard changes?', 'You have unsaved changes that will be lost.', onClose, { confirmLabel: 'Discard' })
+    } else {
+      onClose()
+    }
+  }
+
+  function askConfirm(title, message, onConfirmFn, { confirmLabel = 'Delete' } = {}) {
+    setConfirmState({ title, message, confirmLabel, onConfirmFn })
   }
 
   const totalExercises = weeks.reduce(
@@ -540,6 +560,17 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
           )}
         </div>
       </div>
+
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel}
+          danger
+          onCancel={() => setConfirmState(null)}
+          onConfirm={() => { confirmState.onConfirmFn(); setConfirmState(null) }}
+        />
+      )}
     </div>
   )
 }

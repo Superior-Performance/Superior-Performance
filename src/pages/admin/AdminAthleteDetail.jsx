@@ -17,11 +17,15 @@ import ProgramEditorModal from '../../components/ProgramEditorModal'
 import ToggleSwitch from '../../components/ToggleSwitch'
 import Skeleton from '../../components/Skeleton'
 import ConfirmDialog from '../../components/ConfirmDialog'
-import { PROGRAM_TYPES, DAY_TYPES, matchDayType } from '../../constants/programTypes'
+import { PROGRAM_TYPES, DAY_TYPES, matchDayType, LIFTING_DAY_TYPES, matchLiftingDayType } from '../../constants/programTypes'
 
 // Each day type's stable position in the draft's day grid — see
 // createDraftFromRows below.
 const DAY_TYPE_DAYNUM = Object.fromEntries(DAY_TYPES.map((dt, i) => [dt.key, i + 1]))
+// Lifting's day types get their own stable day-bucket numbering — separate
+// map, separate vocabulary (Upper/Lower vs. High Intent/Hybrid/Synergy/
+// Recovery), same purpose. See createDraftFromRows.
+const LIFTING_DAY_TYPE_DAYNUM = Object.fromEntries(LIFTING_DAY_TYPES.map((dt, i) => [dt.key, i + 1]))
 
 // Mirrors the "Assessment Intake" Google Sheet column-for-column (minus
 // Athlete Name, which the app already tracks) so the saved doc can be handed
@@ -357,16 +361,18 @@ export default function AdminAthleteDetail() {
     rows.forEach(row => {
       const weekNums = parseWeekOrDayRange(row['Week'])
       // College Remote Athletes' rows put a day-type label ("High Intent
-      // Day", "Medium Day", "Recovery Day") directly in the Day column
+      // Day", "Medium Day", "Recovery Day" — or, for lifting, "Upper Body
+      // Day 1" etc., a separate vocabulary) directly in the Day column
       // instead of a weekday name. parseWeekOrDayRange can't parse that as
       // a number, so it'd otherwise fall back to [1] for every row —
-      // silently collapsing all three day types into one Day 1. Detect it
-      // and give each type its own stable day bucket, tagged automatically
-      // so the athlete's day-type picker (see SchedulePage) works right
-      // after the pull instead of needing the coach to re-tag it by hand.
-      const dayTypeKey = matchDayType(row['Day'])
+      // silently collapsing every day type into one Day 1. Detect it and
+      // give each type its own stable day bucket, tagged automatically so
+      // the athlete's day-type picker (see SchedulePage) works right after
+      // the pull instead of needing the coach to re-tag it by hand.
+      const dayTypeKey = programType === 'lifting' ? matchLiftingDayType(row['Day']) : matchDayType(row['Day'])
+      const dayNumMap = programType === 'lifting' ? LIFTING_DAY_TYPE_DAYNUM : DAY_TYPE_DAYNUM
       const dayNums = dayTypeKey
-        ? [DAY_TYPE_DAYNUM[dayTypeKey]]
+        ? [dayNumMap[dayTypeKey]]
         : (row['Day'] !== undefined && row['Day'] !== '' ? parseWeekOrDayRange(row['Day']) : [1])
       const dayOptional = /\(optional\)/i.test(String(row['Day'] ?? ''))
       weekNums.forEach(wk => {

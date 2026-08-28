@@ -13,12 +13,13 @@ import { format } from 'date-fns'
 import EmptyState from '../../components/EmptyState'
 import ProgressRing from '../../components/ProgressRing'
 import Skeleton from '../../components/Skeleton'
-import { programTypeInfo, exerciseCategoryInfo, categoryRank, DAY_TYPES, dayTypeInfo } from '../../constants/programTypes'
+import { programTypeInfo, exerciseCategoryInfo, categoryRank, DAY_TYPES, LIFTING_DAY_TYPES } from '../../constants/programTypes'
 import { isExerciseComplete, keyForWrite, groupIntoSlots, buildSlots, isSlotComplete } from '../../utils/programIds'
 import { computeStreak } from '../../utils/programSchedule'
 
 const CATEGORY_ICONS = { Wind, Heart, Zap, Flame, CircleDot, ListChecks }
 const DAY_TYPE_ICONS = { Moon, Flame, Zap, Sparkles }
+const LIFTING_DAY_TYPE_ICONS = { Dumbbell }
 
 // The one day (first found, in week order) in this program tagged with the
 // given College Remote Athlete day type — see ProgramEditorModal's Day
@@ -237,12 +238,41 @@ export default function SchedulePage() {
   }
 
   // College Remote Athletes get a completely different page — no calendar,
-  // no weeks, just a pick-a-day-type flow. See RemoteDayTypePicker.
+  // no weeks, just a pick-a-day-type flow. See RemoteDayTypePicker. Lifting
+  // runs its own independent day-type picker (Upper/Lower split) rather
+  // than being merged into the throwing-intensity one the other three
+  // program types share — the two vocabularies don't correspond to each
+  // other, so they get separate sections instead of one combined picker.
   if (isRemote) {
+    const liftingPrograms  = programs.filter(p => (p.programType || 'correctives') === 'lifting')
+    const trainingPrograms = programs.filter(p => (p.programType || 'correctives') !== 'lifting')
     return (
-      <div className="min-h-[calc(100vh-56px)] bg-sp-ink-900 px-4 py-4">
+      <div className="min-h-[calc(100vh-56px)] bg-sp-ink-900 px-4 py-4 space-y-6">
         <UpdateNotice programs={updatedPrograms} onDismiss={dismissUpdateNotice} dismissing={dismissing} />
-        <RemoteDayTypePicker programs={programs} weights={weights} onSaveWeight={saveWeight} onOpenDetail={setDetail} />
+        {trainingPrograms.length > 0 && (
+          <RemoteDayTypePicker
+            title="Training"
+            programs={trainingPrograms}
+            dayTypes={DAY_TYPES}
+            dayTypeIcons={DAY_TYPE_ICONS}
+            emptyHint="Ask your coach to tag a day as Recovery, High-Intent, Synergy, or Hybrid."
+            weights={weights}
+            onSaveWeight={saveWeight}
+            onOpenDetail={setDetail}
+          />
+        )}
+        {liftingPrograms.length > 0 && (
+          <RemoteDayTypePicker
+            title="Lifting"
+            programs={liftingPrograms}
+            dayTypes={LIFTING_DAY_TYPES}
+            dayTypeIcons={LIFTING_DAY_TYPE_ICONS}
+            emptyHint="Ask your coach to tag a lifting day as Upper Body or Lower Body."
+            weights={weights}
+            onSaveWeight={saveWeight}
+            onOpenDetail={setDetail}
+          />
+        )}
         <ExerciseDetailModal detail={detail} onClose={() => setDetail(null)} />
       </div>
     )
@@ -477,16 +507,20 @@ function DayBody({
   )
 }
 
-// College Remote Athlete Mode's whole page: pick one of the program's four
-// day types, then see every program type's content tagged with it (merged
-// via the same DayBody/CategoryTiles machinery in-house athletes use).
+// One College Remote Athlete Mode day-type picker: pick one of `dayTypes`,
+// then see every program in `programs` tagged with it, merged via the same
+// DayBody/CategoryTiles machinery in-house athletes use. Rendered twice by
+// SchedulePage — once for training (correctives/throwing/mobility, sharing
+// the High Intent/Hybrid/Synergy/Recovery vocabulary) and once for lifting
+// (its own independent Upper/Lower vocabulary) — each instance's state is
+// fully independent since they're separate component instances.
 // Deliberately self-contained — none of this touches the real `completions`
-// from Firestore. A college athlete might run "Recovery Day" many times
+// from Firestore. A college athlete might run the same day type many times
 // over a season, and re-running it should start fresh each time rather
 // than showing everything already checked off from weeks ago, so
 // completion here is ephemeral local state that resets on every selection
 // instead of being persisted per exercise like the in-house flow.
-function RemoteDayTypePicker({ programs, weights, onSaveWeight, onOpenDetail }) {
+function RemoteDayTypePicker({ title, programs, dayTypes, dayTypeIcons, emptyHint, weights, onSaveWeight, onOpenDetail }) {
   const [selectedDayType, setSelectedDayType] = useState(null)
   const [activeProgramTab, setActiveProgramTab] = useState(null)
   const [ephemeral, setEphemeral] = useState({})
@@ -526,86 +560,86 @@ function RemoteDayTypePicker({ programs, weights, onSaveWeight, onOpenDetail }) 
     ephemeralToggle(programId, ex, wi, di, i, wouldFinishDay)
   }
 
-  const availableTypes = DAY_TYPES.filter(dt =>
+  const availableTypes = dayTypes.filter(dt =>
     programs.some(p => findDayForType(p, dt.key))
   )
 
-  if (availableTypes.length === 0) {
-    return (
-      <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 p-8 text-center">
-        <ListChecks size={26} className="mx-auto mb-2 text-sp-ink-300" />
-        <p className="text-sm font-medium text-white">No day types set up yet</p>
-        <p className="text-xs text-sp-ink-300 mt-0.5">Ask your coach to tag a day as Recovery, High-Intent, or Hybrid.</p>
-      </div>
-    )
-  }
-
-  if (!selectedDayType) {
-    return (
-      <div>
-        <p className="text-sm text-sp-ink-300 mb-3">Pick whichever day type fits the session you're about to run.</p>
-        <div className="grid grid-cols-2 gap-3">
-          {availableTypes.map(dt => {
-            const Icon = DAY_TYPE_ICONS[dt.icon] || Zap
-            return (
-              <button
-                key={dt.key}
-                onClick={() => selectDayType(dt.key)}
-                className="bg-sp-ink-800 border border-sp-ink-600 rounded-2xl p-4 text-left hover:border-sp-green-500/40 transition"
-              >
-                <div className="w-9 h-9 rounded-full bg-sp-green-500/15 flex items-center justify-center mb-3">
-                  <Icon size={17} className="text-sp-green-500" />
-                </div>
-                <p className="font-semibold text-white text-sm">{dt.label}</p>
-              </button>
-            )
-          })}
-        </div>
-      </div>
-    )
-  }
-
-  const typeInfo = dayTypeInfo(selectedDayType)
-  const entries = programs
-    .map(program => {
-      const day = findDayForType(program, selectedDayType)
-      return day ? { program, day } : null
-    })
-    .filter(Boolean)
+  const typeInfo = dayTypes.find(dt => dt.key === selectedDayType) || null
+  const entries = selectedDayType
+    ? programs
+        .map(program => {
+          const day = findDayForType(program, selectedDayType)
+          return day ? { program, day } : null
+        })
+        .filter(Boolean)
+    : []
 
   return (
     <div>
-      <button
-        onClick={() => setSelectedDayType(null)}
-        className="flex items-center gap-1.5 text-sm text-sp-ink-300 hover:text-white transition mb-3"
-      >
-        <ChevronLeft size={16} /> Change day type
-      </button>
-      <p className="font-display text-lg font-bold text-white mb-3">{typeInfo?.label}</p>
+      <p className="text-xs font-bold text-sp-ink-300 uppercase tracking-wider mb-3">{title}</p>
 
-      {entries.length === 0 ? (
-        <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 p-6 text-center text-sm text-sp-ink-300">
-          Nothing tagged {typeInfo?.label} yet.
+      {availableTypes.length === 0 ? (
+        <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 p-8 text-center">
+          <ListChecks size={26} className="mx-auto mb-2 text-sp-ink-300" />
+          <p className="text-sm font-medium text-white">No day types set up yet</p>
+          <p className="text-xs text-sp-ink-300 mt-0.5">{emptyHint}</p>
+        </div>
+      ) : !selectedDayType ? (
+        <div>
+          <p className="text-sm text-sp-ink-300 mb-3">Pick whichever day type fits the session you're about to run.</p>
+          <div className="grid grid-cols-2 gap-3">
+            {availableTypes.map(dt => {
+              const Icon = dayTypeIcons[dt.icon] || Zap
+              return (
+                <button
+                  key={dt.key}
+                  onClick={() => selectDayType(dt.key)}
+                  className="bg-sp-ink-800 border border-sp-ink-600 rounded-2xl p-4 text-left hover:border-sp-green-500/40 transition"
+                >
+                  <div className="w-9 h-9 rounded-full bg-sp-green-500/15 flex items-center justify-center mb-3">
+                    <Icon size={17} className="text-sp-green-500" />
+                  </div>
+                  <p className="font-semibold text-white text-sm">{dt.label}</p>
+                </button>
+              )
+            })}
+          </div>
         </div>
       ) : (
-        <DayBody
-          entries={entries}
-          weekIdx={0}
-          dayIdx={0}
-          groupPrefix={`remote_${selectedDayType}`}
-          completions={ephemeral}
-          weights={weights}
-          selectedType={activeProgramTab}
-          onSelectType={setActiveProgramTab}
-          openBlock={openBlock}
-          toggleBlock={toggleBlock}
-          openSlot={openSlot}
-          toggleSlot={toggleSlot}
-          onToggleComplete={ephemeralToggle}
-          onChooseSlotOption={ephemeralChooseSlotOption}
-          onOpenDetail={onOpenDetail}
-          onSaveWeight={onSaveWeight}
-        />
+        <div>
+          <button
+            onClick={() => setSelectedDayType(null)}
+            className="flex items-center gap-1.5 text-sm text-sp-ink-300 hover:text-white transition mb-3"
+          >
+            <ChevronLeft size={16} /> Change day type
+          </button>
+          <p className="font-display text-lg font-bold text-white mb-3">{typeInfo?.label}</p>
+
+          {entries.length === 0 ? (
+            <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 p-6 text-center text-sm text-sp-ink-300">
+              Nothing tagged {typeInfo?.label} yet.
+            </div>
+          ) : (
+            <DayBody
+              entries={entries}
+              weekIdx={0}
+              dayIdx={0}
+              groupPrefix={`remote_${selectedDayType}`}
+              completions={ephemeral}
+              weights={weights}
+              selectedType={activeProgramTab}
+              onSelectType={setActiveProgramTab}
+              openBlock={openBlock}
+              toggleBlock={toggleBlock}
+              openSlot={openSlot}
+              toggleSlot={toggleSlot}
+              onToggleComplete={ephemeralToggle}
+              onChooseSlotOption={ephemeralChooseSlotOption}
+              onOpenDetail={onOpenDetail}
+              onSaveWeight={onSaveWeight}
+            />
+          )}
+        </div>
       )}
     </div>
   )

@@ -88,6 +88,33 @@ export function matchDayType(raw) {
   return found ? found.key : null
 }
 
+// Lifting's own College Remote Athlete Mode day types — completely separate
+// from DAY_TYPES above. A lifting split (upper/lower, twice each) isn't a
+// point on the same throwing-intensity axis as High Intent/Hybrid/Synergy/
+// Recovery, so it needed its own vocabulary rather than being forced onto
+// that one. A lifting day's `dayType` field is drawn from this list instead
+// — same field, same findDayForType matching, just a different set of valid
+// values depending on the program's type. Never mix these two lists.
+export const LIFTING_DAY_TYPES = [
+  { key: 'upper_1', label: 'Upper Body Day 1', icon: 'Dumbbell' },
+  { key: 'lower_1', label: 'Lower Body Day 1', icon: 'Dumbbell' },
+  { key: 'upper_2', label: 'Upper Body Day 2', icon: 'Dumbbell' },
+  { key: 'lower_2', label: 'Lower Body Day 2', icon: 'Dumbbell' },
+]
+
+export function liftingDayTypeInfo(key) {
+  return LIFTING_DAY_TYPES.find(t => t.key === key) || null
+}
+
+// Mirrors matchDayType above, against LIFTING_DAY_TYPES instead of
+// DAY_TYPES — used only when pulling a `lifting` program from the sheet.
+export function matchLiftingDayType(raw) {
+  const trimmed = String(raw || '').trim().toLowerCase()
+  if (!trimmed) return null
+  const found = LIFTING_DAY_TYPES.find(dt => dt.label.toLowerCase() === trimmed)
+  return found ? found.key : null
+}
+
 const GENERAL_INFO = { key: 'General', label: 'General', icon: 'ListChecks', badgeClass: 'bg-gray-100 text-gray-600', dotClass: 'bg-gray-400' }
 
 function matchesCategory(cat, trimmedLower) {

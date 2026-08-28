@@ -5,7 +5,7 @@ import { makeExerciseId, groupIntoSlots } from '../utils/programIds'
 import { libraryEntryId, buildLibraryEntries, matchLibraryEntries } from '../utils/exerciseLibrary'
 import ConfirmDialog from './ConfirmDialog'
 import { getExerciseLibrary, upsertExerciseLibraryEntries } from '../firebase/firestore'
-import { EXERCISE_CATEGORIES, exerciseCategoryInfo, categoryRank, DAY_TYPES } from '../constants/programTypes'
+import { EXERCISE_CATEGORIES, exerciseCategoryInfo, categoryRank, DAY_TYPES, LIFTING_DAY_TYPES } from '../constants/programTypes'
 
 const CATEGORY_ICONS = { Wind, Heart, Zap, Flame, CircleDot, ListChecks }
 
@@ -401,11 +401,13 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
                       <select
                         value={day.dayType || ''}
                         onChange={e => updateDayField(wi, di, 'dayType', e.target.value)}
-                        title="Day Type — for College Remote Athlete Mode, matches this day across every program type"
+                        title={program.programType === 'lifting'
+                          ? 'Day Type — for College Remote Athlete Mode, matches this lifting day. Lifting has its own Upper/Lower day types, separate from the other program types.'
+                          : 'Day Type — for College Remote Athlete Mode, matches this day across every program type'}
                         className="flex-shrink-0 w-36 px-2 py-1 border border-sp-ink-600 rounded-lg text-xs bg-sp-ink-800 text-sp-ink-300 focus:outline-none focus:ring-2 focus:ring-sp-green-500"
                       >
                         <option value="" className="bg-sp-ink-800 text-sp-ink-50">No day type</option>
-                        {DAY_TYPES.map(dt => <option key={dt.key} value={dt.key} className="bg-sp-ink-800 text-sp-ink-50">{dt.label}</option>)}
+                        {(program.programType === 'lifting' ? LIFTING_DAY_TYPES : DAY_TYPES).map(dt => <option key={dt.key} value={dt.key} className="bg-sp-ink-800 text-sp-ink-50">{dt.label}</option>)}
                       </select>
                       <button
                         onClick={() => removeDay(wi, di)}

@@ -304,8 +304,8 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
     (s, wk) => s + (wk.days || []).reduce((t, d) => t + (d.exercises?.length || 0), 0), 0)
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-      <div className="bg-sp-ink-800 border border-sp-ink-600 rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-xl">
+    <div className="animate-modal-backdrop fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+      <div className="animate-modal-panel bg-sp-ink-800 border border-sp-ink-600 rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-sp-ink-600 flex-shrink-0">
           <div>
             <h2 className="text-lg font-bold text-white">{program.name}</h2>

@@ -45,9 +45,9 @@ export default function InquiryModal({ onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="animate-modal-backdrop fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div
-        className="bg-[#10151d] border border-white/10 rounded-3xl w-full max-w-md p-7 shadow-2xl relative"
+        className="animate-modal-panel bg-[#10151d] border border-white/10 rounded-3xl w-full max-w-md p-7 shadow-2xl relative"
         onClick={e => e.stopPropagation()}
       >
         <button onClick={onClose} className="absolute top-5 right-5 text-white/40 hover:text-white transition" aria-label="Close">

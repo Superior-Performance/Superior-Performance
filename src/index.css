@@ -65,6 +65,27 @@
   transition: background-color 600000s ease-in-out 0s;
 }
 
+/* Modal open animation — a backdrop fade plus a slight scale+rise on the
+   panel itself. Applied to every modal's overlay (.animate-modal-backdrop)
+   and its inner card (.animate-modal-panel) so opening one reads as an
+   intentional motion instead of an instant pop. Reduced-motion users get
+   the instant version, since vestibular-sensitive users may find the
+   scale/translate motion uncomfortable. */
+@keyframes modal-backdrop-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes modal-panel-in {
+  from { opacity: 0; transform: scale(0.96) translateY(6px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.animate-modal-backdrop { animation: modal-backdrop-in 0.15s ease-out; }
+.animate-modal-panel    { animation: modal-panel-in 0.18s cubic-bezier(0.16, 1, 0.3, 1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-modal-backdrop, .animate-modal-panel { animation: none; }
+}
+
 /* Smooth scrolling for mobile */
 .scroll-smooth {
   -webkit-overflow-scrolling: touch;

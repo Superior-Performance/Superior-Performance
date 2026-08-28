@@ -847,8 +847,8 @@ function ExerciseDetailModal({ detail, onClose }) {
   const { ex } = detail
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-sp-ink-800 rounded-2xl w-full max-w-sm max-h-[85vh] overflow-y-auto border border-sp-ink-600" onClick={(e) => e.stopPropagation()}>
+    <div className="animate-modal-backdrop fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="animate-modal-panel bg-sp-ink-800 rounded-2xl w-full max-w-sm max-h-[85vh] overflow-y-auto border border-sp-ink-600" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between px-5 py-4 border-b border-sp-ink-600">
           <div className="min-w-0">
             <p className="font-bold text-sp-ink-50">{ex.name}</p>

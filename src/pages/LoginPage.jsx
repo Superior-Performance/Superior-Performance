@@ -71,7 +71,7 @@ export default function LoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sp-green-500 text-sm transition"
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sp-green-500 text-sm transition"
               placeholder="you@example.com"
               autoComplete="email"
             />
@@ -83,7 +83,7 @@ export default function LoginPage() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sp-green-500 text-sm transition"
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sp-green-500 text-sm transition"
               placeholder="••••••••"
               autoComplete="current-password"
             />
@@ -127,10 +127,10 @@ export default function LoginPage() {
                 value={resetEmail}
                 onChange={e => setResetEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sp-green-500 text-sm"
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sp-green-500 text-sm"
               />
               <div className="flex gap-3">
-                <button type="button" onClick={() => setShowReset(false)} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
+                <button type="button" onClick={() => setShowReset(false)} className="flex-1 py-2.5 border border-gray-200 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
                 <button type="submit" disabled={resetSending} className="btn-brand flex-1 py-2.5 rounded-xl text-sm">
                   {resetSending ? 'Sending…' : 'Send Link'}
                 </button>

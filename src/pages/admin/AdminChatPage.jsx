@@ -1,12 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getAllAthletes } from '../../firebase/firestore'
-import { subscribeChat, sendMessage, markChatRead } from '../../firebase/realtime'
+import { getAllAthletes, sendChatMessage, subscribeChatMessages } from '../../firebase/firestore'
 import { useAuth } from '../../context/AuthContext'
 import { Send, MessageCircle } from 'lucide-react'
 import { format, isToday, isYesterday } from 'date-fns'
 import EmptyState from '../../components/EmptyState'
 import toast from 'react-hot-toast'
+
+// Firestore Timestamps aren't resolved to a real value until the server
+// confirms the write — a message that was just sent shows up via the local
+// optimistic snapshot with createdAt still null for a moment. toDate()
+// handles both that and already-resolved timestamps.
+const toDate = (ts) => ts?.toDate?.() ?? null
 
 export default function AdminChatPage() {
   const { athleteUid } = useParams()
@@ -30,10 +35,7 @@ export default function AdminChatPage() {
 
   useEffect(() => {
     if (!selected) return
-    const unsub = subscribeChat(selected, (msgs) => {
-      setMessages(msgs)
-      markChatRead(selected, currentUser.uid)
-    })
+    const unsub = subscribeChatMessages(selected, setMessages)
     return unsub
   }, [selected])
 
@@ -58,7 +60,7 @@ export default function AdminChatPage() {
     }
     setSending(true)
     try {
-      await sendMessage(selected, {
+      await sendChatMessage(selected, {
         text: text.trim(),
         senderUid:  currentUser.uid,
         senderName: userProfile?.name || 'Coach',
@@ -141,8 +143,8 @@ export default function AdminChatPage() {
               {messages.map((msg, i) => {
                 const isAdmin  = msg.role === 'admin'
                 const prev     = messages[i - 1]
-                const showDate = !prev || !sameDay(prev.timestamp, msg.timestamp)
-                const ts       = msg.timestamp ? new Date(msg.timestamp) : null
+                const ts       = toDate(msg.createdAt)
+                const showDate = !prev || !sameDay(toDate(prev.createdAt), ts)
                 return (
                   <div key={msg.id}>
                     {showDate && ts && (
@@ -197,6 +199,5 @@ export default function AdminChatPage() {
 
 function sameDay(a, b) {
   if (!a || !b) return false
-  const da = new Date(a), db = new Date(b)
-  return da.toDateString() === db.toDateString()
+  return a.toDateString() === b.toDateString()
 }

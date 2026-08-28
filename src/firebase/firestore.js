@@ -6,6 +6,7 @@
  *  programs/{programId}      — { name, athleteId, programType: 'correctives'|'throwing'|'lifting', totalWeeks, weeks: [...], startDate?, createdAt, active }
  *  dataLogs/{uid}/entries/{} — { date, type: 'velo'|'weight', value, exercise?, notes, createdAt }
  *  assessments/{uid}         — { scores: {...}, programId, updatedAt }
+ *  chats/{uid}/messages/{}   — { text, senderUid, senderName, role: 'admin'|'athlete', createdAt }
  *
  * An athlete can have up to one *active* program per programType at a time —
  * correctives, throwing, and lifting run concurrently rather than one program
@@ -213,6 +214,25 @@ export const getCompletions = (uid) =>
 
 export const subscribeCompletions = (uid, callback) =>
   onSnapshot(collection(db, 'completions', uid, 'weeks'), callback)
+
+// ── Chat ─────────────────────────────────────────────────────────────────────
+// chats/{athleteUid}/messages/{messageId} — { text, senderUid, senderName,
+// role: 'admin'|'athlete', createdAt }. One thread per athlete, shared with
+// their coach — same shape on both sides. Previously lived in the Realtime
+// Database; moved here so chat uses the same datastore, rules pattern, and
+// ordering guarantees as everything else in the app instead of a second,
+// separately-configured service.
+export const sendChatMessage = (athleteUid, message) =>
+  addDoc(collection(db, 'chats', athleteUid, 'messages'), {
+    ...message,
+    createdAt: serverTimestamp(),
+  })
+
+export const subscribeChatMessages = (athleteUid, callback) =>
+  onSnapshot(
+    query(collection(db, 'chats', athleteUid, 'messages'), orderBy('createdAt')),
+    (snap) => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+  )
 
 // ── Exercise weight tracking ───────────────────────────────────────────────────
 // exerciseWeights/{uid}/entries/{programId_exerciseId} — { value, exercise, updatedAt }

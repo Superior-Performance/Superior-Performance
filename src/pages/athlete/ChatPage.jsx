@@ -1,10 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
-import { subscribeChat, sendMessage, markChatRead } from '../../firebase/realtime'
+import { subscribeChatMessages, sendChatMessage } from '../../firebase/firestore'
 import { Send } from 'lucide-react'
 import { format, isToday, isYesterday } from 'date-fns'
 import EmptyState from '../../components/EmptyState'
 import toast from 'react-hot-toast'
+
+// Firestore Timestamps aren't resolved to a real value until the server
+// confirms the write — a message that was just sent shows up via the local
+// optimistic snapshot with createdAt still null for a moment. toDate()
+// handles both that and already-resolved timestamps.
+const toDate = (ts) => ts?.toDate?.() ?? null
 
 export default function ChatPage() {
   const { currentUser, userProfile } = useAuth()
@@ -15,10 +21,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!currentUser) return
-    const unsub = subscribeChat(currentUser.uid, (msgs) => {
-      setMessages(msgs)
-      markChatRead(currentUser.uid, currentUser.uid)
-    })
+    const unsub = subscribeChatMessages(currentUser.uid, setMessages)
     return unsub
   }, [currentUser])
 
@@ -31,7 +34,7 @@ export default function ChatPage() {
     if (!text.trim() || sending) return
     setSending(true)
     try {
-      await sendMessage(currentUser.uid, {
+      await sendChatMessage(currentUser.uid, {
         text: text.trim(),
         senderUid:  currentUser.uid,
         senderName: userProfile?.name || 'Athlete',
@@ -65,8 +68,8 @@ export default function ChatPage() {
         {messages.map((msg, i) => {
           const isMe     = msg.senderUid === currentUser.uid
           const prev     = messages[i - 1]
-          const showDate = !prev || !sameDay(prev.timestamp, msg.timestamp)
-          const ts       = msg.timestamp ? new Date(msg.timestamp) : null
+          const ts       = toDate(msg.createdAt)
+          const showDate = !prev || !sameDay(toDate(prev.createdAt), ts)
 
           return (
             <div key={msg.id}>
@@ -128,8 +131,7 @@ export default function ChatPage() {
 
 function sameDay(a, b) {
   if (!a || !b) return false
-  const da = new Date(a), db = new Date(b)
-  return da.getFullYear() === db.getFullYear()
-    && da.getMonth() === db.getMonth()
-    && da.getDate() === db.getDate()
+  return a.getFullYear() === b.getFullYear()
+    && a.getMonth() === b.getMonth()
+    && a.getDate() === b.getDate()
 }

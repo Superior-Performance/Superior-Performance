@@ -1,16 +1,6 @@
 {
   "rules": {
-    "chats": {
-      "$athleteUid": {
-        "messages": {
-          ".read": "auth != null",
-          ".write": "auth != null"
-        },
-        "readBy": {
-          ".read": "auth != null",
-          ".write": "auth != null"
-        }
-      }
-    }
+    ".read": false,
+    ".write": false
   }
 }

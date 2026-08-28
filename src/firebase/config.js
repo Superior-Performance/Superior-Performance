@@ -3,7 +3,6 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
-import { getDatabase } from 'firebase/database'
 
 const firebaseConfig = {
   apiKey:            import.meta.env.VITE_FIREBASE_API_KEY            || "YOUR_API_KEY",
@@ -12,12 +11,10 @@ const firebaseConfig = {
   storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET     || "YOUR_PROJECT.appspot.com",
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID|| "YOUR_SENDER_ID",
   appId:             import.meta.env.VITE_FIREBASE_APP_ID             || "YOUR_APP_ID",
-  databaseURL:       import.meta.env.VITE_FIREBASE_DATABASE_URL       || "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
 }
 
 const app = initializeApp(firebaseConfig)
 
 export const auth = getAuth(app)
-export const db   = getFirestore(app)    // Firestore — programs, athletes, logs
-export const rtdb = getDatabase(app)     // Realtime DB — chat messages
+export const db   = getFirestore(app)    // Firestore — programs, athletes, logs, chat
 export default app

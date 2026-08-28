@@ -66,6 +66,13 @@ service cloud.firestore {
       allow write: if isAdmin() || (isAuth() && request.auth.uid == uid);
     }
 
+    // Chat — one thread per athlete, shared with their coach. Admins can
+    // read/write every thread; an athlete can only read/write their own.
+    match /chats/{athleteUid}/messages/{messageId} {
+      allow read:  if isAdmin() || (isAuth() && request.auth.uid == athleteUid);
+      allow write: if isAdmin() || (isAuth() && request.auth.uid == athleteUid);
+    }
+
     // Exercise library: coach-tooling data (name/category -> last-used
     // sets/reps/notes/video URL) that powers the Program Editor's autofill
     // suggestions. Admin-only — athletes never see or need this.

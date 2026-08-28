@@ -62,7 +62,7 @@ export default function LoginPage() {
       </div>
 
       {/* Card */}
-      <div className="relative z-10 w-full max-w-sm bg-white rounded-2xl shadow-xl p-8">
+      <div className="login-card relative z-10 w-full max-w-sm bg-white rounded-2xl shadow-xl p-8">
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
@@ -117,7 +117,7 @@ export default function LoginPage() {
       {/* Forgot password modal */}
       {showReset && (
         <div className="animate-modal-backdrop fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="animate-modal-panel bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl">
+          <div className="login-card animate-modal-panel bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl">
             <h2 className="text-lg font-bold text-gray-900 mb-1">Reset Password</h2>
             <p className="text-sm text-gray-500 mb-5">Enter your email and we'll send you a reset link.</p>
             <form onSubmit={handleReset} className="space-y-4">

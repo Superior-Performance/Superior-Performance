@@ -65,6 +65,19 @@
   transition: background-color 600000s ease-in-out 0s;
 }
 
+/* Same problem, inverted: the login page's white card gets the browser's
+   dark-mode autofill styling (light text) forced onto its email/password
+   fields — the fields a saved-credential autofill is most likely to hit. */
+.login-card input:-webkit-autofill,
+.login-card input:-webkit-autofill:hover,
+.login-card input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #111827;
+  -webkit-box-shadow: 0 0 0px 1000px #ffffff inset;
+  box-shadow: 0 0 0px 1000px #ffffff inset;
+  caret-color: #111827;
+  transition: background-color 600000s ease-in-out 0s;
+}
+
 /* Modal open animation — a backdrop fade plus a slight scale+rise on the
    panel itself. Applied to every modal's overlay (.animate-modal-backdrop)
    and its inner card (.animate-modal-panel) so opening one reads as an

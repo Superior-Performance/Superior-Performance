@@ -386,7 +386,22 @@ export default function AdminAthleteDetail() {
               ...(dayTypeKey ? { dayType: dayTypeKey } : {}),
             }
           }
-          const category = row['Category'] || row['Type'] || ''
+          // Lifting Outputs has its own column shape: Block (A/B/C — a
+          // group of lifts done together) and Slot # (order within that
+          // block) replace the other tabs' Category/Type column; its "Type"
+          // column (Upper/Lower) is redundant with the Day column's day
+          // type and is ignored here rather than leaking in as a category.
+          // "Block A" doubles as the exercise's `category` so it reuses the
+          // exact same grouping/accordion machinery every other category
+          // already has — see buildCategoryBlocks (SchedulePage) and
+          // buildDayGroups (ProgramEditorModal); `blockSlot` is a new field
+          // just for ordering exercises within that block correctly.
+          const isLifting = programType === 'lifting'
+          const category = isLifting
+            ? (row['Block'] ? `Block ${String(row['Block']).trim().toUpperCase()}` : '')
+            : (row['Category'] || row['Type'] || '')
+          const slotRaw = row['Slot #'] ?? row['Slot#'] ?? row['Slot']
+          const blockSlot = isLifting && slotRaw !== undefined && slotRaw !== '' ? Number(slotRaw) : NaN
           weeksMap[wk].days[day].exercises.push({
             id:        makeExerciseId(),   // stable across later edits — see utils/programIds
             name:      row['Exercise']  || '',
@@ -400,6 +415,7 @@ export default function AdminAthleteDetail() {
             // the outputs tab's name for the same column.
             category,
             videoUrl:  row['Video URL'] || row['Video'] || '',
+            ...(Number.isFinite(blockSlot) ? { blockSlot } : {}),
           })
 
           // The sheet can carry a second, either/or option on the same

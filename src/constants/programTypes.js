@@ -117,6 +117,13 @@ export function matchLiftingDayType(raw) {
 
 const GENERAL_INFO = { key: 'General', label: 'General', icon: 'ListChecks', badgeClass: 'bg-gray-100 text-gray-600', dotClass: 'bg-gray-400' }
 
+// A lifting day's exercises are grouped by the sheet's Block column ("Block
+// A", "Block B", ...) instead of the correctives-style category taxonomy —
+// see AdminAthleteDetail's createDraftFromRows. Gets its own icon/color
+// rather than falling into the fully generic GENERAL_INFO treatment.
+const LIFTING_BLOCK_INFO = { icon: 'Dumbbell', badgeClass: 'bg-sp-green-100 text-sp-green-800', dotClass: 'bg-sp-green-500' }
+const BLOCK_LABEL_RE = /^block\s+([a-z])$/i
+
 function matchesCategory(cat, trimmedLower) {
   if (cat.key.toLowerCase() === trimmedLower) return true
   return (cat.aliases || []).some(a => a.toLowerCase() === trimmedLower)
@@ -132,7 +139,9 @@ export function exerciseCategoryInfo(label) {
   const trimmedLower = trimmed.toLowerCase()
   if (trimmedLower === CATCH_PLAY_INFO.key.toLowerCase()) return CATCH_PLAY_INFO
   const found = EXERCISE_CATEGORIES.find(c => matchesCategory(c, trimmedLower))
-  return found ? found : { ...GENERAL_INFO, key: trimmed, label: trimmed }
+  if (found) return found
+  if (BLOCK_LABEL_RE.test(trimmed)) return { ...LIFTING_BLOCK_INFO, key: trimmed, label: trimmed }
+  return { ...GENERAL_INFO, key: trimmed, label: trimmed }
 }
 
 // Display order when categories from different programs (correctives, catch
@@ -145,6 +154,12 @@ const CATEGORY_ORDER = [
 
 export function categoryRank(label) {
   const trimmed = String(label || '').trim().toLowerCase()
+  // Block A/B/C need a real, deterministic order (not "whatever order the
+  // sheet rows happened to arrive in") since they're the whole point of the
+  // lifting tab's block accordion — rank by the letter itself, ahead of the
+  // Infinity fallback every other unrecognized category gets.
+  const blockMatch = trimmed.match(BLOCK_LABEL_RE)
+  if (blockMatch) return 1000 + (blockMatch[1].charCodeAt(0) - 97)
   const direct = CATEGORY_ORDER.findIndex(c => c.toLowerCase() === trimmed)
   if (direct !== -1) return direct
   const viaAlias = EXERCISE_CATEGORIES.findIndex(c => matchesCategory(c, trimmed))

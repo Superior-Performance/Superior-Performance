@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Plus, Trash2, CheckCircle2, AlertTriangle, CalendarPlus, ChevronDown, ChevronUp, Link2, Unlink, Wind, Heart, Zap, Flame, CircleDot, ListChecks } from 'lucide-react'
+import { X, Plus, Trash2, CheckCircle2, AlertTriangle, CalendarPlus, ChevronDown, ChevronUp, Link2, Unlink, Wind, Heart, Zap, Flame, CircleDot, ListChecks, Dumbbell } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { makeExerciseId, groupIntoSlots } from '../utils/programIds'
 import { libraryEntryId, buildLibraryEntries, matchLibraryEntries } from '../utils/exerciseLibrary'
@@ -7,13 +7,17 @@ import ConfirmDialog from './ConfirmDialog'
 import { getExerciseLibrary, upsertExerciseLibraryEntries } from '../firebase/firestore'
 import { EXERCISE_CATEGORIES, exerciseCategoryInfo, categoryRank, DAY_TYPES, LIFTING_DAY_TYPES } from '../constants/programTypes'
 
-const CATEGORY_ICONS = { Wind, Heart, Zap, Flame, CircleDot, ListChecks }
+const CATEGORY_ICONS = { Wind, Heart, Zap, Flame, CircleDot, ListChecks, Dumbbell }
+const LIFTING_BLOCK_LETTERS = ['A', 'B', 'C', 'D']
 
 // Groups a day's exercises by category (same taxonomy the athlete's
 // SchedulePage groups by) so the editor's exercise list reads as clickable,
 // collapsible sections instead of one long flat list. `rawCategory` keeps
 // the underlying (possibly empty) category value for prefilling new
 // exercises added within the group — "General" is a display fallback only.
+// Within a group, a lifting exercise's `blockSlot` (from the sheet's Slot #
+// column) orders it correctly within its block; other program types never
+// set `blockSlot` so this sort is a no-op for them.
 function buildDayGroups(day) {
   const groups = []
   const indexByKey = {}
@@ -26,6 +30,7 @@ function buildDayGroups(day) {
     }
     groups[indexByKey[key]].items.push({ ex, ei })
   })
+  groups.forEach(g => g.items.sort((a, b) => (a.ex.blockSlot ?? Infinity) - (b.ex.blockSlot ?? Infinity)))
   return groups.sort((a, b) => categoryRank(a.key) - categoryRank(b.key))
 }
 
@@ -456,6 +461,7 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
                                         key={ex.id || ei}
                                         ex={ex}
                                         label={slot.items.length > 1 ? (pos === 0 ? 'Option A' : 'Option B') : null}
+                                        isLifting={program.programType === 'lifting'}
                                         onChange={(field, value) => updateExercise(wi, di, ei, field, value)}
                                         onRemove={() => removeExercise(wi, di, ei)}
                                         onAddOption={ex.altGroup ? null : () => addAltOption(wi, di, ei)}
@@ -580,7 +586,7 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
 // One exercise's editable fields. `label` ("Option A"/"Option B") and the
 // add/unlink handlers only apply when this exercise is part of an either/or
 // pair — see addAltOption/unlinkAltOptions above.
-function ExerciseFields({ ex, label, onChange, onRemove, onAddOption, onUnlink, library, onAutofill }) {
+function ExerciseFields({ ex, label, isLifting, onChange, onRemove, onAddOption, onUnlink, library, onAutofill }) {
   // Suggestions stay hidden until there's something to match against —
   // matchLibraryEntries itself also floors at 2 typed characters.
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -610,9 +616,20 @@ function ExerciseFields({ ex, label, onChange, onRemove, onAddOption, onUnlink, 
           onChange={e => onChange('category', e.target.value)}
           className="flex-shrink-0 w-36 px-2 py-1.5 border border-sp-ink-600 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-sp-green-500 bg-sp-ink-900 text-sp-ink-200"
         >
-          <option value="" className="bg-sp-ink-900 text-sp-ink-50">No category</option>
-          {EXERCISE_CATEGORIES.map(c => <option key={c.key} value={c.key} className="bg-sp-ink-900 text-sp-ink-50">{c.label}</option>)}
-          <option value="Catch Play" className="bg-sp-ink-900 text-sp-ink-50">Catch Play</option>
+          {isLifting ? (
+            <>
+              <option value="" className="bg-sp-ink-900 text-sp-ink-50">No block</option>
+              {LIFTING_BLOCK_LETTERS.map(letter => (
+                <option key={letter} value={`Block ${letter}`} className="bg-sp-ink-900 text-sp-ink-50">Block {letter}</option>
+              ))}
+            </>
+          ) : (
+            <>
+              <option value="" className="bg-sp-ink-900 text-sp-ink-50">No category</option>
+              {EXERCISE_CATEGORIES.map(c => <option key={c.key} value={c.key} className="bg-sp-ink-900 text-sp-ink-50">{c.label}</option>)}
+              <option value="Catch Play" className="bg-sp-ink-900 text-sp-ink-50">Catch Play</option>
+            </>
+          )}
         </select>
         <div className="relative flex-1">
           <input

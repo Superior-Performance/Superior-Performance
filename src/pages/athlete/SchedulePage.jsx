@@ -17,7 +17,7 @@ import { programTypeInfo, exerciseCategoryInfo, categoryRank, DAY_TYPES, LIFTING
 import { isExerciseComplete, keyForWrite, groupIntoSlots, buildSlots, isSlotComplete } from '../../utils/programIds'
 import { computeStreak } from '../../utils/programSchedule'
 
-const CATEGORY_ICONS = { Wind, Heart, Zap, Flame, CircleDot, ListChecks }
+const CATEGORY_ICONS = { Wind, Heart, Zap, Flame, CircleDot, ListChecks, Dumbbell }
 const DAY_TYPE_ICONS = { Moon, Flame, Zap, Sparkles }
 const LIFTING_DAY_TYPE_ICONS = { Dumbbell }
 
@@ -62,7 +62,10 @@ function buildCategoryBlocks(day, fallbackLabel) {
     }
     blocks[indexByKey[label]].items.push({ ex, i })
   })
-  blocks.forEach(b => { b.slots = groupIntoSlots(b.items) })
+  // A lifting exercise's `blockSlot` (from the sheet's Slot # column) orders
+  // it within its block; other program types never set it, so this sort is
+  // a no-op there (stable sort keeps their original order).
+  blocks.forEach(b => { b.items.sort((a, c) => (a.ex.blockSlot ?? Infinity) - (c.ex.blockSlot ?? Infinity)); b.slots = groupIntoSlots(b.items) })
   return blocks.sort((a, b) => categoryRank(a.label) - categoryRank(b.label))
 }
 
@@ -239,10 +242,8 @@ export default function SchedulePage() {
 
   // College Remote Athletes get a completely different page — no calendar,
   // no weeks, just a pick-a-day-type flow. See RemoteDayTypePicker. Lifting
-  // runs its own independent day-type picker (Upper/Lower split) rather
-  // than being merged into the throwing-intensity one the other three
-  // program types share — the two vocabularies don't correspond to each
-  // other, so they get separate sections instead of one combined picker.
+  // is not part of that flow at all — see LiftingBrowser below, used
+  // identically here and for in-house athletes.
   if (isRemote) {
     const liftingPrograms  = programs.filter(p => (p.programType || 'correctives') === 'lifting')
     const trainingPrograms = programs.filter(p => (p.programType || 'correctives') !== 'lifting')
@@ -262,16 +263,18 @@ export default function SchedulePage() {
           />
         )}
         {liftingPrograms.length > 0 && (
-          <RemoteDayTypePicker
-            title="Lifting"
-            programs={liftingPrograms}
-            dayTypes={LIFTING_DAY_TYPES}
-            dayTypeIcons={LIFTING_DAY_TYPE_ICONS}
-            emptyHint="Ask your coach to tag a lifting day as Upper Body or Lower Body."
-            weights={weights}
-            onSaveWeight={saveWeight}
-            onOpenDetail={setDetail}
-          />
+          <div>
+            <p className="text-xs font-bold text-sp-ink-300 uppercase tracking-wider mb-3">Lifting</p>
+            <LiftingBrowser
+              programs={liftingPrograms}
+              completions={completions}
+              weights={weights}
+              onToggleComplete={toggleExerciseComplete}
+              onChooseSlotOption={chooseSlotOption}
+              onOpenDetail={setDetail}
+              onSaveWeight={saveWeight}
+            />
+          </div>
         )}
         <ExerciseDetailModal detail={detail} onClose={() => setDetail(null)} />
       </div>
@@ -302,9 +305,16 @@ export default function SchedulePage() {
     )
   }
 
+  // Lifting doesn't take part in "today" at all — a lift day is Upper/Lower,
+  // not a calendar weekday, so its dayNum (a stable 1-4 bucket, see
+  // LIFTING_DAY_TYPE_DAYNUM) has no relationship to pos.dayNum here. It gets
+  // its own always-available tab via LiftingBrowser instead — see DayBody.
+  const liftingPrograms = programs.filter(p => (p.programType || 'correctives') === 'lifting')
+  const nonLiftingPrograms = programs.filter(p => (p.programType || 'correctives') !== 'lifting')
+
   // Week → Day → (if more than one program lands on that day) program tab.
   const dayMap = new Map() // dayNum -> [{ program, day }]
-  programs.forEach(program => {
+  nonLiftingPrograms.forEach(program => {
     (program.weeks?.[pos.weekIdx]?.days || []).forEach((day, i) => {
       if (!day.exercises?.length) return
       const dayNum = day.dayNum ?? i + 1
@@ -331,7 +341,7 @@ export default function SchedulePage() {
         todayTotal={todayTotal}
       />
 
-      {days.length === 0 ? (
+      {days.length === 0 && liftingPrograms.length === 0 ? (
         <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 p-8 text-center">
           <Moon size={26} className="mx-auto mb-2 text-sp-ink-300" />
           <p className="text-sm font-medium text-white">Rest day</p>
@@ -339,7 +349,7 @@ export default function SchedulePage() {
         </div>
       ) : (
         <DayBody
-          entries={days[0].entries}
+          entries={days[0]?.entries || []}
           weekIdx={pos.weekIdx}
           dayIdx={pos.dayNum - 1}
           groupPrefix="today"
@@ -355,6 +365,7 @@ export default function SchedulePage() {
           onChooseSlotOption={chooseSlotOption}
           onOpenDetail={setDetail}
           onSaveWeight={saveWeight}
+          liftingPrograms={liftingPrograms}
         />
       )}
 
@@ -448,8 +459,14 @@ function DayBody({
   entries, weekIdx, dayIdx, groupPrefix,
   completions, weights, selectedType, onSelectType,
   openBlock, toggleBlock, openSlot, toggleSlot, onToggleComplete, onChooseSlotOption, onOpenDetail, onSaveWeight,
+  liftingPrograms = [],
 }) {
-  const availableTypes = TAB_ORDER.filter(t => entries.some(e => (e.program.programType || 'correctives') === t))
+  // Lifting is always available as a tab (if the athlete has an active
+  // lifting program) regardless of whether it landed in today's `entries` —
+  // it isn't date-driven, see LiftingBrowser.
+  const availableTypes = TAB_ORDER.filter(t =>
+    t === 'lifting' ? liftingPrograms.length > 0 : entries.some(e => (e.program.programType || 'correctives') === t)
+  )
   const activeType = availableTypes.includes(selectedType) ? selectedType : availableTypes[0]
   const activeEntry = entries.find(e => (e.program.programType || 'correctives') === activeType)
   const groupKey = `${groupPrefix}_${activeType}`
@@ -478,7 +495,18 @@ function DayBody({
         </div>
       )}
 
-      {activeEntry && (
+      {activeType === 'lifting' ? (
+        <LiftingBrowser
+          programs={liftingPrograms}
+          completions={completions}
+          weights={weights}
+          onToggleComplete={onToggleComplete}
+          onChooseSlotOption={onChooseSlotOption}
+          onOpenDetail={onOpenDetail}
+          onSaveWeight={onSaveWeight}
+          initialWeekIdx={weekIdx}
+        />
+      ) : activeEntry && (
         <div className="bg-sp-ink-800 rounded-2xl overflow-hidden border border-sp-ink-600">
           <CategoryTiles
             program={activeEntry.program}
@@ -638,6 +666,148 @@ function RemoteDayTypePicker({ title, programs, dayTypes, dayTypeIcons, emptyHin
               onOpenDetail={onOpenDetail}
               onSaveWeight={onSaveWeight}
             />
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Lifting doesn't map onto "today" the way the other program types do — a
+// lift day is Upper/Lower, not a calendar weekday — so instead of showing
+// whatever's due today it's an explicit drill-down: pick the week, then
+// which of the four day types, then work through that day's blocks (Block
+// A/B/C, each a collapsible tile via the same CategoryTiles machinery,
+// since a lifting exercise's `category` is literally "Block A" etc. — see
+// AdminAthleteDetail's createDraftFromRows). Real Firestore completions are
+// used (unlike RemoteDayTypePicker's ephemeral state) since Week + Day Type
+// together pick out one specific, non-repeating day for every athlete,
+// in-house or remote.
+function LiftingBrowser({ programs, completions, weights, onToggleComplete, onChooseSlotOption, onOpenDetail, onSaveWeight, initialWeekIdx = 0 }) {
+  const totalWeeks = Math.max(1, ...programs.map(p => p.weeks?.length || 0))
+  const [weekIdx, setWeekIdx] = useState(Math.min(Math.max(initialWeekIdx, 0), totalWeeks - 1))
+  const [selectedDayType, setSelectedDayType] = useState(null)
+  const [openBlock, setOpenBlock] = useState({})
+  const [openSlot, setOpenSlot] = useState({})
+
+  function toggleBlock(groupKey, blockKey) {
+    setOpenBlock(prev => ({ ...prev, [groupKey]: prev[groupKey] === blockKey ? null : blockKey }))
+  }
+  function toggleSlot(scopeKey, altGroup) {
+    setOpenSlot(prev => ({ ...prev, [scopeKey]: prev[scopeKey] === altGroup ? null : altGroup }))
+  }
+  function selectWeek(idx) {
+    setWeekIdx(idx)
+    setSelectedDayType(null)
+    setOpenBlock({})
+    setOpenSlot({})
+  }
+  function selectDayType(key) {
+    setSelectedDayType(key)
+    setOpenBlock({})
+    setOpenSlot({})
+  }
+
+  const availableDayTypes = LIFTING_DAY_TYPES.filter(dt =>
+    programs.some(p => p.weeks?.[weekIdx]?.days?.some(d => d.dayType === dt.key && d.exercises?.length))
+  )
+  const typeInfo = LIFTING_DAY_TYPES.find(dt => dt.key === selectedDayType) || null
+
+  // dayIdx is the day's actual array position within week.days (not
+  // dayNum - 1) so completion keys line up correctly regardless of which
+  // day types a given week happens to include.
+  const entries = selectedDayType
+    ? programs
+        .map(program => {
+          const dayIdx = (program.weeks?.[weekIdx]?.days || []).findIndex(d => d.dayType === selectedDayType && d.exercises?.length)
+          return dayIdx === -1 ? null : { program, day: program.weeks[weekIdx].days[dayIdx], dayIdx }
+        })
+        .filter(Boolean)
+    : []
+
+  return (
+    <div>
+      <div className="flex gap-1 px-1 pb-3 overflow-x-auto no-scrollbar">
+        {Array.from({ length: totalWeeks }, (_, i) => i).map(i => (
+          <button
+            key={i}
+            onClick={() => selectWeek(i)}
+            className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+              weekIdx === i ? 'bg-sp-green-500 text-white' : 'bg-sp-ink-800 border border-sp-ink-600 text-sp-ink-300'
+            }`}
+          >
+            Week {i + 1}
+          </button>
+        ))}
+      </div>
+
+      {availableDayTypes.length === 0 ? (
+        <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 p-6 text-center text-sm text-sp-ink-300">
+          Nothing scheduled for lifting this week.
+        </div>
+      ) : !selectedDayType ? (
+        <div className="grid grid-cols-2 gap-3">
+          {availableDayTypes.map(dt => {
+            const Icon = LIFTING_DAY_TYPE_ICONS[dt.icon] || Dumbbell
+            return (
+              <button
+                key={dt.key}
+                onClick={() => selectDayType(dt.key)}
+                className="bg-sp-ink-800 border border-sp-ink-600 rounded-2xl p-4 text-left hover:border-sp-green-500/40 transition"
+              >
+                <div className="w-9 h-9 rounded-full bg-sp-green-500/15 flex items-center justify-center mb-3">
+                  <Icon size={17} className="text-sp-green-500" />
+                </div>
+                <p className="font-semibold text-white text-sm">{dt.label}</p>
+              </button>
+            )
+          })}
+        </div>
+      ) : (
+        <div>
+          <button
+            onClick={() => setSelectedDayType(null)}
+            className="flex items-center gap-1.5 text-sm text-sp-ink-300 hover:text-white transition mb-3"
+          >
+            <ChevronLeft size={16} /> Change day type
+          </button>
+          <p className="font-display text-lg font-bold text-white mb-3">{typeInfo?.label}</p>
+
+          {entries.length === 0 ? (
+            <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 p-6 text-center text-sm text-sp-ink-300">
+              Nothing tagged {typeInfo?.label} this week.
+            </div>
+          ) : (
+            entries.map(({ program, day, dayIdx }) => {
+              const slots = buildSlots(day.exercises)
+              const doneCount = slots.filter(slot => isSlotComplete(completions, program.id, slot, weekIdx, dayIdx)).length
+              const groupKey = `lift_${program.id}_${weekIdx}_${selectedDayType}`
+              return (
+                <div key={program.id} className="bg-sp-ink-800 rounded-2xl overflow-hidden border border-sp-ink-600 mb-3 last:mb-0">
+                  <CategoryTiles
+                    program={program}
+                    day={day}
+                    fallbackCategory="Lift"
+                    currentWeek={weekIdx}
+                    dayIdx={dayIdx}
+                    groupKey={groupKey}
+                    doneCount={doneCount}
+                    totalExercises={slots.length}
+                    showWeight
+                    completions={completions}
+                    weights={weights}
+                    openBlockKey={openBlock[groupKey]}
+                    toggleBlock={toggleBlock}
+                    openSlot={openSlot}
+                    toggleSlot={toggleSlot}
+                    onToggleComplete={onToggleComplete}
+                    onChooseSlotOption={onChooseSlotOption}
+                    onOpenDetail={onOpenDetail}
+                    onSaveWeight={onSaveWeight}
+                  />
+                </div>
+              )
+            })
           )}
         </div>
       )}

@@ -1224,7 +1224,7 @@ export default function AdminAthleteDetail() {
               <tr className="bg-white/[0.03] border-b border-sp-ink-600">
                 <th className="text-left px-5 py-3 text-xs font-semibold text-sp-ink-300 uppercase tracking-wider">Type</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold text-sp-ink-300 uppercase tracking-wider">Value</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-sp-ink-300 uppercase tracking-wider">Exercise</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-sp-ink-300 uppercase tracking-wider">Notes</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold text-sp-ink-300 uppercase tracking-wider">Date</th>
               </tr>
             </thead>
@@ -1236,11 +1236,11 @@ export default function AdminAthleteDetail() {
                       log.type === 'velo' ? 'bg-amber-500/15 text-amber-300' : 'bg-sky-500/15 text-sky-300'
                     }`}>
                       {log.type === 'velo' ? <Zap size={11} /> : <Dumbbell size={11} />}
-                      {log.type === 'velo' ? 'Velocity' : 'Weight'}
+                      {log.type === 'velo' ? 'Velo' : 'Body Weight'}
                     </span>
                   </td>
                   <td className="px-5 py-3 font-medium text-white">{log.value} {log.type === 'velo' ? 'mph' : 'lbs'}</td>
-                  <td className="px-5 py-3 text-sp-ink-300">{log.exercise || '—'}</td>
+                  <td className="px-5 py-3 text-sp-ink-300 max-w-xs truncate" title={log.notes || ''}>{log.notes || '—'}</td>
                   <td className="px-5 py-3 text-sp-ink-300">{log.date ? format(new Date(log.date), 'MMM d, yyyy') : '—'}</td>
                 </tr>
               ))}

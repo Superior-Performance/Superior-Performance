@@ -6,20 +6,24 @@ import {
 } from '../../firebase/firestore'
 import { buildSlots, isSlotComplete } from '../../utils/programIds'
 import { computeStreak } from '../../utils/programSchedule'
-import { TrendingUp, CheckCircle2, Lock, Dumbbell, Flame, Zap, Plus, X, Trophy } from 'lucide-react'
+import { TrendingUp, CheckCircle2, Lock, Dumbbell, Flame, Zap, Scale, Plus, X } from 'lucide-react'
 import EmptyState from '../../components/EmptyState'
 import Skeleton from '../../components/Skeleton'
 import ProgressRing from '../../components/ProgressRing'
-import Sparkline from '../../components/Sparkline'
+import TrendChart from '../../components/TrendChart'
 import { programTypeInfo } from '../../constants/programTypes'
 import { format } from 'date-fns'
 import toast from 'react-hot-toast'
 
 const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 
+// "Weight" here is exclusively body weight — a lift's working weight is
+// tracked per-exercise on the Lift tab (see liftLog below) and never
+// belongs in this freeform log, so there's no "Exercise" field on these
+// entries at all.
 const TRACK_TYPES = [
-  { key: 'velo',   label: 'Velocity', unit: 'mph', Icon: Zap,      dot: 'bg-amber-400', pill: 'bg-amber-500/15 text-amber-400', card: 'bg-amber-500/10 text-amber-300 border border-amber-500/20' },
-  { key: 'weight', label: 'Weight',   unit: 'lbs', Icon: Dumbbell, dot: 'bg-sky-400',   pill: 'bg-sky-500/15 text-sky-400',     card: 'bg-sky-500/10 text-sky-300 border border-sky-500/20' },
+  { key: 'velo',   label: 'Velo',        unit: 'mph', Icon: Zap,   dot: 'bg-amber-400', pill: 'bg-amber-500/15 text-amber-400', card: 'bg-amber-500/10 text-amber-300 border border-amber-500/20', stroke: '#E0A82E' },
+  { key: 'weight', label: 'Body Weight', unit: 'lbs', Icon: Scale, dot: 'bg-sky-400',   pill: 'bg-sky-500/15 text-sky-400',     card: 'bg-sky-500/10 text-sky-300 border border-sky-500/20',     stroke: '#5AA9D6' },
 ]
 
 export default function ProgressPage() {
@@ -30,14 +34,17 @@ export default function ProgressPage() {
   const [logs, setLogs]               = useState([]) // freeform velo/weight PR log — see Track tab merge below
   const [loading, setLoading]         = useState(true)
 
-  // Track tab (velo/weight PR logging), migrated in from the old standalone tab
+  // Track tab (velo/body weight PR logging), migrated in from the old standalone tab
   const [showLogForm, setShowLogForm] = useState(false)
   const [logType, setLogType]         = useState('velo')
   const [logValue, setLogValue]       = useState('')
-  const [logExercise, setLogExercise] = useState('')
   const [logNotes, setLogNotes]       = useState('')
   const [logSaving, setLogSaving]     = useState(false)
-  const [logFilter, setLogFilter]     = useState('all')
+
+  function openLogForm(type) {
+    setLogType(type)
+    setShowLogForm(true)
+  }
 
   useEffect(() => {
     if (!currentUser) return
@@ -82,13 +89,11 @@ export default function ProgressPage() {
       await addDataLog(currentUser.uid, {
         type: logType,
         value: parseFloat(logValue),
-        exercise: logExercise.trim() || null,
-        notes:    logNotes.trim()    || null,
-        date:     new Date().toISOString(),
+        notes: logNotes.trim() || null,
+        date:  new Date().toISOString(),
       })
       toast.success('Entry saved!')
       setLogValue('')
-      setLogExercise('')
       setLogNotes('')
       setShowLogForm(false)
     } catch {
@@ -182,14 +187,15 @@ export default function ProgressPage() {
     .filter(entry => entry.value !== '' && entry.value != null)
     .sort((a, b) => (b.updatedAt?.toMillis?.() ?? 0) - (a.updatedAt?.toMillis?.() ?? 0))
 
-  // Freeform velo/weight PR tracking (migrated from the old Track tab)
-  const filteredLogs = logFilter === 'all' ? logs : logs.filter(l => l.type === logFilter)
+  // Freeform velo/body weight PR tracking (migrated from the old Track tab).
+  // `logs` comes back newest-first (see subscribeDataLogs); the chart wants
+  // chronological order, so each entry list below is reversed for its points.
   const veloEntries   = logs.filter(l => l.type === 'velo')
   const weightEntries = logs.filter(l => l.type === 'weight')
-  const bestVelo      = veloEntries.length   ? Math.max(...veloEntries.map(l => l.value)) : null
-  const latestWeight  = weightEntries.length ? weightEntries[0]?.value : null
-  const veloTrend     = veloEntries.slice(0, 10).map(l => l.value).reverse()
-  const weightTrend   = weightEntries.slice(0, 10).map(l => l.value).reverse()
+  const bestVelo       = veloEntries.length   ? Math.max(...veloEntries.map(l => l.value)) : null
+  const latestWeight   = weightEntries.length ? weightEntries[0]?.value : null
+  const veloPoints     = veloEntries.slice().reverse().map(l => ({ date: l.date, value: l.value }))
+  const weightPoints   = weightEntries.slice().reverse().map(l => ({ date: l.date, value: l.value }))
 
   return (
     <div className="min-h-[calc(100vh-56px)] bg-sp-ink-900 px-4 py-4 space-y-4 pb-24">
@@ -308,68 +314,24 @@ export default function ProgressPage() {
         </div>
       </div>
 
-      {/* Performance tracking — migrated in from the old Track tab */}
-      <div>
-        <div className="flex items-center gap-1.5 mb-3">
-          <Trophy size={13} className="text-sp-green-500" />
-          <p className="text-xs font-semibold text-sp-ink-300 uppercase tracking-wider">Performance Tracking</p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <StatCard label="Best Velo" value={bestVelo} unit="mph" cardClass={TRACK_TYPES[0].card} trend={veloTrend} trendColor="#2E9E63" />
-          <StatCard label="Latest Weight" value={latestWeight} unit="lbs" cardClass={TRACK_TYPES[1].card} trend={weightTrend} trendColor="#68BC8E" />
-        </div>
-
-        <div className="flex gap-2 mb-3">
-          {[{ k: 'all', l: 'All' }, { k: 'velo', l: 'Velocity' }, { k: 'weight', l: 'Weight' }].map(({ k, l }) => (
-            <button
-              key={k}
-              onClick={() => setLogFilter(k)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
-                logFilter === k ? 'bg-sp-green-500 text-white' : 'bg-sp-ink-800 border border-sp-ink-600 text-sp-ink-300'
-              }`}
-            >
-              {l}
-            </button>
-          ))}
-        </div>
-
-        <div className="space-y-2">
-          {filteredLogs.length === 0 && (
-            <p className="text-center text-sp-ink-300 text-sm py-6">No entries yet. Tap + to log a PR.</p>
-          )}
-          {filteredLogs.map((entry) => {
-            const t = TRACK_TYPES.find(t => t.key === entry.type) || TRACK_TYPES[0]
-            const { Icon, dot } = t
-            return (
-              <div key={entry.id} className="bg-sp-ink-800 rounded-xl border border-sp-ink-600 px-4 py-3 flex items-center gap-3">
-                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${dot}`} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="font-bold text-white">{entry.value}</span>
-                    <span className="text-xs text-sp-ink-300">{t.unit}</span>
-                    {entry.exercise && <span className="text-xs text-sp-ink-300 truncate">· {entry.exercise}</span>}
-                  </div>
-                  {entry.notes && <p className="text-xs text-sp-ink-300 mt-0.5 truncate">{entry.notes}</p>}
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="text-xs text-sp-ink-300">{entry.date ? format(new Date(entry.date), 'MMM d') : ''}</p>
-                  <p className={`text-[10px] font-medium mt-0.5 ${t.pill} px-1.5 py-0.5 rounded-full`}>{t.label}</p>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* FAB — log a velo/weight PR */}
-      <button
-        onClick={() => setShowLogForm(true)}
-        className="btn-brand fixed bottom-20 right-5 w-14 h-14 rounded-full flex items-center justify-center active:scale-95 z-40"
-        aria-label="Log a PR"
-      >
-        <Plus size={24} />
-      </button>
+      {/* Body Weight and Velo — each a clearly separate tracking feature
+          (own trend chart, own log button), not a filtered merge of the two */}
+      <TrackSection
+        type={TRACK_TYPES[1]}
+        latestLabel="Latest"
+        latestValue={latestWeight}
+        points={weightPoints}
+        entries={weightEntries}
+        onLog={() => openLogForm('weight')}
+      />
+      <TrackSection
+        type={TRACK_TYPES[0]}
+        latestLabel="Best"
+        latestValue={bestVelo}
+        points={veloPoints}
+        entries={veloEntries}
+        onLog={() => openLogForm('velo')}
+      />
 
       {/* Bottom sheet — log entry form */}
       {showLogForm && (
@@ -416,21 +378,8 @@ export default function ProgressPage() {
                 />
               </div>
 
-              {logType === 'weight' && (
-                <div>
-                  <label className="text-xs font-medium text-sp-ink-300 mb-1 block">Exercise (optional)</label>
-                  <input
-                    type="text"
-                    value={logExercise}
-                    onChange={(e) => setLogExercise(e.target.value)}
-                    placeholder="e.g. Squat, Bench"
-                    className="w-full px-4 py-3 bg-sp-ink-900 border border-sp-ink-600 text-white placeholder-sp-ink-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
-                  />
-                </div>
-              )}
-
               <div>
-                <label className="text-xs font-medium text-sp-ink-300 mb-1 block">Notes (optional)</label>
+                <label className="text-xs font-medium text-sp-ink-300 mb-1 block">Notes (optional) — visible to your coach</label>
                 <input
                   type="text"
                   value={logNotes}
@@ -493,19 +442,55 @@ function WeekBarChart({ dayCount, dayStats, todayDayNum }) {
   )
 }
 
-function StatCard({ label, value, unit, cardClass, trend, trendColor }) {
+// One tracking feature (Body Weight or Velo) — a stat + real trend chart in
+// a branded card, a "Log" button, and the full entry history below with any
+// notes the athlete added (notes are also visible on the coach's Logs tab).
+function TrackSection({ type, latestLabel, latestValue, points, entries, onLog }) {
+  const { Icon, label, unit, card, stroke } = type
   return (
-    <div className={`${cardClass} rounded-2xl p-4`}>
-      <p className="text-xs font-medium opacity-80 mb-1">{label}</p>
-      <div className="flex items-end justify-between gap-2">
-        <p className="text-2xl font-bold">
-          {value != null ? value : '—'}
-          {value != null && <span className="text-sm font-medium ml-1 opacity-70">{unit}</span>}
-        </p>
-        {trend?.length >= 2 && (
-          <Sparkline values={trend} width={56} height={26} stroke={trendColor} />
-        )}
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-1.5">
+          <Icon size={14} className="text-sp-green-500" />
+          <p className="text-xs font-semibold text-sp-ink-300 uppercase tracking-wider">{label}</p>
+        </div>
+        <button
+          onClick={onLog}
+          className="flex items-center gap-1 text-xs font-semibold text-sp-green-400 hover:text-sp-green-300 transition"
+        >
+          <Plus size={13} /> Log {label}
+        </button>
       </div>
+
+      <div className={`${card} rounded-2xl p-4 mb-3`}>
+        <div className="flex items-center justify-between mb-1">
+          <p className="text-xs font-medium opacity-80">{latestLabel}</p>
+          <p className="text-lg font-bold">
+            {latestValue != null ? latestValue : '—'}
+            {latestValue != null && <span className="text-xs font-medium ml-1 opacity-70">{unit}</span>}
+          </p>
+        </div>
+        <TrendChart points={points} unit={unit} stroke={stroke} height={140} />
+      </div>
+
+      {entries.length === 0 ? (
+        <p className="text-center text-sp-ink-300 text-sm py-4">No entries yet.</p>
+      ) : (
+        <div className="space-y-2">
+          {entries.slice(0, 8).map((entry) => (
+            <div key={entry.id} className="bg-sp-ink-800 rounded-xl border border-sp-ink-600 px-4 py-3 flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-baseline gap-1.5">
+                  <span className="font-bold text-white">{entry.value}</span>
+                  <span className="text-xs text-sp-ink-300">{unit}</span>
+                </div>
+                {entry.notes && <p className="text-xs text-sp-ink-300 mt-0.5">{entry.notes}</p>}
+              </div>
+              <p className="text-xs text-sp-ink-300 flex-shrink-0">{entry.date ? format(new Date(entry.date), 'MMM d') : ''}</p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

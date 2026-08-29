@@ -4,7 +4,10 @@
  * Collections:
  *  users/{uid}               — { name, email, role: 'athlete'|'admin', programTypes?: string[], createdAt }
  *  programs/{programId}      — { name, athleteId, programType: 'correctives'|'throwing'|'lifting', totalWeeks, weeks: [...], startDate?, createdAt, active }
- *  dataLogs/{uid}/entries/{} — { date, type: 'velo'|'weight', value, exercise?, notes, createdAt }
+ *  dataLogs/{uid}/entries/{} — { date, type: 'velo'|'weight', value, notes, createdAt } — 'weight' is
+ *                              body weight specifically (a lift's working weight lives on the exercise
+ *                              itself, see exerciseWeights below); `exercise` is a retired field some
+ *                              older entries may still carry
  *  assessments/{uid}         — { scores: {...}, programId, updatedAt }
  *  chats/{uid}/messages/{}   — { text, senderUid, senderName, role: 'admin'|'athlete', createdAt }
  *

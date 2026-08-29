@@ -6,9 +6,9 @@ import {
   updateLiveProgram, migrateCompletionKeys,
   createProgram, deleteProgram, getSettings, getProgramsForAthlete, getGeneralPrograms,
 } from '../../firebase/firestore'
-import { getDataLogs } from '../../firebase/firestore'
+import { getDataLogs, addDataLog } from '../../firebase/firestore'
 import { ensureExerciseIds, completionKey, legacyCompletionKey, makeExerciseId } from '../../utils/programIds'
-import { ArrowLeft, Save, Zap, Dumbbell, MessageCircle, Pencil, Trash2, X, Sparkles, KeyRound, XCircle, FileSpreadsheet, Download, ChevronDown, GraduationCap, Search } from 'lucide-react'
+import { ArrowLeft, Save, Zap, Scale, MessageCircle, Pencil, Trash2, X, Sparkles, KeyRound, XCircle, FileSpreadsheet, Download, ChevronDown, GraduationCap, Search, Plus } from 'lucide-react'
 import { sendPasswordResetEmail } from 'firebase/auth'
 import { auth } from '../../firebase/config'
 import toast from 'react-hot-toast'
@@ -158,6 +158,15 @@ export default function AdminAthleteDetail() {
   // null. See ConfirmDialog for why this is state instead of a synchronous
   // confirm() call.
   const [confirmState, setConfirmState] = useState(null)
+  // Admin-side body weight / velo entry — same dataLogs collection the
+  // athlete's own Progress tab writes to, so it shows up in both places
+  // immediately (see firestore.rules for the matching write permission).
+  const [showAddLog, setShowAddLog] = useState(false)
+  const [logType, setLogType]       = useState('velo')
+  const [logValue, setLogValue]     = useState('')
+  const [logDate, setLogDate]       = useState('')
+  const [logNotes, setLogNotes]     = useState('')
+  const [logSaving, setLogSaving]   = useState(false)
 
   useEffect(() => {
     load()
@@ -593,6 +602,37 @@ export default function AdminAthleteDetail() {
       toast.success(`Reset email sent to ${athlete.email}`)
     } catch {
       toast.error('Could not send reset email.')
+    }
+  }
+
+  function openAddLog(type) {
+    setLogType(type)
+    setLogValue('')
+    setLogDate(new Date().toISOString().slice(0, 10))
+    setLogNotes('')
+    setShowAddLog(true)
+  }
+
+  async function handleAddLog(e) {
+    e.preventDefault()
+    if (!logValue || !logDate) return
+    setLogSaving(true)
+    try {
+      // Noon, not midnight — a plain date-only value parsed at UTC midnight
+      // can roll back a day once formatted in a timezone behind UTC.
+      await addDataLog(uid, {
+        type: logType,
+        value: parseFloat(logValue),
+        notes: logNotes.trim() || null,
+        date: new Date(`${logDate}T12:00:00`).toISOString(),
+      })
+      toast.success('Entry added.')
+      setShowAddLog(false)
+      load()
+    } catch {
+      toast.error('Could not add entry.')
+    } finally {
+      setLogSaving(false)
     }
   }
 
@@ -1218,7 +1258,25 @@ export default function AdminAthleteDetail() {
 
       {/* Logs tab */}
       {tab === 'logs' && (
-        <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 overflow-hidden">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-sp-ink-300 uppercase tracking-wider">Body Weight & Velo</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => openAddLog('weight')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-sp-ink-800 border border-sp-ink-600 text-sp-ink-100 hover:bg-white/5 transition"
+              >
+                <Plus size={13} /> Body Weight
+              </button>
+              <button
+                onClick={() => openAddLog('velo')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-sp-ink-800 border border-sp-ink-600 text-sp-ink-100 hover:bg-white/5 transition"
+              >
+                <Plus size={13} /> Velo
+              </button>
+            </div>
+          </div>
+          <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-white/[0.03] border-b border-sp-ink-600">
@@ -1235,7 +1293,7 @@ export default function AdminAthleteDetail() {
                     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${
                       log.type === 'velo' ? 'bg-amber-500/15 text-amber-300' : 'bg-sky-500/15 text-sky-300'
                     }`}>
-                      {log.type === 'velo' ? <Zap size={11} /> : <Dumbbell size={11} />}
+                      {log.type === 'velo' ? <Zap size={11} /> : <Scale size={11} />}
                       {log.type === 'velo' ? 'Velo' : 'Body Weight'}
                     </span>
                   </td>
@@ -1249,6 +1307,83 @@ export default function AdminAthleteDetail() {
               )}
             </tbody>
           </table>
+          </div>
+        </div>
+      )}
+
+      {/* Add body weight / velo entry */}
+      {showAddLog && (
+        <div className="animate-modal-backdrop fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="animate-modal-panel bg-sp-ink-800 border border-sp-ink-600 rounded-2xl w-full max-w-sm p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-white">Add Log Entry</h2>
+              <button onClick={() => setShowAddLog(false)} className="p-1 hover:bg-white/10 text-sp-ink-300 rounded-lg"><X size={18} /></button>
+            </div>
+            <form onSubmit={handleAddLog} className="space-y-4">
+              <div className="flex gap-2">
+                {[{ key: 'velo', label: 'Velo', Icon: Zap }, { key: 'weight', label: 'Body Weight', Icon: Scale }].map(t => (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => setLogType(t.key)}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition ${
+                      logType === t.key ? 'bg-sp-green-500 text-white' : 'bg-white/5 text-sp-ink-300'
+                    }`}
+                  >
+                    <t.Icon size={15} />
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-sp-ink-300 mb-1 block">
+                  {logType === 'velo' ? 'Velo (mph)' : 'Body Weight (lbs)'}
+                </label>
+                <input
+                  type="number"
+                  step="0.1"
+                  required
+                  value={logValue}
+                  onChange={(e) => setLogValue(e.target.value)}
+                  placeholder={logType === 'velo' ? 'e.g. 87.5' : 'e.g. 185'}
+                  className="w-full px-4 py-2.5 bg-sp-ink-900 border border-sp-ink-600 text-white placeholder-sp-ink-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-sp-ink-300 mb-1 block">Date</label>
+                <input
+                  type="date"
+                  required
+                  value={logDate}
+                  onChange={(e) => setLogDate(e.target.value)}
+                  style={{ colorScheme: 'dark' }}
+                  className="w-full px-4 py-2.5 bg-sp-ink-900 border border-sp-ink-600 text-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-sp-ink-300 mb-1 block">Notes (optional) — visible to the athlete too</label>
+                <input
+                  type="text"
+                  value={logNotes}
+                  onChange={(e) => setLogNotes(e.target.value)}
+                  placeholder="Context for this entry"
+                  className="w-full px-4 py-2.5 bg-sp-ink-900 border border-sp-ink-600 text-white placeholder-sp-ink-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sp-green-500"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={logSaving}
+                className="btn-brand w-full py-3 rounded-xl flex items-center justify-center gap-2"
+              >
+                {logSaving && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                {logSaving ? 'Saving…' : 'Save Entry'}
+              </button>
+            </form>
+          </div>
         </div>
       )}
 

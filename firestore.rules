@@ -31,7 +31,7 @@ service cloud.firestore {
     // Data logs: admins read all; athletes read/write their own
     match /dataLogs/{uid}/entries/{entryId} {
       allow read:  if isAdmin() || (isAuth() && request.auth.uid == uid);
-      allow write: if isAuth() && request.auth.uid == uid;
+      allow write: if isAdmin() || (isAuth() && request.auth.uid == uid);
     }
 
     // Assessments: admins full access; athletes read-only their own

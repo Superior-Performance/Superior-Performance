@@ -248,8 +248,19 @@ export const subscribeChatMessages = (athleteUid, callback) =>
 // One-time (non-subscribing) read of a thread — for the dashboard's roster
 // scan, where dozens of live onSnapshot listeners would be wasteful. Real-time
 // chat views should still use subscribeChatMessages above.
-export const getChatMessages = (athleteUid) =>
-  getDocs(query(collection(db, 'chats', athleteUid, 'messages'), orderBy('createdAt', 'desc')))
+//
+// `sinceMs`, when given, narrows to messages created after that time — the
+// dashboard passes each athlete's chatReads.lastReadAt so an established
+// thread with months of history only ever pulls back the handful of
+// messages that might actually be unread, not the whole conversation. Safe
+// to filter and order by the same field (createdAt) without a composite
+// index.
+export const getChatMessages = (athleteUid, sinceMs) =>
+  getDocs(query(
+    collection(db, 'chats', athleteUid, 'messages'),
+    ...(sinceMs ? [where('createdAt', '>', Timestamp.fromMillis(sinceMs))] : []),
+    orderBy('createdAt', 'desc'),
+  ))
 
 // chatReads/{athleteUid} — { lastReadAt } — when the coach last opened this
 // athlete's conversation. Athlete-authored messages newer than this count as

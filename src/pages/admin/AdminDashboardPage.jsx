@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  getAllAthletes, getAllPrograms, getCompletions, getDataLogs, getAthletePrefs, setDataLogFlag,
+  getAllAthletes, getAllPrograms, getCompletions, getDataLogs, setDataLogFlag,
   getChatMessages, getAllChatReads,
 } from '../../firebase/firestore'
 import { buildSlots, isSlotComplete, countProgramProgress } from '../../utils/programIds'
@@ -62,13 +62,18 @@ function lastActivityMillis(completionsSnap, logsSnap) {
   return max || null
 }
 
-// This page fans out to ~4 Firestore reads per athlete (completions, data
-// logs, prefs, chat messages) — real latency on a roster of any size, and
-// it's now the page every admin session opens on first. Module-level so it
-// survives navigating away and back within the same browser session (not a
-// hard reload): the second-and-later visit paints instantly from this while
-// a background refresh quietly brings it up to date, instead of re-paying
-// the full fan-out and showing a blank loading state every single time.
+// Stands in for a completions snapshot when it's skipped entirely (see
+// below) so the row-building loop doesn't need a separate no-completions
+// code path — it just iterates zero docs.
+const EMPTY_SNAPSHOT = { forEach: () => {} }
+
+// This page fans out to Firestore reads per athlete (completions, data
+// logs, chat messages) — real latency on a roster of any size, and it's now
+// the page every admin session opens on first. Module-level so it survives
+// navigating away and back within the same browser session (not a hard
+// reload): the second-and-later visit paints instantly from this while a
+// background refresh quietly brings it up to date, instead of re-paying the
+// full fan-out and showing a blank loading state every single time.
 let dashboardCache = null
 
 export default function AdminDashboardPage() {
@@ -89,25 +94,41 @@ export default function AdminDashboardPage() {
     if (isBackgroundRefresh) setRefreshing(true)
     else setLoading(true)
     try {
-      const [athletesSnap, programsSnap] = await Promise.all([getAllAthletes(), getAllPrograms()])
+      // chatReads doesn't depend on the athlete list, so it rides along with
+      // wave 1 instead of waiting for it — one fewer round trip in the
+      // critical path.
+      const [athletesSnap, programsSnap, chatReadsSnap] = await Promise.all([
+        getAllAthletes(), getAllPrograms(), getAllChatReads(),
+      ])
       const athletes = athletesSnap.docs.map(d => ({ id: d.id, ...d.data() }))
       const allPrograms = programsSnap.docs.map(d => ({ id: d.id, ...d.data() }))
-
-      const [completionsSnaps, logsSnaps, prefsSnaps, messagesSnaps, chatReadsSnap] = await Promise.all([
-        Promise.all(athletes.map(a => getCompletions(a.id))),
-        Promise.all(athletes.map(a => getDataLogs(a.id))),
-        Promise.all(athletes.map(a => getAthletePrefs(a.id))),
-        Promise.all(athletes.map(a => getChatMessages(a.id))),
-        getAllChatReads(),
-      ])
       const chatReadByAthlete = {}
       chatReadsSnap.forEach(d => { chatReadByAthlete[d.id] = d.data() })
+
+      // Known before wave 2 fires (allPrograms is already in hand), so an
+      // athlete with no active program at all — nothing to be "behind" or
+      // "inactive" on — never needs a completions read in the first place.
+      const activeProgramsByAthlete = {}
+      athletes.forEach(a => {
+        activeProgramsByAthlete[a.id] = allPrograms.filter(p => p.athleteId === a.id && p.active === true)
+      })
+
+      const [completionsSnaps, logsSnaps, messagesSnaps] = await Promise.all([
+        Promise.all(athletes.map(a =>
+          activeProgramsByAthlete[a.id].length > 0 ? getCompletions(a.id) : Promise.resolve(EMPTY_SNAPSHOT)
+        )),
+        Promise.all(athletes.map(a => getDataLogs(a.id))),
+        // Narrowed to "created after this athlete's chatReads.lastReadAt" —
+        // an established thread with months of history only ever pulls
+        // back what might actually be unread, not the whole conversation.
+        Promise.all(athletes.map(a => getChatMessages(a.id, toMillis(chatReadByAthlete[a.id]?.lastReadAt) || null))),
+      ])
 
       const flaggedFeed = []
       const unreadFeed = []
       const nextRows = athletes.map((athlete, i) => {
         const athletePrograms = allPrograms.filter(p => p.athleteId === athlete.id)
-        const activePrograms = athletePrograms.filter(p => p.active === true)
+        const activePrograms = activeProgramsByAthlete[athlete.id]
         const draftCount = athletePrograms.filter(p => p.active === false && !p.archived).length
 
         const completions = {}
@@ -118,11 +139,6 @@ export default function AdminDashboardPage() {
           flaggedFeed.push({ athleteId: athlete.id, athleteName: athlete.name, entry })
         })
 
-        const prefsSeen = prefsSnaps[i].data()?.programNoticesSeen || {}
-        const unacknowledged = activePrograms.filter(
-          p => p.lastEditedAt && toMillis(p.lastEditedAt) > toMillis(prefsSeen[p.id])
-        ).length
-
         const pct = athleteProgress(activePrograms, completions)
         const lastActivityMs = lastActivityMillis(completionsSnaps[i], logsSnaps[i])
         const inactive = activePrograms.length > 0 &&
@@ -130,7 +146,9 @@ export default function AdminDashboardPage() {
         const behind = pct != null && pct < BEHIND_THRESHOLD
 
         // Athlete-authored messages newer than the coach's last-opened marker
-        // for this thread — see chatReads in firebase/firestore.js.
+        // for this thread — see chatReads in firebase/firestore.js. The role
+        // check still needs to happen client-side (the query only narrows by
+        // date), but the date narrowing already did the heavy lifting.
         const lastReadMs = toMillis(chatReadByAthlete[athlete.id]?.lastReadAt)
         const unreadMessages = messagesSnaps[i].docs
           .map(d => ({ id: d.id, ...d.data() }))
@@ -140,7 +158,7 @@ export default function AdminDashboardPage() {
         }
 
         return {
-          athlete, activePrograms, draftCount, unacknowledged,
+          athlete, activePrograms, draftCount,
           pct, lastActivityMs, inactive, behind,
           flagCount: logs.filter(l => l.flagged).length,
           unreadCount: unreadMessages.length,

@@ -9,7 +9,6 @@ import { computeStreak } from '../../utils/programSchedule'
 import { LayoutDashboard, Flag, Clock, TrendingDown, FileClock, MessageCircle, Zap, Scale, ChevronRight, X } from 'lucide-react'
 import { format, formatDistanceToNow } from 'date-fns'
 import toast from 'react-hot-toast'
-import Skeleton from '../../components/Skeleton'
 import EmptyState from '../../components/EmptyState'
 
 // Below this elapsed-completion % an athlete shows as "Behind" — elapsed
@@ -63,21 +62,32 @@ function lastActivityMillis(completionsSnap, logsSnap) {
   return max || null
 }
 
+// This page fans out to ~4 Firestore reads per athlete (completions, data
+// logs, prefs, chat messages) — real latency on a roster of any size, and
+// it's now the page every admin session opens on first. Module-level so it
+// survives navigating away and back within the same browser session (not a
+// hard reload): the second-and-later visit paints instantly from this while
+// a background refresh quietly brings it up to date, instead of re-paying
+// the full fan-out and showing a blank loading state every single time.
+let dashboardCache = null
+
 export default function AdminDashboardPage() {
-  const [loading, setLoading] = useState(true)
-  const [rows, setRows] = useState([])       // one per athlete
-  const [flagged, setFlagged] = useState([]) // flattened flagged log entries, newest first
-  const [unread, setUnread] = useState([])   // one per athlete with unread messages, newest first
+  const [loading, setLoading] = useState(!dashboardCache)
+  const [refreshing, setRefreshing] = useState(false)
+  const [rows, setRows] = useState(dashboardCache?.rows || [])       // one per athlete
+  const [flagged, setFlagged] = useState(dashboardCache?.flagged || []) // flattened flagged log entries, newest first
+  const [unread, setUnread] = useState(dashboardCache?.unread || [])   // one per athlete with unread messages, newest first
   const [activeFilter, setActiveFilter] = useState(null) // one of FILTERS' keys, or null
 
   function toggleFilter(key) {
     setActiveFilter(prev => prev === key ? null : key)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(!!dashboardCache) }, [])
 
-  async function load() {
-    setLoading(true)
+  async function load(isBackgroundRefresh) {
+    if (isBackgroundRefresh) setRefreshing(true)
+    else setLoading(true)
     try {
       const [athletesSnap, programsSnap] = await Promise.all([getAllAthletes(), getAllPrograms()])
       const athletes = athletesSnap.docs.map(d => ({ id: d.id, ...d.data() }))
@@ -139,11 +149,13 @@ export default function AdminDashboardPage() {
 
       flaggedFeed.sort((a, b) => toMillis(b.entry.date) - toMillis(a.entry.date))
       unreadFeed.sort((a, b) => toMillis(b.latest.createdAt) - toMillis(a.latest.createdAt))
+      dashboardCache = { rows: nextRows, flagged: flaggedFeed, unread: unreadFeed }
       setRows(nextRows)
       setFlagged(flaggedFeed)
       setUnread(unreadFeed)
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }
 
@@ -152,6 +164,13 @@ export default function AdminDashboardPage() {
     const prevFlagged = flagged
     setFlagged(prev => prev.filter(f => !(f.athleteId === athleteId && f.entry.id === entryId)))
     setRows(prev => prev.map(r => r.athlete.id === athleteId ? { ...r, flagCount: Math.max(0, r.flagCount - 1) } : r))
+    if (dashboardCache) {
+      dashboardCache = {
+        ...dashboardCache,
+        flagged: dashboardCache.flagged.filter(f => !(f.athleteId === athleteId && f.entry.id === entryId)),
+        rows: dashboardCache.rows.map(r => r.athlete.id === athleteId ? { ...r, flagCount: Math.max(0, r.flagCount - 1) } : r),
+      }
+    }
     try {
       await setDataLogFlag(athleteId, entryId, false)
     } catch {
@@ -162,12 +181,11 @@ export default function AdminDashboardPage() {
 
   if (loading) {
     return (
-      <div className="p-8 bg-sp-ink-900 min-h-full space-y-4">
-        <Skeleton className="h-10 w-64" />
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
+      <div className="p-8 bg-sp-ink-900 min-h-full flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-10 h-10 border-4 border-sp-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-sm text-sp-ink-300">Loading dashboard…</p>
         </div>
-        <Skeleton className="h-48 rounded-2xl" />
       </div>
     )
   }
@@ -194,7 +212,12 @@ export default function AdminDashboardPage() {
           <LayoutDashboard size={20} />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-white">Dashboard</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-white">Dashboard</h1>
+            {refreshing && (
+              <div className="w-3.5 h-3.5 border-2 border-sp-green-500 border-t-transparent rounded-full animate-spin" title="Refreshing…" />
+            )}
+          </div>
           <p className="text-sp-ink-300 text-sm">What needs your attention today</p>
         </div>
       </div>

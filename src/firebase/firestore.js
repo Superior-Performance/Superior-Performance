@@ -130,6 +130,13 @@ export const subscribeDataLogs = (uid, callback) =>
     callback,
   )
 
+// Admin-only bookkeeping — a coach marking a body weight/velo entry for
+// follow-up. Not visible to the athlete anywhere; just a boolean on the
+// entry itself rather than a separate collection, since nothing else is
+// flaggable yet.
+export const setDataLogFlag = (uid, entryId, flagged) =>
+  updateDoc(doc(db, 'dataLogs', uid, 'entries', entryId), { flagged })
+
 // ── Assessments ──────────────────────────────────────────────────────────────
 // Flat field map — keys mirror the "Assessment Intake" Google Sheet columns
 // (minus Athlete Name, which the app already tracks as the athlete's identity)

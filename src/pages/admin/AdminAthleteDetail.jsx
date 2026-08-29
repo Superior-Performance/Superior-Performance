@@ -6,9 +6,9 @@ import {
   updateLiveProgram, migrateCompletionKeys,
   createProgram, deleteProgram, getSettings, getProgramsForAthlete, getGeneralPrograms,
 } from '../../firebase/firestore'
-import { getDataLogs, addDataLog } from '../../firebase/firestore'
+import { getDataLogs, addDataLog, setDataLogFlag } from '../../firebase/firestore'
 import { ensureExerciseIds, completionKey, legacyCompletionKey, makeExerciseId } from '../../utils/programIds'
-import { ArrowLeft, Save, Zap, Scale, MessageCircle, Pencil, Trash2, X, Sparkles, KeyRound, XCircle, FileSpreadsheet, Download, ChevronDown, GraduationCap, Search, Plus } from 'lucide-react'
+import { ArrowLeft, Save, Zap, Scale, MessageCircle, Pencil, Trash2, X, Sparkles, KeyRound, XCircle, FileSpreadsheet, Download, ChevronDown, GraduationCap, Search, Plus, Flag } from 'lucide-react'
 import { sendPasswordResetEmail } from 'firebase/auth'
 import { auth } from '../../firebase/config'
 import toast from 'react-hot-toast'
@@ -602,6 +602,18 @@ export default function AdminAthleteDetail() {
       toast.success(`Reset email sent to ${athlete.email}`)
     } catch {
       toast.error('Could not send reset email.')
+    }
+  }
+
+  // Optimistic — a coach scanning the table shouldn't wait on a round trip
+  // to see the flag state change; reverts if the write actually fails.
+  async function toggleLogFlag(entryId, flagged) {
+    setLogs(prev => prev.map(l => l.id === entryId ? { ...l, flagged } : l))
+    try {
+      await setDataLogFlag(uid, entryId, flagged)
+    } catch {
+      toast.error('Could not update flag.')
+      setLogs(prev => prev.map(l => l.id === entryId ? { ...l, flagged: !flagged } : l))
     }
   }
 
@@ -1277,6 +1289,7 @@ export default function AdminAthleteDetail() {
             </div>
           </div>
           <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 overflow-hidden">
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-white/[0.03] border-b border-sp-ink-600">
@@ -1284,11 +1297,12 @@ export default function AdminAthleteDetail() {
                 <th className="text-left px-5 py-3 text-xs font-semibold text-sp-ink-300 uppercase tracking-wider">Value</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold text-sp-ink-300 uppercase tracking-wider">Notes</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold text-sp-ink-300 uppercase tracking-wider">Date</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-sp-ink-300 uppercase tracking-wider">Flag</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-sp-ink-600/60">
               {logs.map(log => (
-                <tr key={log.id} className="hover:bg-white/[0.04]">
+                <tr key={log.id} className={`hover:bg-white/[0.04] ${log.flagged ? 'bg-amber-500/5' : ''}`}>
                   <td className="px-5 py-3">
                     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${
                       log.type === 'velo' ? 'bg-amber-500/15 text-amber-300' : 'bg-sky-500/15 text-sky-300'
@@ -1300,13 +1314,24 @@ export default function AdminAthleteDetail() {
                   <td className="px-5 py-3 font-medium text-white">{log.value} {log.type === 'velo' ? 'mph' : 'lbs'}</td>
                   <td className="px-5 py-3 text-sp-ink-300 max-w-xs truncate" title={log.notes || ''}>{log.notes || '—'}</td>
                   <td className="px-5 py-3 text-sp-ink-300">{log.date ? format(new Date(log.date), 'MMM d, yyyy') : '—'}</td>
+                  <td className="px-5 py-3">
+                    <button
+                      onClick={() => toggleLogFlag(log.id, !log.flagged)}
+                      className={`p-1.5 rounded-lg transition ${log.flagged ? 'text-amber-400' : 'text-sp-ink-300/40 hover:text-sp-ink-300'}`}
+                      aria-label={log.flagged ? 'Unflag entry' : 'Flag for follow-up'}
+                      title={log.flagged ? 'Unflag' : 'Flag for follow-up'}
+                    >
+                      <Flag size={15} fill={log.flagged ? 'currentColor' : 'none'} />
+                    </button>
+                  </td>
                 </tr>
               ))}
               {logs.length === 0 && (
-                <tr><td colSpan={4} className="px-5 py-8 text-center text-sp-ink-300">No data logged yet.</td></tr>
+                <tr><td colSpan={5} className="px-5 py-8 text-center text-sp-ink-300">No data logged yet.</td></tr>
               )}
             </tbody>
           </table>
+          </div>
           </div>
         </div>
       )}

@@ -6,7 +6,7 @@ import {
 } from '../../firebase/firestore'
 import { buildSlots, isSlotComplete, countProgramProgress } from '../../utils/programIds'
 import { computeStreak } from '../../utils/programSchedule'
-import { LayoutDashboard, Flag, Clock, TrendingDown, FileClock, MessageCircle, Zap, Scale, ChevronRight } from 'lucide-react'
+import { LayoutDashboard, Flag, Clock, TrendingDown, FileClock, MessageCircle, Zap, Scale, ChevronRight, X } from 'lucide-react'
 import { format, formatDistanceToNow } from 'date-fns'
 import toast from 'react-hot-toast'
 import Skeleton from '../../components/Skeleton'
@@ -23,6 +23,18 @@ const BEHIND_THRESHOLD = 70
 const INACTIVE_DAYS = 10
 
 const toMillis = (t) => (t?.toMillis?.() ?? (t ? new Date(t).getTime() : 0))
+
+// Each tile doubles as a filter — clicking one narrows the page to just that
+// category instead of being a dead-end count. `hasFeed` categories already
+// have a richer list above the roster (message/note preview), so selecting
+// them shows that feed instead of duplicating it as a flat roster filter.
+const FILTERS = {
+  unread:   { label: 'Unread messages',       hasFeed: true,  test: r => r.unreadCount > 0 },
+  flagged:  { label: 'Flagged notes',         hasFeed: true,  test: r => r.flagCount > 0 },
+  inactive: { label: `Inactive ${INACTIVE_DAYS}+ days`, hasFeed: false, test: r => r.inactive },
+  behind:   { label: 'Behind on program',     hasFeed: false, test: r => r.behind },
+  drafts:   { label: 'Drafts awaiting review', hasFeed: false, test: r => r.draftCount > 0 },
+}
 
 // How much of an athlete's program is done, counted only through the week
 // they're actually on right now (see computeStreak) — not the whole
@@ -56,6 +68,11 @@ export default function AdminDashboardPage() {
   const [rows, setRows] = useState([])       // one per athlete
   const [flagged, setFlagged] = useState([]) // flattened flagged log entries, newest first
   const [unread, setUnread] = useState([])   // one per athlete with unread messages, newest first
+  const [activeFilter, setActiveFilter] = useState(null) // one of FILTERS' keys, or null
+
+  function toggleFilter(key) {
+    setActiveFilter(prev => prev === key ? null : key)
+  }
 
   useEffect(() => { load() }, [])
 
@@ -160,6 +177,16 @@ export default function AdminDashboardPage() {
   const draftTotal = rows.reduce((s, r) => s + r.draftCount, 0)
   const unreadCount = rows.reduce((s, r) => s + r.unreadCount, 0)
 
+  // Selecting a tile narrows the page to just that category. The two feed
+  // categories (unread/flagged) already have a richer list than the roster
+  // table can show, so picking one of those shows its feed instead of a
+  // second, flatter view of the same thing; the other three have no feed at
+  // all today, so the roster filtered down to just them is the whole point.
+  const showUnreadFeed = !activeFilter || activeFilter === 'unread'
+  const showFlaggedFeed = !activeFilter || activeFilter === 'flagged'
+  const showRoster = !activeFilter || !FILTERS[activeFilter].hasFeed
+  const rosterRows = activeFilter ? rows.filter(FILTERS[activeFilter].test) : rows
+
   return (
     <div className="p-8 bg-sp-ink-900 min-h-full">
       <div className="flex items-center gap-3 mb-6">
@@ -172,16 +199,26 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* Needs attention tiles */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
-        <Tile Icon={MessageCircle} value={unreadCount} label="Unread messages" tone="amber" />
-        <Tile Icon={Flag} value={flagged.length} label="Flagged notes" tone="amber" />
-        <Tile Icon={Clock} value={inactiveCount} label={`Inactive ${INACTIVE_DAYS}+ days`} tone="red" />
-        <Tile Icon={TrendingDown} value={behindCount} label="Behind on program" tone="amber" />
-        <Tile Icon={FileClock} value={draftTotal} label="Drafts awaiting review" tone="neutral" />
+      {/* Needs attention tiles — each doubles as a filter, click to narrow the page */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+        <Tile Icon={MessageCircle} value={unreadCount} label="Unread messages" tone="amber" active={activeFilter === 'unread'} onClick={() => toggleFilter('unread')} />
+        <Tile Icon={Flag} value={flagged.length} label="Flagged notes" tone="amber" active={activeFilter === 'flagged'} onClick={() => toggleFilter('flagged')} />
+        <Tile Icon={Clock} value={inactiveCount} label={`Inactive ${INACTIVE_DAYS}+ days`} tone="red" active={activeFilter === 'inactive'} onClick={() => toggleFilter('inactive')} />
+        <Tile Icon={TrendingDown} value={behindCount} label="Behind on program" tone="amber" active={activeFilter === 'behind'} onClick={() => toggleFilter('behind')} />
+        <Tile Icon={FileClock} value={draftTotal} label="Drafts awaiting review" tone="neutral" active={activeFilter === 'drafts'} onClick={() => toggleFilter('drafts')} />
       </div>
 
+      {activeFilter && (
+        <div className="flex items-center gap-2 mb-6">
+          <span className="text-sm text-sp-ink-300">Showing <span className="text-white font-medium">{FILTERS[activeFilter].label}</span></span>
+          <button onClick={() => setActiveFilter(null)} className="flex items-center gap-1 text-xs font-semibold text-sp-green-400 hover:text-sp-green-300 transition">
+            <X size={12} /> Clear
+          </button>
+        </div>
+      )}
+
       {/* Unread messages feed */}
+      {showUnreadFeed && (
       <div className="mb-8">
         <p className="text-xs font-bold text-sp-ink-300 uppercase tracking-wider mb-3">Unread messages</p>
         {unread.length === 0 ? (
@@ -214,8 +251,10 @@ export default function AdminDashboardPage() {
           </div>
         )}
       </div>
+      )}
 
       {/* Flagged notes feed */}
+      {showFlaggedFeed && (
       <div className="mb-8">
         <p className="text-xs font-bold text-sp-ink-300 uppercase tracking-wider mb-3">Flagged notes</p>
         {flagged.length === 0 ? (
@@ -250,12 +289,21 @@ export default function AdminDashboardPage() {
           </div>
         )}
       </div>
+      )}
 
       {/* Roster */}
+      {showRoster && (
       <div>
-        <p className="text-xs font-bold text-sp-ink-300 uppercase tracking-wider mb-3">Roster</p>
-        {rows.length === 0 ? (
-          <EmptyState icon={LayoutDashboard} title="No athletes yet" subtitle="Add an athlete to see them here." compact dark />
+        <p className="text-xs font-bold text-sp-ink-300 uppercase tracking-wider mb-3">
+          Roster{activeFilter ? ` — ${FILTERS[activeFilter].label} (${rosterRows.length})` : ''}
+        </p>
+        {rosterRows.length === 0 ? (
+          <EmptyState
+            icon={LayoutDashboard}
+            title={activeFilter ? 'Nothing here' : 'No athletes yet'}
+            subtitle={activeFilter ? 'No athletes match this filter.' : 'Add an athlete to see them here.'}
+            compact dark
+          />
         ) : (
           <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 overflow-hidden">
             <div className="overflow-x-auto">
@@ -270,7 +318,7 @@ export default function AdminDashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-sp-ink-600/60">
-                {rows.map(({ athlete, activePrograms, pct, lastActivityMs, inactive, behind, flagCount, unreadCount }) => (
+                {rosterRows.map(({ athlete, activePrograms, draftCount, pct, lastActivityMs, inactive, behind, flagCount, unreadCount }) => (
                   <tr key={athlete.id} className="hover:bg-white/[0.04]">
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-3">
@@ -282,6 +330,11 @@ export default function AdminDashboardPage() {
                     </td>
                     <td className="px-5 py-3 text-sp-ink-300">
                       {activePrograms.length === 0 ? 'No program' : pct != null ? `${pct}% complete` : 'Not started yet'}
+                      {draftCount > 0 && (
+                        <span className="ml-1.5 text-[10px] font-medium bg-white/5 text-sp-ink-300 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                          {draftCount} draft{draftCount === 1 ? '' : 's'}
+                        </span>
+                      )}
                     </td>
                     <td className="px-5 py-3 text-sp-ink-300">
                       {lastActivityMs ? formatDistanceToNow(new Date(lastActivityMs), { addSuffix: true }) : '—'}
@@ -302,6 +355,7 @@ export default function AdminDashboardPage() {
           </div>
         )}
       </div>
+      )}
     </div>
   )
 }
@@ -312,15 +366,29 @@ const TILE_TONE = {
   neutral: 'text-white',
 }
 
-function Tile({ Icon, value, label, tone }) {
+const TILE_RING = {
+  amber: 'border-amber-500/60',
+  red: 'border-red-500/60',
+  neutral: 'border-sp-green-500/60',
+}
+
+// Doubles as a filter toggle — see toggleFilter/FILTERS above. `active`
+// rings the tile in its own tone so the selected filter stays visible even
+// after the page has scrolled past the tile row.
+function Tile({ Icon, value, label, tone, active, onClick }) {
   return (
-    <div className="bg-sp-ink-800 border border-sp-ink-600 rounded-2xl p-4">
+    <button
+      onClick={onClick}
+      className={`text-left bg-sp-ink-800 border rounded-2xl p-4 transition hover:bg-white/[0.04] ${
+        active ? TILE_RING[tone] : 'border-sp-ink-600'
+      }`}
+    >
       <div className="flex items-center gap-1.5 mb-1">
         <Icon size={13} className="text-sp-ink-300" />
         <span className={`text-2xl font-bold ${TILE_TONE[tone]}`}>{value}</span>
       </div>
       <p className="text-xs text-sp-ink-300">{label}</p>
-    </div>
+    </button>
   )
 }
 

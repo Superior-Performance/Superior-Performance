@@ -1,9 +1,20 @@
+import { useRef, useState } from 'react'
 import { Outlet, NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import {
-  Flame, MessageCircle, TrendingUp, Activity, LogOut, UserCircle, ExternalLink,
+  Flame, MessageCircle, TrendingUp, Activity, LogOut, UserCircle, ExternalLink, RefreshCw,
 } from 'lucide-react'
 import Logo from '../../components/Logo'
+
+// Pull-to-refresh distance (px) needed to trigger a reload. Installed as a
+// home-screen icon, the app has no browser chrome and no reload button —
+// body already sets overscroll-behavior: none (see index.css) to stop the
+// page from bouncing/showing blank space at scroll bounds, which as a side
+// effect kills the native pull-to-refresh gesture too. This replaces it
+// with our own, scoped to the one shared scroll container every athlete
+// tab renders into (see <main> below) — not the Rapsodo tab, which is a
+// separate always-mounted iframe <main> never contains.
+const PULL_THRESHOLD = 70
 
 // "Track" no longer gets its own tab — velo/weight PR logging moved into
 // Progress alongside the rest of the long-term view. See ProgressPage.
@@ -19,6 +30,37 @@ export default function AthleteLayout() {
   const { userProfile, logout } = useAuth()
   const location = useLocation()
   const onRapsodo = location.pathname.includes('/rapsodo')
+
+  const mainRef = useRef(null)
+  const pullStartY = useRef(null)
+  const [pullDistance, setPullDistance] = useState(0)
+  const [refreshing, setRefreshing] = useState(false)
+
+  // Only starts tracking a pull when already scrolled to the very top —
+  // otherwise this is just a normal downward scroll and should do nothing.
+  function handlePointerDown(e) {
+    if (refreshing || mainRef.current?.scrollTop > 0) return
+    pullStartY.current = e.clientY
+  }
+  function handlePointerMove(e) {
+    if (pullStartY.current == null) return
+    const delta = e.clientY - pullStartY.current
+    if (delta <= 0) { setPullDistance(0); return }
+    // Damped so it doesn't track 1:1 with the finger — reads as "pulling
+    // against something" rather than the content just sliding freely.
+    setPullDistance(Math.min(delta * 0.5, 100))
+  }
+  function handlePointerUp() {
+    if (pullStartY.current == null) return
+    if (pullDistance >= PULL_THRESHOLD) {
+      setRefreshing(true)
+      setPullDistance(PULL_THRESHOLD)
+      window.location.reload()
+    } else {
+      setPullDistance(0)
+    }
+    pullStartY.current = null
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-sp-ink-900">
@@ -73,9 +115,31 @@ export default function AthleteLayout() {
 
       {/* All other page content */}
       <main
+        ref={mainRef}
         className="flex-1 overflow-y-auto pb-20"
         style={{ display: onRapsodo ? 'none' : 'block' }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
       >
+        {/* Pull-to-refresh indicator — height tracks the pull so content
+            visibly pushes down, same as a native app's gesture. */}
+        <div
+          className="flex items-center justify-center overflow-hidden transition-[height] duration-150"
+          style={{ height: pullDistance }}
+        >
+          {pullDistance > 8 && (
+            <RefreshCw
+              size={20}
+              className={refreshing || pullDistance >= PULL_THRESHOLD ? 'text-sp-green-500 animate-spin' : 'text-sp-ink-300'}
+              style={{
+                transform: `rotate(${pullDistance * 2.5}deg)`,
+                opacity: Math.min(pullDistance / PULL_THRESHOLD, 1),
+              }}
+            />
+          )}
+        </div>
         <Outlet />
       </main>
 

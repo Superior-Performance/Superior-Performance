@@ -15,6 +15,7 @@ import AccountPage    from './pages/athlete/AccountPage'
 
 // Admin pages
 import AdminLayout       from './pages/admin/AdminLayout'
+import AdminDashboardPage from './pages/admin/AdminDashboardPage'
 import AdminAthletesPage from './pages/admin/AdminAthletesPage'
 import AdminProgramsPage from './pages/admin/AdminProgramsPage'
 import AdminChatPage     from './pages/admin/AdminChatPage'
@@ -78,7 +79,8 @@ export default function App() {
       <Route path="/admin" element={
         <RequireAuth role="admin"><AdminLayout /></RequireAuth>
       }>
-        <Route index element={<Navigate to="athletes" replace />} />
+        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="dashboard"         element={<AdminDashboardPage />} />
         <Route path="athletes"          element={<AdminAthletesPage />} />
         <Route path="athletes/:uid"     element={<AdminAthleteDetail />} />
         <Route path="programs"          element={<AdminProgramsPage />} />

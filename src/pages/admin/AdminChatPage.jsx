@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getAllAthletes, sendChatMessage, subscribeChatMessages } from '../../firebase/firestore'
+import { getAllAthletes, sendChatMessage, subscribeChatMessages, markChatRead } from '../../firebase/firestore'
 import { useAuth } from '../../context/AuthContext'
 import { Send, MessageCircle } from 'lucide-react'
 import { format, isToday, isYesterday } from 'date-fns'
@@ -36,6 +36,9 @@ export default function AdminChatPage() {
   useEffect(() => {
     if (!selected) return
     const unsub = subscribeChatMessages(selected, setMessages)
+    // Opening a thread is what "read" means here — see chatReads in
+    // firebase/firestore.js, consumed by the admin dashboard's unread count.
+    markChatRead(selected)
     return unsub
   }, [selected])
 

@@ -73,6 +73,12 @@ service cloud.firestore {
       allow write: if isAdmin() || (isAuth() && request.auth.uid == athleteUid);
     }
 
+    // Admin-only "coach last opened this thread" marker — the athlete side
+    // has no unread state to track, so no athlete-uid branch here at all.
+    match /chatReads/{athleteUid} {
+      allow read, write: if isAdmin();
+    }
+
     // Exercise library: coach-tooling data (name/category -> last-used
     // sets/reps/notes/video URL) that powers the Program Editor's autofill
     // suggestions. Admin-only — athletes never see or need this.

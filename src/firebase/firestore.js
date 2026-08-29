@@ -10,6 +10,7 @@
  *                              older entries may still carry
  *  assessments/{uid}         — { scores: {...}, programId, updatedAt }
  *  chats/{uid}/messages/{}   — { text, senderUid, senderName, role: 'admin'|'athlete', createdAt }
+ *  chatReads/{uid}           — { lastReadAt } — admin-only "coach last opened this thread" marker
  *
  * An athlete can have up to one *active* program per programType at a time —
  * correctives, throwing, and lifting run concurrently rather than one program
@@ -243,6 +244,22 @@ export const subscribeChatMessages = (athleteUid, callback) =>
     query(collection(db, 'chats', athleteUid, 'messages'), orderBy('createdAt')),
     (snap) => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
   )
+
+// One-time (non-subscribing) read of a thread — for the dashboard's roster
+// scan, where dozens of live onSnapshot listeners would be wasteful. Real-time
+// chat views should still use subscribeChatMessages above.
+export const getChatMessages = (athleteUid) =>
+  getDocs(query(collection(db, 'chats', athleteUid, 'messages'), orderBy('createdAt', 'desc')))
+
+// chatReads/{athleteUid} — { lastReadAt } — when the coach last opened this
+// athlete's conversation. Athlete-authored messages newer than this count as
+// unread on the admin dashboard and Messages nav. Admin-only bookkeeping —
+// the athlete side has no equivalent, their chat just shows full history.
+export const getAllChatReads = () =>
+  getDocs(collection(db, 'chatReads'))
+
+export const markChatRead = (athleteUid) =>
+  setDoc(doc(db, 'chatReads', athleteUid), { lastReadAt: serverTimestamp() }, { merge: true })
 
 // ── Exercise weight tracking ───────────────────────────────────────────────────
 // exerciseWeights/{uid}/entries/{programId_exerciseId} — { value, exercise, updatedAt }

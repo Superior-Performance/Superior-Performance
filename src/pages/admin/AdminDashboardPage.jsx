@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   getAllAthletes, getAllPrograms, getCompletions, getDataLogs, getAthletePrefs, setDataLogFlag,
+  getChatMessages, getAllChatReads,
 } from '../../firebase/firestore'
 import { buildSlots, isSlotComplete, countProgramProgress } from '../../utils/programIds'
 import { computeStreak } from '../../utils/programSchedule'
-import { LayoutDashboard, Flag, Clock, TrendingDown, FileClock, Zap, Scale, ChevronRight } from 'lucide-react'
+import { LayoutDashboard, Flag, Clock, TrendingDown, FileClock, MessageCircle, Zap, Scale, ChevronRight } from 'lucide-react'
 import { format, formatDistanceToNow } from 'date-fns'
 import toast from 'react-hot-toast'
 import Skeleton from '../../components/Skeleton'
@@ -54,6 +55,7 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [rows, setRows] = useState([])       // one per athlete
   const [flagged, setFlagged] = useState([]) // flattened flagged log entries, newest first
+  const [unread, setUnread] = useState([])   // one per athlete with unread messages, newest first
 
   useEffect(() => { load() }, [])
 
@@ -64,13 +66,18 @@ export default function AdminDashboardPage() {
       const athletes = athletesSnap.docs.map(d => ({ id: d.id, ...d.data() }))
       const allPrograms = programsSnap.docs.map(d => ({ id: d.id, ...d.data() }))
 
-      const [completionsSnaps, logsSnaps, prefsSnaps] = await Promise.all([
+      const [completionsSnaps, logsSnaps, prefsSnaps, messagesSnaps, chatReadsSnap] = await Promise.all([
         Promise.all(athletes.map(a => getCompletions(a.id))),
         Promise.all(athletes.map(a => getDataLogs(a.id))),
         Promise.all(athletes.map(a => getAthletePrefs(a.id))),
+        Promise.all(athletes.map(a => getChatMessages(a.id))),
+        getAllChatReads(),
       ])
+      const chatReadByAthlete = {}
+      chatReadsSnap.forEach(d => { chatReadByAthlete[d.id] = d.data() })
 
       const flaggedFeed = []
+      const unreadFeed = []
       const nextRows = athletes.map((athlete, i) => {
         const athletePrograms = allPrograms.filter(p => p.athleteId === athlete.id)
         const activePrograms = athletePrograms.filter(p => p.active === true)
@@ -95,16 +102,29 @@ export default function AdminDashboardPage() {
           (!lastActivityMs || Date.now() - lastActivityMs > INACTIVE_DAYS * 86400000)
         const behind = pct != null && pct < BEHIND_THRESHOLD
 
+        // Athlete-authored messages newer than the coach's last-opened marker
+        // for this thread — see chatReads in firebase/firestore.js.
+        const lastReadMs = toMillis(chatReadByAthlete[athlete.id]?.lastReadAt)
+        const unreadMessages = messagesSnaps[i].docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(m => m.role === 'athlete' && toMillis(m.createdAt) > lastReadMs)
+        if (unreadMessages.length > 0) {
+          unreadFeed.push({ athleteId: athlete.id, athleteName: athlete.name, latest: unreadMessages[0], count: unreadMessages.length })
+        }
+
         return {
           athlete, activePrograms, draftCount, unacknowledged,
           pct, lastActivityMs, inactive, behind,
           flagCount: logs.filter(l => l.flagged).length,
+          unreadCount: unreadMessages.length,
         }
       })
 
       flaggedFeed.sort((a, b) => toMillis(b.entry.date) - toMillis(a.entry.date))
+      unreadFeed.sort((a, b) => toMillis(b.latest.createdAt) - toMillis(a.latest.createdAt))
       setRows(nextRows)
       setFlagged(flaggedFeed)
+      setUnread(unreadFeed)
     } finally {
       setLoading(false)
     }
@@ -127,8 +147,8 @@ export default function AdminDashboardPage() {
     return (
       <div className="p-8 bg-sp-ink-900 min-h-full space-y-4">
         <Skeleton className="h-10 w-64" />
-        <div className="grid grid-cols-4 gap-3">
-          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
         </div>
         <Skeleton className="h-48 rounded-2xl" />
       </div>
@@ -138,6 +158,7 @@ export default function AdminDashboardPage() {
   const inactiveCount = rows.filter(r => r.inactive).length
   const behindCount = rows.filter(r => r.behind).length
   const draftTotal = rows.reduce((s, r) => s + r.draftCount, 0)
+  const unreadCount = rows.reduce((s, r) => s + r.unreadCount, 0)
 
   return (
     <div className="p-8 bg-sp-ink-900 min-h-full">
@@ -152,11 +173,46 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Needs attention tiles */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
+        <Tile Icon={MessageCircle} value={unreadCount} label="Unread messages" tone="amber" />
         <Tile Icon={Flag} value={flagged.length} label="Flagged notes" tone="amber" />
         <Tile Icon={Clock} value={inactiveCount} label={`Inactive ${INACTIVE_DAYS}+ days`} tone="red" />
         <Tile Icon={TrendingDown} value={behindCount} label="Behind on program" tone="amber" />
         <Tile Icon={FileClock} value={draftTotal} label="Drafts awaiting review" tone="neutral" />
+      </div>
+
+      {/* Unread messages feed */}
+      <div className="mb-8">
+        <p className="text-xs font-bold text-sp-ink-300 uppercase tracking-wider mb-3">Unread messages</p>
+        {unread.length === 0 ? (
+          <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 p-6 text-center text-sm text-sp-ink-300">
+            No unread messages.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {unread.map(({ athleteId, athleteName, latest, count }) => (
+              <Link
+                key={athleteId}
+                to={`/admin/chat/${athleteId}`}
+                className="bg-sp-ink-800 border border-amber-500/30 rounded-xl px-4 py-3 flex items-center gap-3 hover:bg-white/[0.04] transition"
+              >
+                <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-sm font-semibold text-white">{athleteName}</span>
+                    <span className="text-[10px] font-medium bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded-full">
+                      {count} new
+                    </span>
+                  </div>
+                  <p className="text-sm text-sp-ink-100 mt-0.5 truncate">{latest.text}</p>
+                </div>
+                <span className="text-xs text-sp-ink-300 flex-shrink-0">
+                  {latest.createdAt ? formatDistanceToNow(new Date(toMillis(latest.createdAt)), { addSuffix: true }) : ''}
+                </span>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Flagged notes feed */}
@@ -214,7 +270,7 @@ export default function AdminDashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-sp-ink-600/60">
-                {rows.map(({ athlete, activePrograms, pct, lastActivityMs, inactive, behind, flagCount }) => (
+                {rows.map(({ athlete, activePrograms, pct, lastActivityMs, inactive, behind, flagCount, unreadCount }) => (
                   <tr key={athlete.id} className="hover:bg-white/[0.04]">
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-3">
@@ -231,7 +287,7 @@ export default function AdminDashboardPage() {
                       {lastActivityMs ? formatDistanceToNow(new Date(lastActivityMs), { addSuffix: true }) : '—'}
                     </td>
                     <td className="px-5 py-3">
-                      <StatusBadge hasProgram={activePrograms.length > 0} flagCount={flagCount} inactive={inactive} behind={behind} />
+                      <StatusBadge hasProgram={activePrograms.length > 0} unreadCount={unreadCount} flagCount={flagCount} inactive={inactive} behind={behind} />
                     </td>
                     <td className="px-5 py-3 text-right">
                       <Link to={`/admin/athletes/${athlete.id}`} className="inline-flex items-center gap-1 text-sp-green-400 text-sm font-medium hover:text-sp-green-300 transition">
@@ -268,10 +324,15 @@ function Tile({ Icon, value, label, tone }) {
   )
 }
 
-// Priority: a flag open beats everything (a coach explicitly wants to
-// follow up), then inactivity (not engaging at all), then behind pace,
-// then on track. An athlete with no program at all just shows that.
-function StatusBadge({ hasProgram, flagCount, inactive, behind }) {
+// Priority: an unread message beats everything (the athlete is waiting on a
+// reply right now, regardless of program status), then a flag open (a coach
+// explicitly wants to follow up), then inactivity (not engaging at all),
+// then behind pace, then on track. An athlete with no program at all and
+// nothing else going on just shows that.
+function StatusBadge({ hasProgram, unreadCount, flagCount, inactive, behind }) {
+  if (unreadCount > 0) {
+    return <span className="text-xs font-medium bg-amber-500/15 text-amber-400 px-2 py-0.5 rounded-full whitespace-nowrap">New message</span>
+  }
   if (!hasProgram) {
     return <span className="text-xs font-medium bg-white/5 text-sp-ink-300 px-2 py-0.5 rounded-full whitespace-nowrap">No program</span>
   }

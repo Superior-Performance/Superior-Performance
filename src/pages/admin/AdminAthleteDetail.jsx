@@ -8,6 +8,7 @@ import {
 } from '../../firebase/firestore'
 import { getDataLogs, addDataLog, setDataLogFlag } from '../../firebase/firestore'
 import { ensureExerciseIds, completionKey, legacyCompletionKey, makeExerciseId } from '../../utils/programIds'
+import { initials } from '../../utils/initials'
 import { ArrowLeft, Save, Zap, Scale, MessageCircle, Pencil, Trash2, X, Sparkles, KeyRound, XCircle, FileSpreadsheet, Download, ChevronDown, GraduationCap, Search, Plus, Flag } from 'lucide-react'
 import { sendPasswordResetEmail } from 'firebase/auth'
 import { auth } from '../../firebase/config'
@@ -867,7 +868,7 @@ export default function AdminAthleteDetail() {
         <div className="relative flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-full bg-white/10 text-sp-green-300 flex items-center justify-center font-bold text-xl flex-shrink-0">
-              {athlete.name?.charAt(0)}
+              {initials(athlete.name)}
             </div>
             <div>
               <h1 className="text-2xl font-bold">{athlete.name}</h1>

@@ -6,6 +6,7 @@ import { Send, MessageCircle } from 'lucide-react'
 import { format, isToday, isYesterday } from 'date-fns'
 import EmptyState from '../../components/EmptyState'
 import toast from 'react-hot-toast'
+import { initials } from '../../utils/initials'
 
 // Firestore Timestamps aren't resolved to a real value until the server
 // confirms the write — a message that was just sent shows up via the local
@@ -97,7 +98,7 @@ export default function AdminChatPage() {
               }`}
             >
               <div className="w-9 h-9 rounded-full bg-sp-green-500/20 text-sp-green-400 flex items-center justify-center font-bold text-sm flex-shrink-0">
-                {a.name?.charAt(0)}
+                {initials(a.name)}
               </div>
               <div className="min-w-0">
                 <p className={`text-sm font-medium truncate ${selected === a.id ? 'text-sp-green-400' : 'text-white'}`}>{a.name}</p>
@@ -118,7 +119,7 @@ export default function AdminChatPage() {
           {selectedAthlete ? (
             <>
               <div className="w-8 h-8 rounded-full bg-sp-green-500/20 text-sp-green-400 flex items-center justify-center font-bold text-sm">
-                {selectedAthlete.name?.charAt(0)}
+                {initials(selectedAthlete.name)}
               </div>
               <div>
                 <p className="font-semibold text-white text-sm">{selectedAthlete.name}</p>

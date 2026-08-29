@@ -6,6 +6,7 @@ import {
 } from '../../firebase/firestore'
 import { buildSlots, isSlotComplete, countProgramProgress } from '../../utils/programIds'
 import { computeStreak } from '../../utils/programSchedule'
+import { initials } from '../../utils/initials'
 import { LayoutDashboard, Flag, Clock, TrendingDown, FileClock, MessageCircle, Zap, Scale, ChevronRight, X } from 'lucide-react'
 import { format, formatDistanceToNow } from 'date-fns'
 import toast from 'react-hot-toast'
@@ -364,7 +365,7 @@ export default function AdminDashboardPage() {
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-sp-green-500/20 text-sp-green-400 flex items-center justify-center font-bold text-sm flex-shrink-0">
-                          {athlete.name?.charAt(0) || '?'}
+                          {initials(athlete.name)}
                         </div>
                         <span className="font-medium text-white">{athlete.name}</span>
                       </div>

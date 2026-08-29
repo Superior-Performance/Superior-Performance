@@ -8,6 +8,7 @@ import {
 import { auth } from '../../firebase/config'
 import { Lock, CheckCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { initials } from '../../utils/initials'
 
 export default function AccountPage() {
   const { userProfile } = useAuth()
@@ -45,7 +46,7 @@ export default function AccountPage() {
       {/* Header */}
       <div className="mb-6">
         <div className="w-14 h-14 rounded-full bg-sp-green-500/20 text-sp-green-400 flex items-center justify-center font-bold text-2xl mb-3">
-          {userProfile?.name?.charAt(0) || '?'}
+          {initials(userProfile?.name)}
         </div>
         <h1 className="text-xl font-bold text-white">{userProfile?.name}</h1>
         <p className="text-sp-ink-300 text-sm">{userProfile?.email}</p>

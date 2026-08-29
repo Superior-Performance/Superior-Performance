@@ -95,11 +95,15 @@ export function matchDayType(raw) {
 // that one. A lifting day's `dayType` field is drawn from this list instead
 // — same field, same findDayForType matching, just a different set of valid
 // values depending on the program's type. Never mix these two lists.
+// `label` is exactly the Lifting Outputs sheet's Day column text ("Upper Day
+// 1", not "Upper Body Day 1") — matchLiftingDayType does an exact match, so
+// drifting from the sheet's actual wording here silently breaks every pull
+// (it did once already; see AdminAthleteDetail's createDraftFromRows).
 export const LIFTING_DAY_TYPES = [
-  { key: 'upper_1', label: 'Upper Body Day 1', icon: 'Dumbbell' },
-  { key: 'lower_1', label: 'Lower Body Day 1', icon: 'Dumbbell' },
-  { key: 'upper_2', label: 'Upper Body Day 2', icon: 'Dumbbell' },
-  { key: 'lower_2', label: 'Lower Body Day 2', icon: 'Dumbbell' },
+  { key: 'upper_1', label: 'Upper Day 1', icon: 'Dumbbell' },
+  { key: 'lower_1', label: 'Lower Day 1', icon: 'Dumbbell' },
+  { key: 'upper_2', label: 'Upper Day 2', icon: 'Dumbbell' },
+  { key: 'lower_2', label: 'Lower Day 2', icon: 'Dumbbell' },
 ]
 
 export function liftingDayTypeInfo(key) {

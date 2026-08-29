@@ -361,8 +361,8 @@ export default function AdminAthleteDetail() {
     rows.forEach(row => {
       const weekNums = parseWeekOrDayRange(row['Week'])
       // College Remote Athletes' rows put a day-type label ("High Intent
-      // Day", "Medium Day", "Recovery Day" — or, for lifting, "Upper Body
-      // Day 1" etc., a separate vocabulary) directly in the Day column
+      // Day", "Medium Day", "Recovery Day" — or, for lifting, "Upper Day 1"
+      // etc., a separate vocabulary) directly in the Day column
       // instead of a weekday name. parseWeekOrDayRange can't parse that as
       // a number, so it'd otherwise fall back to [1] for every row —
       // silently collapsing every day type into one Day 1. Detect it and

@@ -13,11 +13,18 @@ service cloud.firestore {
     function isAthlete() { return isAuth() && role() == 'athlete'; }
 
     // Users: admins can read/write all; athletes can read only their own doc.
-    // Writes are admin-only — the app never has athletes edit their own user doc,
-    // and role/programId living on this doc make self-writes a privilege escalation risk.
+    // Writes are otherwise admin-only — role/programTypes living on this doc
+    // make a general self-write a privilege escalation risk — except an
+    // athlete may update their OWN doc's photoURL and nothing else (profile
+    // photo upload, see AccountPage). affectedKeys().hasOnly(['photoURL'])
+    // rejects any write that touches a second field in the same call, so
+    // this can't be piggybacked into changing role/etc.
     match /users/{uid} {
       allow read:  if isAdmin() || (isAuth() && request.auth.uid == uid);
-      allow write: if isAdmin();
+      allow write: if isAdmin() || (
+        isAuth() && request.auth.uid == uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photoURL'])
+      );
     }
 
     // Programs: admins full access; athletes can only read their own, and only

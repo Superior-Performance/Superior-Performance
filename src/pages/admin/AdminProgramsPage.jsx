@@ -12,7 +12,7 @@ import Skeleton from '../../components/Skeleton'
 import ProgramEditorModal from '../../components/ProgramEditorModal'
 import { PROGRAM_TYPES, programTypeInfo } from '../../constants/programTypes'
 import { makeExerciseId } from '../../utils/programIds'
-import { initials } from '../../utils/initials'
+import Avatar from '../../components/Avatar'
 
 /**
  * Google Sheets CSV format expected:
@@ -567,9 +567,7 @@ function AthleteProgramsRow({ athlete, expanded, onToggle, cacheEntry }) {
         className="w-full flex items-center justify-between px-5 py-3 hover:bg-white/[0.04] transition"
       >
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-8 h-8 rounded-full bg-sp-green-500/20 text-sp-green-400 flex items-center justify-center font-bold text-sm flex-shrink-0">
-            {initials(athlete.name)}
-          </div>
+          <Avatar name={athlete.name} photoURL={athlete.photoURL} size={8} />
           <div className="text-left min-w-0">
             <p className="font-medium text-white text-sm truncate">{athlete.name}</p>
             <div className="flex flex-wrap gap-2 mt-0.5">
@@ -659,9 +657,7 @@ function MoveToAthleteModal({ program, athletes, saving, onMove, onClose }) {
               {filtered.map((a) => (
                 <div key={a.id} className="flex items-center justify-between gap-3 py-2 border-b border-sp-ink-600/60 last:border-0">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-7 h-7 rounded-full bg-sp-green-500/20 text-sp-green-400 flex items-center justify-center font-bold text-xs flex-shrink-0">
-                      {initials(a.name)}
-                    </div>
+                    <Avatar name={a.name} photoURL={a.photoURL} size={7} />
                     <p className="text-sm font-medium text-white truncate">{a.name}</p>
                   </div>
                   <button

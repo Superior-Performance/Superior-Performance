@@ -1,21 +1,51 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import {
   EmailAuthProvider,
   reauthenticateWithCredential,
   updatePassword,
 } from 'firebase/auth'
-import { auth } from '../../firebase/config'
-import { Lock, CheckCircle } from 'lucide-react'
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
+import { auth, storage } from '../../firebase/config'
+import { updateUser } from '../../firebase/firestore'
+import { resizeImageToSquare } from '../../utils/imageResize'
+import { Lock, CheckCircle, Camera } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { initials } from '../../utils/initials'
+import Avatar from '../../components/Avatar'
 
 export default function AccountPage() {
-  const { userProfile } = useAuth()
+  const { currentUser, userProfile, refreshProfile } = useAuth()
   const [current, setCurrent]   = useState('')
   const [next, setNext]         = useState('')
   const [confirm, setConfirm]   = useState('')
   const [saving, setSaving]     = useState(false)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const fileInputRef = useRef(null)
+
+  async function handlePhotoSelect(e) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // lets the same file be picked again later if needed
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please choose an image file.')
+      return
+    }
+    setUploadingPhoto(true)
+    try {
+      const blob = await resizeImageToSquare(file)
+      const photoRef = ref(storage, `profilePhotos/${currentUser.uid}/avatar.jpg`)
+      await uploadBytes(photoRef, blob, { contentType: 'image/jpeg' })
+      const photoURL = await getDownloadURL(photoRef)
+      await updateUser(currentUser.uid, { photoURL })
+      await refreshProfile()
+      toast.success('Profile photo updated!')
+    } catch (err) {
+      console.error('Profile photo upload failed:', err)
+      toast.error('Could not update photo. Try again.')
+    } finally {
+      setUploadingPhoto(false)
+    }
+  }
 
   async function handleChange(e) {
     e.preventDefault()
@@ -45,9 +75,28 @@ export default function AccountPage() {
     <div className="px-4 py-6 max-w-md mx-auto min-h-[calc(100vh-136px)] bg-sp-ink-900">
       {/* Header */}
       <div className="mb-6">
-        <div className="w-14 h-14 rounded-full bg-sp-green-500/20 text-sp-green-400 flex items-center justify-center font-bold text-2xl mb-3">
-          {initials(userProfile?.name)}
-        </div>
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploadingPhoto}
+          className="relative mb-3 rounded-full disabled:opacity-70"
+          aria-label="Change profile photo"
+        >
+          <Avatar name={userProfile?.name} photoURL={userProfile?.photoURL} size={14} />
+          <span className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-sp-green-500 border-2 border-sp-ink-900 flex items-center justify-center">
+            {uploadingPhoto
+              ? <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              : <Camera size={12} className="text-white" />
+            }
+          </span>
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handlePhotoSelect}
+          className="hidden"
+        />
         <h1 className="text-xl font-bold text-white">{userProfile?.name}</h1>
         <p className="text-sp-ink-300 text-sm">{userProfile?.email}</p>
       </div>

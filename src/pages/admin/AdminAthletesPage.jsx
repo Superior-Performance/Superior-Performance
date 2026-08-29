@@ -7,7 +7,7 @@ import toast from 'react-hot-toast'
 import EmptyState from '../../components/EmptyState'
 import Skeleton from '../../components/Skeleton'
 import { programTypeInfo } from '../../constants/programTypes'
-import { initials } from '../../utils/initials'
+import Avatar from '../../components/Avatar'
 
 export default function AdminAthletesPage() {
   const navigate = useNavigate()
@@ -128,9 +128,7 @@ export default function AdminAthletesPage() {
                 >
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-sp-green-500/20 text-sp-green-400 flex items-center justify-center font-bold text-sm">
-                        {initials(a.name)}
-                      </div>
+                      <Avatar name={a.name} photoURL={a.photoURL} size={8} />
                       <span className="font-medium text-white hover:text-sp-green-400 transition">{a.name}</span>
                     </div>
                   </td>

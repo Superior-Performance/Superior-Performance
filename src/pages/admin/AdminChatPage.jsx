@@ -6,7 +6,7 @@ import { Send, MessageCircle } from 'lucide-react'
 import { format, isToday, isYesterday } from 'date-fns'
 import EmptyState from '../../components/EmptyState'
 import toast from 'react-hot-toast'
-import { initials } from '../../utils/initials'
+import Avatar from '../../components/Avatar'
 
 // Firestore Timestamps aren't resolved to a real value until the server
 // confirms the write — a message that was just sent shows up via the local
@@ -97,9 +97,7 @@ export default function AdminChatPage() {
                 selected === a.id ? 'bg-sp-green-500/10 border-l-2 border-l-sp-green-500' : ''
               }`}
             >
-              <div className="w-9 h-9 rounded-full bg-sp-green-500/20 text-sp-green-400 flex items-center justify-center font-bold text-sm flex-shrink-0">
-                {initials(a.name)}
-              </div>
+              <Avatar name={a.name} photoURL={a.photoURL} size={9} />
               <div className="min-w-0">
                 <p className={`text-sm font-medium truncate ${selected === a.id ? 'text-sp-green-400' : 'text-white'}`}>{a.name}</p>
                 <p className="text-xs text-sp-ink-300 truncate">{a.email}</p>
@@ -118,9 +116,7 @@ export default function AdminChatPage() {
         <div className="px-5 py-3.5 bg-sp-ink-800 border-b border-sp-ink-600 flex items-center gap-3">
           {selectedAthlete ? (
             <>
-              <div className="w-8 h-8 rounded-full bg-sp-green-500/20 text-sp-green-400 flex items-center justify-center font-bold text-sm">
-                {initials(selectedAthlete.name)}
-              </div>
+              <Avatar name={selectedAthlete.name} photoURL={selectedAthlete.photoURL} size={8} />
               <div>
                 <p className="font-semibold text-white text-sm">{selectedAthlete.name}</p>
                 <p className="text-xs text-sp-ink-300">{selectedAthlete.email}</p>

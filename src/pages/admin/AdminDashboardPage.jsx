@@ -6,7 +6,7 @@ import {
 } from '../../firebase/firestore'
 import { buildSlots, isSlotComplete, countProgramProgress } from '../../utils/programIds'
 import { computeStreak } from '../../utils/programSchedule'
-import { initials } from '../../utils/initials'
+import Avatar from '../../components/Avatar'
 import { LayoutDashboard, Flag, Clock, TrendingDown, FileClock, MessageCircle, Zap, Scale, ChevronRight, X } from 'lucide-react'
 import { format, formatDistanceToNow } from 'date-fns'
 import toast from 'react-hot-toast'
@@ -364,9 +364,7 @@ export default function AdminDashboardPage() {
                   <tr key={athlete.id} className="hover:bg-white/[0.04]">
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-sp-green-500/20 text-sp-green-400 flex items-center justify-center font-bold text-sm flex-shrink-0">
-                          {initials(athlete.name)}
-                        </div>
+                        <Avatar name={athlete.name} photoURL={athlete.photoURL} size={8} />
                         <span className="font-medium text-white">{athlete.name}</span>
                       </div>
                     </td>

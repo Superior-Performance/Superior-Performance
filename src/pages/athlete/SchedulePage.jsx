@@ -504,7 +504,6 @@ function DayBody({
           onChooseSlotOption={onChooseSlotOption}
           onOpenDetail={onOpenDetail}
           onSaveWeight={onSaveWeight}
-          initialWeekIdx={weekIdx}
         />
       ) : activeEntry && (
         <div className="bg-sp-ink-800 rounded-2xl overflow-hidden border border-sp-ink-600">
@@ -673,22 +672,61 @@ function RemoteDayTypePicker({ title, programs, dayTypes, dayTypeIcons, emptyHin
   )
 }
 
+// A day type is "done" for a given program/week once every exercise in it
+// is checked off — the unit LiftingBrowser's week-gating counts against.
+function isLiftingDayTypeDone(program, weekIdx, dayTypeKey, completions) {
+  const days = program.weeks?.[weekIdx]?.days || []
+  const dayIdx = days.findIndex(d => d.dayType === dayTypeKey && d.exercises?.length)
+  if (dayIdx === -1) return false
+  const slots = buildSlots(days[dayIdx].exercises)
+  return slots.length > 0 && slots.every(slot => isSlotComplete(completions, program.id, slot, weekIdx, dayIdx))
+}
+
+// The athlete's current week isn't picked by hand — it's the first week
+// that isn't fully done yet (every day type it has tagged, all checked
+// off), capped at the program's last week. A remote athlete runs on their
+// own schedule rather than a fixed calendar, so gating progression on
+// "finished all 4 lifts" is the natural substitute for a fixed weekly
+// cadence — see AdminAthleteDetail comment history for why. Computed off
+// the first program only; in practice an athlete has exactly one active
+// lifting program at a time.
+function computeLiftingWeekIdx(program, completions) {
+  const weeks = program?.weeks || []
+  for (let wi = 0; wi < weeks.length; wi++) {
+    const dayTypesThisWeek = LIFTING_DAY_TYPES.filter(dt => weeks[wi].days?.some(d => d.dayType === dt.key && d.exercises?.length))
+    if (dayTypesThisWeek.length === 0) continue
+    if (!dayTypesThisWeek.every(dt => isLiftingDayTypeDone(program, wi, dt.key, completions))) return wi
+  }
+  return Math.max(weeks.length - 1, 0)
+}
+
 // Lifting doesn't map onto "today" the way the other program types do — a
 // lift day is Upper/Lower, not a calendar weekday — so instead of showing
-// whatever's due today it's an explicit drill-down: pick the week, then
-// which of the four day types, then work through that day's blocks (Block
-// A/B/C, each a collapsible tile via the same CategoryTiles machinery,
-// since a lifting exercise's `category` is literally "Block A" etc. — see
-// AdminAthleteDetail's createDraftFromRows). Real Firestore completions are
-// used (unlike RemoteDayTypePicker's ephemeral state) since Week + Day Type
-// together pick out one specific, non-repeating day for every athlete,
-// in-house or remote.
-function LiftingBrowser({ programs, completions, weights, onToggleComplete, onChooseSlotOption, onOpenDetail, onSaveWeight, initialWeekIdx = 0 }) {
-  const totalWeeks = Math.max(1, ...programs.map(p => p.weeks?.length || 0))
-  const [weekIdx, setWeekIdx] = useState(Math.min(Math.max(initialWeekIdx, 0), totalWeeks - 1))
+// whatever's due today it's an explicit drill-down: the athlete's current
+// (auto-advancing) week, then which of the four day types, then that day's
+// blocks (Block A/B/C, each a collapsible tile via the same CategoryTiles
+// machinery, since a lifting exercise's `category` is literally "Block A"
+// etc. — see AdminAthleteDetail's createDraftFromRows). Real Firestore
+// completions are used (unlike RemoteDayTypePicker's ephemeral state) since
+// Week + Day Type together pick out one specific, non-repeating day for
+// every athlete, in-house or remote.
+function LiftingBrowser({ programs, completions, weights, onToggleComplete, onChooseSlotOption, onOpenDetail, onSaveWeight }) {
+  const primaryProgram = programs[0]
+  const totalWeeks = primaryProgram?.weeks?.length || 1
+  const weekIdx = computeLiftingWeekIdx(primaryProgram, completions)
   const [selectedDayType, setSelectedDayType] = useState(null)
   const [openBlock, setOpenBlock] = useState({})
   const [openSlot, setOpenSlot] = useState({})
+
+  // The week advances on its own as completions come in — if that just
+  // moved the athlete into a new week mid-session, drop back to the day
+  // type grid instead of leaving them "inside" a day type that may not
+  // even exist in the new week.
+  useEffect(() => {
+    setSelectedDayType(null)
+    setOpenBlock({})
+    setOpenSlot({})
+  }, [weekIdx])
 
   function toggleBlock(groupKey, blockKey) {
     setOpenBlock(prev => ({ ...prev, [groupKey]: prev[groupKey] === blockKey ? null : blockKey }))
@@ -696,22 +734,13 @@ function LiftingBrowser({ programs, completions, weights, onToggleComplete, onCh
   function toggleSlot(scopeKey, altGroup) {
     setOpenSlot(prev => ({ ...prev, [scopeKey]: prev[scopeKey] === altGroup ? null : altGroup }))
   }
-  function selectWeek(idx) {
-    setWeekIdx(idx)
-    setSelectedDayType(null)
-    setOpenBlock({})
-    setOpenSlot({})
-  }
-  function selectDayType(key) {
-    setSelectedDayType(key)
-    setOpenBlock({})
-    setOpenSlot({})
-  }
 
   const availableDayTypes = LIFTING_DAY_TYPES.filter(dt =>
     programs.some(p => p.weeks?.[weekIdx]?.days?.some(d => d.dayType === dt.key && d.exercises?.length))
   )
   const typeInfo = LIFTING_DAY_TYPES.find(dt => dt.key === selectedDayType) || null
+  const allDoneThisWeek = availableDayTypes.length > 0 &&
+    availableDayTypes.every(dt => programs.some(p => isLiftingDayTypeDone(p, weekIdx, dt.key, completions)))
 
   // dayIdx is the day's actual array position within week.days (not
   // dayNum - 1) so completion keys line up correctly regardless of which
@@ -727,18 +756,15 @@ function LiftingBrowser({ programs, completions, weights, onToggleComplete, onCh
 
   return (
     <div>
-      <div className="flex gap-1 px-1 pb-3 overflow-x-auto no-scrollbar">
-        {Array.from({ length: totalWeeks }, (_, i) => i).map(i => (
-          <button
-            key={i}
-            onClick={() => selectWeek(i)}
-            className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-              weekIdx === i ? 'bg-sp-green-500 text-white' : 'bg-sp-ink-800 border border-sp-ink-600 text-sp-ink-300'
-            }`}
-          >
-            Week {i + 1}
-          </button>
-        ))}
+      <div className="mb-3">
+        <p className="font-display text-lg font-bold text-white">Week {weekIdx + 1}{totalWeeks > 1 ? ` of ${totalWeeks}` : ''}</p>
+        {weekIdx < totalWeeks - 1 ? (
+          <p className="text-xs text-sp-ink-300 mt-0.5">
+            Complete all {availableDayTypes.length || 4} days to unlock Week {weekIdx + 2}.
+          </p>
+        ) : allDoneThisWeek ? (
+          <p className="text-xs text-sp-green-400 mt-0.5">All weeks complete — nice work.</p>
+        ) : null}
       </div>
 
       {availableDayTypes.length === 0 ? (
@@ -749,14 +775,18 @@ function LiftingBrowser({ programs, completions, weights, onToggleComplete, onCh
         <div className="grid grid-cols-2 gap-3">
           {availableDayTypes.map(dt => {
             const Icon = LIFTING_DAY_TYPE_ICONS[dt.icon] || Dumbbell
+            const done = programs.some(p => isLiftingDayTypeDone(p, weekIdx, dt.key, completions))
             return (
               <button
                 key={dt.key}
-                onClick={() => selectDayType(dt.key)}
+                onClick={() => setSelectedDayType(dt.key)}
                 className="bg-sp-ink-800 border border-sp-ink-600 rounded-2xl p-4 text-left hover:border-sp-green-500/40 transition"
               >
-                <div className="w-9 h-9 rounded-full bg-sp-green-500/15 flex items-center justify-center mb-3">
-                  <Icon size={17} className="text-sp-green-500" />
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-9 h-9 rounded-full bg-sp-green-500/15 flex items-center justify-center">
+                    <Icon size={17} className="text-sp-green-500" />
+                  </div>
+                  {done && <CheckCircle2 size={18} className="text-sp-green-500" />}
                 </div>
                 <p className="font-semibold text-white text-sm">{dt.label}</p>
               </button>

@@ -90,45 +90,46 @@ export default function LandingPage() {
   useEffect(() => { logout() }, [])
 
   return (
-    <div className="min-h-screen bg-[#080c14] text-white overflow-x-hidden">
+    <div className="relative min-h-screen bg-[#080c14] text-white overflow-x-hidden">
 
-      {/* Background grid */}
-      <div className="fixed inset-0 pointer-events-none" style={{
-        backgroundImage: 'linear-gradient(rgba(46,158,99,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(46,158,99,0.06) 1px, transparent 1px)',
-        backgroundSize: '60px 60px',
-      }} />
-
-      {/* Glow orbs */}
-      <div className="fixed top-[-200px] left-1/2 -translate-x-1/2 w-[800px] h-[800px] rounded-full pointer-events-none"
+      {/* Glow orbs — absolute (not fixed) so they scroll with the page instead of
+          repainting against a fixed viewport, which was leaving a stale seam at
+          section boundaries as the page scrolled past them. */}
+      <div className="absolute top-[-200px] left-1/2 -translate-x-1/2 w-[800px] h-[800px] rounded-full pointer-events-none"
         style={{ background: 'radial-gradient(circle, rgba(46,158,99,0.15) 0%, transparent 70%)' }} />
-      <div className="fixed bottom-[-100px] right-[-100px] w-[500px] h-[500px] rounded-full pointer-events-none"
+      <div className="absolute bottom-[-100px] right-[-100px] w-[500px] h-[500px] rounded-full pointer-events-none"
         style={{ background: 'radial-gradient(circle, rgba(46,158,99,0.08) 0%, transparent 70%)' }} />
 
-      {/* Nav */}
-      <nav className="relative z-10 flex items-center justify-between px-6 py-5 max-w-7xl mx-auto">
-        <Logo className="h-12 w-auto" />
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowInquiry(true)}
-            className="hidden sm:flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white/60 hover:text-white transition-colors"
-          >
-            Inquire
-          </button>
-          <Link
-            to="/login"
-            className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-xl border border-white/10 hover:border-white/25 hover:bg-white/5 transition-all"
-          >
-            Sign In <ArrowRight size={14} />
-          </Link>
-        </div>
-      </nav>
+      {/* Nav — a solid, blurred bar so it reads as chrome, not a fade into the hero */}
+      <div
+        className="sticky top-0 z-20 border-b border-white/[0.07]"
+        style={{ background: 'rgba(8,12,20,0.82)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}
+      >
+        <nav className="flex items-center justify-between px-6 py-5 max-w-7xl mx-auto">
+          <Logo className="h-12 w-auto" />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowInquiry(true)}
+              className="hidden sm:flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white/60 hover:text-white transition-colors"
+            >
+              Inquire
+            </button>
+            <Link
+              to="/login"
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-xl border border-white/10 hover:border-white/25 hover:bg-white/5 transition-all"
+            >
+              Sign In <ArrowRight size={14} />
+            </Link>
+          </div>
+        </nav>
+      </div>
 
       {/* Hero */}
       <section className="relative z-10 px-6 pt-16 pb-32 max-w-7xl mx-auto text-center overflow-hidden">
         <SectionPhoto
           src="/photos/hero-glove.jpg"
-          opacity={0.16}
-          overlay="linear-gradient(180deg, rgba(8,12,20,0.55) 0%, #080c14 88%)"
+          opacity={0.32}
+          overlay="linear-gradient(180deg, rgba(8,12,20,0.3) 0%, #080c14 88%)"
           startVisible
         />
 
@@ -393,6 +394,10 @@ export default function LandingPage() {
  * no per-frame work). Pass `startVisible` for the hero, which is on screen
  * before the observer has a chance to fire.
  */
+// Feathers the top/bottom edges to transparent so the photo dissolves into
+// whatever sits above and below it instead of reading as a pasted rectangle.
+const PHOTO_FEATHER = 'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.45) 14%, black 34%, black 66%, rgba(0,0,0,0.45) 86%, transparent 100%)'
+
 function SectionPhoto({ src, opacity, overlay, startVisible = false }) {
   const ref = useRef(null)
   const [inView, setInView] = useState(startVisible)
@@ -414,7 +419,23 @@ function SectionPhoto({ src, opacity, overlay, startVisible = false }) {
         src={src}
         alt=""
         className="absolute inset-0 w-full h-full object-cover transition-opacity duration-[1400ms] ease-out"
-        style={{ filter: 'grayscale(1)', opacity: inView ? opacity : 0 }}
+        style={{
+          filter: 'grayscale(1)',
+          opacity: inView ? opacity : 0,
+          WebkitMaskImage: PHOTO_FEATHER,
+          maskImage: PHOTO_FEATHER,
+        }}
+      />
+      {/* Green duotone so the photo reads as brand, not a raw gray stock shot */}
+      <div
+        className="absolute inset-0 transition-opacity duration-[1400ms] ease-out"
+        style={{
+          background: '#1B5E3F',
+          mixBlendMode: 'color',
+          opacity: inView ? 0.7 : 0,
+          WebkitMaskImage: PHOTO_FEATHER,
+          maskImage: PHOTO_FEATHER,
+        }}
       />
       <div className="absolute inset-0" style={{ background: overlay }} />
     </div>

@@ -27,7 +27,7 @@ const TRACK_TYPES = [
 ]
 
 export default function ProgressPage() {
-  const { currentUser } = useAuth()
+  const { currentUser, userProfile } = useAuth()
   const [programs, setPrograms]       = useState([]) // every active program, any type
   const [completions, setCompletions] = useState({})
   const [weights, setWeights]         = useState({}) // fed in from the Lift tab, not entered here
@@ -322,6 +322,7 @@ export default function ProgressPage() {
         latestValue={latestWeight}
         points={weightPoints}
         entries={weightEntries}
+        goal={userProfile?.goals?.weight ?? null}
         onLog={() => openLogForm('weight')}
       />
       <TrackSection
@@ -330,6 +331,7 @@ export default function ProgressPage() {
         latestValue={bestVelo}
         points={veloPoints}
         entries={veloEntries}
+        goal={userProfile?.goals?.velo ?? null}
         onLog={() => openLogForm('velo')}
       />
 
@@ -445,7 +447,7 @@ function WeekBarChart({ dayCount, dayStats, todayDayNum }) {
 // One tracking feature (Body Weight or Velo) — a stat + real trend chart in
 // a branded card, a "Log" button, and the full entry history below with any
 // notes the athlete added (notes are also visible on the coach's Logs tab).
-function TrackSection({ type, latestLabel, latestValue, points, entries, onLog }) {
+function TrackSection({ type, latestLabel, latestValue, points, entries, goal, onLog }) {
   const { Icon, label, unit, card, stroke } = type
   return (
     <div>
@@ -464,13 +466,18 @@ function TrackSection({ type, latestLabel, latestValue, points, entries, onLog }
 
       <div className={`${card} rounded-2xl p-4 mb-3`}>
         <div className="flex items-center justify-between mb-1">
-          <p className="text-xs font-medium opacity-80">{latestLabel}</p>
-          <p className="text-lg font-bold">
-            {latestValue != null ? latestValue : '—'}
-            {latestValue != null && <span className="text-xs font-medium ml-1 opacity-70">{unit}</span>}
-          </p>
+          <div>
+            <p className="text-xs font-medium opacity-80">{latestLabel}</p>
+            <p className="text-lg font-bold">
+              {latestValue != null ? latestValue : '—'}
+              {latestValue != null && <span className="text-xs font-medium ml-1 opacity-70">{unit}</span>}
+            </p>
+          </div>
+          {goal != null && (
+            <p className="text-xs font-medium text-amber-400">Goal · {goal} {unit}</p>
+          )}
         </div>
-        <TrendChart points={points} unit={unit} stroke={stroke} height={140} />
+        <TrendChart points={points} unit={unit} stroke={stroke} height={140} goal={goal} />
       </div>
 
       {entries.length === 0 ? (

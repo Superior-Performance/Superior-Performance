@@ -5,11 +5,13 @@ import {
   updateUser, deleteUser, getProgramForAthlete, updateProgram,
   updateLiveProgram, migrateCompletionKeys,
   createProgram, deleteProgram, getSettings, getProgramsForAthlete, getGeneralPrograms,
+  getCompletions,
 } from '../../firebase/firestore'
 import { getDataLogs, addDataLog, setDataLogFlag } from '../../firebase/firestore'
-import { ensureExerciseIds, completionKey, legacyCompletionKey, makeExerciseId } from '../../utils/programIds'
+import { ensureExerciseIds, completionKey, legacyCompletionKey, makeExerciseId, countProgramProgress } from '../../utils/programIds'
 import Avatar from '../../components/Avatar'
-import { ArrowLeft, Save, Zap, Scale, MessageCircle, Pencil, Trash2, X, Sparkles, KeyRound, XCircle, FileSpreadsheet, Download, ChevronDown, GraduationCap, Search, Plus, Flag } from 'lucide-react'
+import { ArrowLeft, Save, Zap, Scale, MessageCircle, Pencil, Trash2, X, Sparkles, KeyRound, XCircle, FileSpreadsheet, Download, ChevronDown, GraduationCap, Search, Plus, Flag, Target } from 'lucide-react'
+import Papa from 'papaparse'
 import { sendPasswordResetEmail } from 'firebase/auth'
 import { auth } from '../../firebase/config'
 import toast from 'react-hot-toast'
@@ -168,22 +170,38 @@ export default function AdminAthleteDetail() {
   const [logDate, setLogDate]       = useState('')
   const [logNotes, setLogNotes]     = useState('')
   const [logSaving, setLogSaving]   = useState(false)
+  // Coach-set targets shown as a reference line on the athlete's own trend
+  // charts (see TrendChart's `goal` prop) — admin-only, like every other
+  // users/{uid} field besides photoURL (see firestore.rules).
+  const [completions, setCompletions] = useState({})
+  const [goalVelo, setGoalVelo]     = useState('')
+  const [goalWeight, setGoalWeight] = useState('')
+  const [savingGoals, setSavingGoals] = useState(false)
+  const [exportingReport, setExportingReport] = useState(false)
 
   useEffect(() => {
     load()
   }, [uid])
 
+  // Sync the goal inputs whenever a fresh athlete doc comes in (initial
+  // load, or after load() re-runs) — not on every keystroke.
+  useEffect(() => {
+    setGoalVelo(athlete?.goals?.velo ?? '')
+    setGoalWeight(athlete?.goals?.weight ?? '')
+  }, [athlete?.goals?.velo, athlete?.goals?.weight])
+
   async function load() {
     setLoading(true)
     setLoadError(null)
     try {
-      const [userSnap, progSnap, assessSnap, ownProgs, generalProgs, logsSnap] = await Promise.all([
+      const [userSnap, progSnap, assessSnap, ownProgs, generalProgs, logsSnap, completionsSnap] = await Promise.all([
         getUser(uid),
         getProgramForAthlete(uid),
         getAssessment(uid),
         getProgramsForAthlete(uid),
         getGeneralPrograms(),
         getDataLogs(uid),
+        getCompletions(uid),
       ])
       setAthlete(userSnap.exists() ? { id: uid, ...userSnap.data() } : null)
       const active = {}
@@ -200,6 +218,9 @@ export default function AdminAthleteDetail() {
       }
       setPrograms(mergePrograms(ownProgs, generalProgs))
       setLogs(logsSnap.docs.map(d => ({ id: d.id, ...d.data() })))
+      const completionsMap = {}
+      completionsSnap.forEach(d => { completionsMap[d.id] = d.data() })
+      setCompletions(completionsMap)
     } catch (err) {
       console.error('Failed to load athlete detail:', err)
       setLoadError(err.message || 'Something went wrong loading this athlete.')
@@ -646,6 +667,88 @@ export default function AdminAthleteDetail() {
       toast.error('Could not add entry.')
     } finally {
       setLogSaving(false)
+    }
+  }
+
+  // Blank clears a goal (stored as null, not omitted, so it actually
+  // overwrites a previously-set value instead of leaving it stale).
+  async function saveGoals() {
+    setSavingGoals(true)
+    try {
+      const goals = {
+        velo: goalVelo === '' ? null : parseFloat(goalVelo),
+        weight: goalWeight === '' ? null : parseFloat(goalWeight),
+      }
+      await updateUser(uid, { goals })
+      setAthlete(prev => prev ? { ...prev, goals } : prev)
+      toast.success('Goals updated.')
+    } catch {
+      toast.error('Could not save goals.')
+    } finally {
+      setSavingGoals(false)
+    }
+  }
+
+  // A season summary as CSV — program completion, velo, and body weight —
+  // built entirely from data this page already has in state (programs,
+  // completions, logs), so there's no extra round trip on click. Uses
+  // Papa.unparse (already a dependency for the sheet-import flow) rather
+  // than adding a PDF library for a first cut.
+  function exportSeasonReport() {
+    setExportingReport(true)
+    try {
+      const rows = [
+        ['Athlete', athlete?.name || ''],
+        ['Report Generated', format(new Date(), 'MMM d, yyyy')],
+        [],
+        ['PROGRAMS'],
+        ['Program Name', 'Type', 'Weeks', 'Completion %'],
+      ]
+
+      // Published programs only — a draft the athlete hasn't started yet
+      // shouldn't pad a season summary.
+      const seasonPrograms = programs.filter(p => p.athleteId === uid && p.active !== false)
+      seasonPrograms.forEach(p => {
+        const { total, done } = countProgramProgress(completions, p)
+        const pct = total ? Math.round((done / total) * 100) : 0
+        const typeInfo = PROGRAM_TYPES.find(t => t.key === (p.programType || 'correctives'))
+        rows.push([p.name, typeInfo?.label || p.programType || '—', p.weeks?.length || 0, `${pct}%`])
+      })
+      if (seasonPrograms.length === 0) rows.push(['No programs on file', '', '', ''])
+
+      const veloEntries = logs.filter(l => l.type === 'velo').sort((a, b) => new Date(b.date) - new Date(a.date))
+      const weightEntries = logs.filter(l => l.type === 'weight').sort((a, b) => new Date(b.date) - new Date(a.date))
+      const bestVelo = veloEntries.length ? Math.max(...veloEntries.map(l => l.value)) : null
+
+      rows.push(
+        [],
+        ['VELO'],
+        ['Best (mph)', bestVelo ?? '—'],
+        ['Most Recent (mph)', veloEntries[0]?.value ?? '—', veloEntries[0]?.date ? format(new Date(veloEntries[0].date), 'MMM d, yyyy') : ''],
+        ['Goal (mph)', athlete?.goals?.velo ?? '—'],
+        ['Entries Logged', veloEntries.length],
+        [],
+        ['BODY WEIGHT'],
+        ['Most Recent (lbs)', weightEntries[0]?.value ?? '—', weightEntries[0]?.date ? format(new Date(weightEntries[0].date), 'MMM d, yyyy') : ''],
+        ['Goal (lbs)', athlete?.goals?.weight ?? '—'],
+        ['Entries Logged', weightEntries.length],
+      )
+
+      const csv = Papa.unparse(rows)
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${(athlete?.name || 'athlete').replace(/\s+/g, '-')}-season-report-${format(new Date(), 'yyyy-MM-dd')}.csv`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Could not build season report:', err)
+      toast.error('Could not export report.')
+    } finally {
+      setExportingReport(false)
     }
   }
 
@@ -1274,6 +1377,13 @@ export default function AdminAthleteDetail() {
             <p className="text-xs font-semibold text-sp-ink-300 uppercase tracking-wider">Body Weight & Velo</p>
             <div className="flex gap-2">
               <button
+                onClick={exportSeasonReport}
+                disabled={exportingReport}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-sp-ink-800 border border-sp-ink-600 text-sp-ink-100 hover:bg-white/5 transition disabled:opacity-60"
+              >
+                <Download size={13} /> Export Report
+              </button>
+              <button
                 onClick={() => openAddLog('weight')}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-sp-ink-800 border border-sp-ink-600 text-sp-ink-100 hover:bg-white/5 transition"
               >
@@ -1284,6 +1394,48 @@ export default function AdminAthleteDetail() {
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-sp-ink-800 border border-sp-ink-600 text-sp-ink-100 hover:bg-white/5 transition"
               >
                 <Plus size={13} /> Velo
+              </button>
+            </div>
+          </div>
+
+          {/* Goals — a coach-set target shown as a reference line on the
+              athlete's own trend charts (TrendChart's `goal` prop). Admin-only
+              on purpose: athletes can only self-write photoURL on their user
+              doc, see firestore.rules. */}
+          <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 p-4">
+            <div className="flex items-center gap-1.5 mb-3">
+              <Target size={13} className="text-amber-400" />
+              <p className="text-xs font-semibold text-sp-ink-300 uppercase tracking-wider">Goals</p>
+            </div>
+            <div className="flex flex-wrap items-end gap-3">
+              <div>
+                <label className="block text-xs text-sp-ink-300 mb-1">Velo (mph)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={goalVelo}
+                  onChange={e => setGoalVelo(e.target.value)}
+                  placeholder="e.g. 90"
+                  className="w-28 px-3 py-2 border border-sp-ink-600 rounded-lg text-sm text-sp-ink-50 placeholder-sp-ink-300 bg-sp-ink-900 focus:outline-none focus:ring-2 focus:ring-sp-green-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-sp-ink-300 mb-1">Body Weight (lbs)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={goalWeight}
+                  onChange={e => setGoalWeight(e.target.value)}
+                  placeholder="e.g. 190"
+                  className="w-28 px-3 py-2 border border-sp-ink-600 rounded-lg text-sm text-sp-ink-50 placeholder-sp-ink-300 bg-sp-ink-900 focus:outline-none focus:ring-2 focus:ring-sp-green-500"
+                />
+              </div>
+              <button
+                onClick={saveGoals}
+                disabled={savingGoals}
+                className="px-4 py-2 bg-sp-green-500 hover:bg-sp-green-600 text-white rounded-lg text-sm font-semibold transition disabled:opacity-60"
+              >
+                {savingGoals ? 'Saving…' : 'Save Goals'}
               </button>
             </div>
           </div>

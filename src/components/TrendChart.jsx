@@ -6,7 +6,7 @@ import { format } from 'date-fns'
 // No charting library in this project, so this is hand-rolled SVG like
 // Sparkline/ProgressRing. Single series, so no legend — the section title
 // above it already names what's being tracked.
-export default function TrendChart({ points, unit, stroke = '#2E9E63', height = 160 }) {
+export default function TrendChart({ points, unit, stroke = '#2E9E63', height = 160, goal = null }) {
   const [hoverIdx, setHoverIdx] = useState(null)
   const svgRef = useRef(null)
   const width = 320 // viewBox units; scales to the container via width="100%"
@@ -23,7 +23,8 @@ export default function TrendChart({ points, unit, stroke = '#2E9E63', height = 
   const plotW = width - padding.left - padding.right
   const plotH = height - padding.top - padding.bottom
 
-  const values = points.map(p => p.value)
+  const hasGoal = typeof goal === 'number' && !Number.isNaN(goal)
+  const values = hasGoal ? [...points.map(p => p.value), goal] : points.map(p => p.value)
   const min = Math.min(...values)
   const max = Math.max(...values)
   const range = (max - min) || Math.max(Math.abs(max), 1) * 0.1 || 1
@@ -75,6 +76,18 @@ export default function TrendChart({ points, unit, stroke = '#2E9E63', height = 
             <text x={padding.left} y={y(v) - 3} fontSize="8" fill="#9AA4AC">{Math.round(v * 10) / 10}</text>
           </g>
         ))}
+
+        {hasGoal && (
+          <g>
+            <line
+              x1={padding.left} x2={width - padding.right} y1={y(goal)} y2={y(goal)}
+              stroke="#E0A82E" strokeWidth="1.25" strokeDasharray="4,3"
+            />
+            <text x={width - padding.right} y={y(goal) - 3} fontSize="8" fill="#E0A82E" textAnchor="end">
+              Goal · {Math.round(goal * 10) / 10}
+            </text>
+          </g>
+        )}
 
         <path d={path} fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
 

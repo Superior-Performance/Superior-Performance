@@ -63,14 +63,23 @@ const STATS = [
 const TRACK_COPY = {
   correctives: {
     icon: ClipboardList,
+    photo: '/photos/facility-hallway.jpg',
+    photoPosition: '62% 48%',
+    tone: 'text-sp-green-300',
     desc: 'Built directly from your assessment — shoulder and hip mobility, posture. Every restriction the screen finds gets addressed before you throw a single pitch.',
   },
   throwing: {
     icon: Zap,
+    photo: '/photos/baseballs-bucket.jpg',
+    photoPosition: '48% 60%',
+    tone: 'text-sky-300',
     desc: 'A structured throwing progression that starts once your foundation is in place, matched to where you actually are in your development.',
   },
   lifting: {
     icon: Target,
+    photo: '/photos/facility-lane.jpg',
+    photoPosition: '82% 42%',
+    tone: 'text-amber-300',
     desc: 'Strength work programmed alongside your throwing — individualized the same way as your correctives, not a generic template.',
   },
 }
@@ -99,6 +108,16 @@ export default function LandingPage() {
         style={{ background: 'radial-gradient(circle, rgba(46,158,99,0.15) 0%, transparent 70%)' }} />
       <div className="absolute bottom-[-100px] right-[-100px] w-[500px] h-[500px] rounded-full pointer-events-none"
         style={{ background: 'radial-gradient(circle, rgba(46,158,99,0.08) 0%, transparent 70%)' }} />
+
+      {/* Film-grain texture — flat dark sections otherwise read as unfinished/digital.
+          Layered CSS dot patterns (not an SVG feTurbulence data-URI — that filter
+          silently fails to rasterize as a background-image in this browser target)
+          at two scales/angles so it reads as texture, not a mechanical grid. */}
+      <div className="absolute inset-0 pointer-events-none" style={{
+        backgroundImage: 'radial-gradient(rgba(255,255,255,0.26) 1px, transparent 1px), radial-gradient(rgba(255,255,255,0.15) 1px, transparent 1px)',
+        backgroundSize: '9px 9px, 14px 14px',
+        backgroundPosition: '0 0, 4px 6px',
+      }} />
 
       {/* Nav — a solid, blurred bar so it reads as chrome, not a fade into the hero */}
       <div
@@ -162,8 +181,8 @@ export default function LandingPage() {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <Link
             to="/login"
-            className="group flex items-center gap-2.5 px-7 py-4 font-bold rounded-2xl text-sm transition-all shadow-lg"
-            style={{ background: 'linear-gradient(135deg, #2E9E63, #216341)', boxShadow: '0 0 40px rgba(46,158,99,0.4)' }}
+            className="group flex items-center gap-2.5 px-7 py-4 font-bold rounded-2xl text-sm transition-all shadow-[0_6px_0_#163f2b,0_14px_34px_-10px_rgba(46,158,99,0.45)] hover:brightness-110 active:translate-y-[3px] active:shadow-[0_2px_0_#163f2b,0_8px_20px_-10px_rgba(46,158,99,0.4)]"
+            style={{ background: 'linear-gradient(135deg, #2E9E63, #216341)' }}
           >
             Access Your Program
             <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
@@ -188,14 +207,10 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Three Tracks */}
-      <section className="relative z-10 px-6 pb-28 max-w-7xl mx-auto overflow-hidden">
-        <SectionPhoto
-          src="/photos/baseballs-bucket.jpg"
-          opacity={0.22}
-          overlay="linear-gradient(180deg, rgba(8,12,20,0.55) 0%, rgba(8,12,20,0.92) 100%)"
-        />
-        <div className="relative">
+      {/* Three Tracks — real facility photography carries the cards themselves
+          (full color, no wash) instead of an ambient background image, so this
+          section reads as photographic proof rather than another dark gradient. */}
+      <section className="relative z-10 px-6 pb-28 max-w-7xl mx-auto">
         <div className="text-center mb-16">
           <p className="text-sp-green-400 text-xs font-bold uppercase tracking-widest mb-3">Your Program</p>
           <h2 className="text-4xl font-extrabold tracking-tight mb-4">Three tracks, running together.</h2>
@@ -207,22 +222,33 @@ export default function LandingPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {PROGRAM_TYPES.filter(({ key }) => TRACK_COPY[key]).map(({ key, label }) => {
-            const { icon: Icon, desc } = TRACK_COPY[key]
+            const { icon: Icon, desc, photo, photoPosition, tone } = TRACK_COPY[key]
             return (
-              <div key={key} className="relative rounded-2xl border border-white/10 bg-white/[0.03] p-7 overflow-hidden">
-                <div className="flex items-center gap-2.5 mb-4">
-                  <div className={`w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center ${
-                    key === 'correctives' ? 'text-sp-green-400' : key === 'throwing' ? 'text-blue-400' : 'text-amber-400'
-                  }`}>
-                    <Icon size={17} />
+              <div
+                key={key}
+                className="group relative h-80 rounded-2xl overflow-hidden border border-white/10 transition-all duration-300 hover:-translate-y-1"
+                style={{ boxShadow: '0 24px 44px -28px rgba(0,0,0,0.85)' }}
+              >
+                <img
+                  src={photo}
+                  alt=""
+                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.06]"
+                  style={{ objectPosition: photoPosition }}
+                />
+                <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(14,17,19,0.15) 0%, rgba(14,17,19,0.35) 45%, rgba(14,17,19,0.96) 100%)' }} />
+                <div className="absolute bottom-0 left-0 right-0 p-6">
+                  <div
+                    className={`w-9 h-9 rounded-lg bg-black/50 border border-white/15 flex items-center justify-center mb-3 ${tone}`}
+                    style={{ backdropFilter: 'blur(6px)' }}
+                  >
+                    <Icon size={16} />
                   </div>
-                  <h3 className="font-bold text-white">{label}</h3>
+                  <h3 className="font-bold text-white text-lg mb-1.5">{label}</h3>
+                  <p className="text-white/70 text-sm leading-relaxed">{desc}</p>
                 </div>
-                <p className="text-white/45 text-sm leading-relaxed">{desc}</p>
               </div>
             )
           })}
-        </div>
         </div>
       </section>
 
@@ -240,12 +266,15 @@ export default function LandingPage() {
             return (
               <div
                 key={title}
-                className="group relative rounded-2xl border p-6 hover:scale-[1.02] transition-all duration-200 cursor-default overflow-hidden"
-                style={{ background: tone.bg, borderColor: tone.border }}
+                className="group relative rounded-2xl border p-6 hover:scale-[1.02] hover:-translate-y-0.5 transition-all duration-200 cursor-default overflow-hidden"
+                style={{ background: tone.bg, borderColor: tone.border, boxShadow: '0 20px 36px -26px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.05)' }}
               >
                 <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
                   style={{ background: 'radial-gradient(circle at 50% 0%, rgba(255,255,255,0.03), transparent 70%)' }} />
-                <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center mb-4" style={{ color: tone.icon }}>
+                <div
+                  className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center mb-4"
+                  style={{ color: tone.icon, boxShadow: '0 3px 8px -2px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)' }}
+                >
                   <Icon size={19} />
                 </div>
                 <h3 className="font-bold text-white mb-2">{title}</h3>
@@ -260,7 +289,7 @@ export default function LandingPage() {
       <section className="relative z-10 px-6 pb-28 max-w-7xl mx-auto overflow-hidden">
         <SectionPhoto
           src="/photos/facility-lane.jpg"
-          opacity={0.2}
+          opacity={0.32}
           overlay="linear-gradient(180deg, rgba(8,12,20,0.5) 0%, rgba(8,12,20,0.9) 100%)"
         />
         <div className="relative">
@@ -272,11 +301,20 @@ export default function LandingPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {HOW_IT_WORKS.map(({ step, title, desc }, i) => (
             <div key={step} className="relative">
-              <div className="text-5xl font-black text-white/[0.08] mb-3 tabular-nums">{step}</div>
+              <div
+                className="w-11 h-11 rounded-full flex items-center justify-center font-display font-bold text-sm tabular-nums text-sp-green-300 mb-4"
+                style={{
+                  background: 'linear-gradient(160deg, rgba(46,158,99,0.28), rgba(46,158,99,0.06))',
+                  border: '1px solid rgba(46,158,99,0.35)',
+                  boxShadow: '0 10px 20px -10px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.1)',
+                }}
+              >
+                {step}
+              </div>
               <h3 className="font-bold text-white mb-2">{title}</h3>
               <p className="text-white/45 text-sm leading-relaxed">{desc}</p>
               {i < HOW_IT_WORKS.length - 1 && (
-                <div className="hidden lg:block absolute top-6 -right-3 w-6 h-px bg-white/10" />
+                <div className="hidden lg:block absolute top-[22px] -right-3 w-6 h-px bg-white/10" />
               )}
             </div>
           ))}
@@ -300,7 +338,7 @@ export default function LandingPage() {
           <div className="relative flex flex-col lg:flex-row gap-10 items-start">
             <div className="flex-shrink-0">
               <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-3xl font-black"
-                style={{ background: 'linear-gradient(135deg, #2E9E63, #216341)' }}>
+                style={{ background: 'linear-gradient(135deg, #2E9E63, #216341)', boxShadow: '0 16px 30px -12px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.15)' }}>
                 SP
               </div>
             </div>
@@ -319,8 +357,8 @@ export default function LandingPage() {
               <div className="flex flex-col sm:flex-row gap-3">
                 <Link
                   to="/login"
-                  className="inline-flex items-center gap-2 px-6 py-3 font-bold text-sm rounded-xl transition-all"
-                  style={{ background: 'linear-gradient(135deg, #2E9E63, #216341)', boxShadow: '0 0 30px rgba(46,158,99,0.3)' }}
+                  className="inline-flex items-center gap-2 px-6 py-3 font-bold text-sm rounded-xl transition-all shadow-[0_5px_0_#163f2b,0_10px_26px_-10px_rgba(46,158,99,0.4)] hover:brightness-110 active:translate-y-[2px] active:shadow-[0_2px_0_#163f2b,0_6px_16px_-10px_rgba(46,158,99,0.35)]"
+                  style={{ background: 'linear-gradient(135deg, #2E9E63, #216341)' }}
                 >
                   Sign In <ChevronRight size={15} />
                 </Link>
@@ -336,33 +374,38 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* CTA Banner */}
-      <section className="relative z-10 px-6 pb-28 max-w-7xl mx-auto">
-        <div className="text-center">
-          <h2 className="text-5xl sm:text-6xl font-extrabold tracking-tighter mb-6">
-            Ready to<br />
-            <span style={{
-              background: 'linear-gradient(90deg, #68BC8E, #2E9E63)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-            }}>level up?</span>
-          </h2>
-          <p className="text-white/40 mb-8 max-w-sm mx-auto">Your program is waiting. Sign in to get started.</p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link
-              to="/login"
-              className="inline-flex items-center gap-2.5 px-8 py-4 font-bold rounded-2xl text-sm transition-all"
-              style={{ background: 'linear-gradient(135deg, #2E9E63, #216341)', boxShadow: '0 0 60px rgba(46,158,99,0.35)' }}
-            >
-              Access Your Program <ChevronRight size={16} />
-            </Link>
-            <button
-              onClick={() => setShowInquiry(true)}
-              className="inline-flex items-center gap-2 px-6 py-4 font-semibold text-sm text-white/50 hover:text-white transition-colors"
-            >
-              <Mail size={15} /> Not a member? Inquire
-            </button>
+      {/* CTA Banner — full-bleed solid green, a deliberate break from the dark
+          scroll above so the close of the page has real weight, not another
+          faded gradient-on-black section. */}
+      <section className="relative z-10 mb-28 overflow-hidden">
+        <div
+          className="py-24 px-6 relative"
+          style={{ background: 'linear-gradient(160deg, #2E9E63 0%, #1B5E3F 100%)' }}
+        >
+          <div
+            className="absolute inset-0 pointer-events-none opacity-25"
+            style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.5) 1px, transparent 1px)', backgroundSize: '28px 28px' }}
+          />
+          <div className="relative max-w-7xl mx-auto text-center">
+            <h2 className="text-5xl sm:text-6xl font-extrabold tracking-tighter mb-6 text-white">
+              Ready to<br />
+              <span className="text-sp-ink-900">level up?</span>
+            </h2>
+            <p className="text-white/80 mb-8 max-w-sm mx-auto">Your program is waiting. Sign in to get started.</p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Link
+                to="/login"
+                className="inline-flex items-center gap-2.5 px-8 py-4 font-bold rounded-2xl text-sm text-white bg-sp-ink-900 transition-all shadow-[0_6px_0_#000,0_16px_30px_-12px_rgba(0,0,0,0.5)] hover:brightness-125 active:translate-y-[3px] active:shadow-[0_2px_0_#000,0_8px_18px_-10px_rgba(0,0,0,0.45)]"
+              >
+                Access Your Program <ChevronRight size={16} />
+              </Link>
+              <button
+                onClick={() => setShowInquiry(true)}
+                className="inline-flex items-center gap-2 px-6 py-4 font-semibold text-sm text-sp-ink-900/70 hover:text-sp-ink-900 transition-colors"
+              >
+                <Mail size={15} /> Not a member? Inquire
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -432,7 +475,7 @@ function SectionPhoto({ src, opacity, overlay, startVisible = false }) {
         style={{
           background: '#1B5E3F',
           mixBlendMode: 'color',
-          opacity: inView ? 0.7 : 0,
+          opacity: inView ? 0.5 : 0,
           WebkitMaskImage: PHOTO_FEATHER,
           maskImage: PHOTO_FEATHER,
         }}

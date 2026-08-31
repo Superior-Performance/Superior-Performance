@@ -69,22 +69,9 @@ For non-green semantic states: amber `#E0A82E` (missed / behind), red `#D9534F` 
 - **Body / UI:** Inter (already loaded).
 - **Display:** `font-display` → Lato, the logo typeface. Use for hero headings and big numbers (velo readouts) that should echo the mark. Don't use it for body copy.
 
-## Migration status — IN PROGRESS
+## Migration status — complete
 
-The app was built on a blue palette (`brand-*` in `tailwind.config.js`, plus hardcoded `#3b5bdb` / `#2541b0` / `#1a2d7a` in `src/index.css`). The brand is now charcoal + green.
-
-Both palettes currently exist so nothing broke mid-build. **When touching any file, migrate it:**
-
-- `brand-500` → `sp-green-500`
-- `brand-600` → `sp-green-600`
-- `brand-700` → `sp-green-600`
-- `brand-900` → `sp-ink-900`
-- `brand-50` / `brand-100` → `sp-green-50` / `sp-green-100`
-- `.btn-brand` gradient `#3b5bdb → #2541b0` → `#2E9E63 → #216341`, shadow `rgba(46,158,99,0.35)`
-- `.surface-brand` gradient `#1a2d7a → #0f1442` → `#0E1113 → #14432E`
-
-Files still on the old palette (highest usage first): `LandingPage.jsx`, `AdminAthleteDetail.jsx`, `AdminSettingsPage.jsx`, `DataPage.jsx`, `AdminProgramsPage.jsx`, `ProgressPage.jsx`, `AdminChatPage.jsx`, `AdminAthletesPage.jsx`, `SchedulePage.jsx`, `LoginPage.jsx`, `index.css`.
-
-Also replace the text wordmarks with `<Logo />`: `LandingPage.jsx` (header + footer), `LoginPage.jsx` (h1), `AdminLayout.jsx` (sidebar).
-
-Once every file is migrated, delete the `brand` scale from `tailwind.config.js`.
+The app was originally built on a blue palette (`brand-*`). It's now fully on
+charcoal + green (`sp-*`) — no `brand-*` classes, old hex values, or text
+wordmarks remain anywhere in `src/`, and the `brand` scale is gone from
+`tailwind.config.js`. Nothing left to migrate.

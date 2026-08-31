@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Plus, Trash2, CheckCircle2, AlertTriangle, CalendarPlus, ChevronDown, ChevronUp, Link2, Unlink, Wind, Heart, Zap, Flame, CircleDot, ListChecks, Dumbbell } from 'lucide-react'
+import { X, Plus, Trash2, CheckCircle2, AlertTriangle, CalendarPlus, Copy, ChevronDown, ChevronUp, Link2, Unlink, Wind, Heart, Zap, Flame, CircleDot, ListChecks, Dumbbell } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { makeExerciseId, groupIntoSlots } from '../utils/programIds'
 import { libraryEntryId, buildLibraryEntries, matchLibraryEntries } from '../utils/exerciseLibrary'
@@ -272,6 +272,38 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
     }])
   }
 
+  // Deep-copies a week and inserts it directly after itself — every
+  // exercise (and alt-group pairing) gets a fresh id so the copy's
+  // completion state can never collide with the source week's, same as
+  // syncCategoryAcrossDays does when it copies exercises across days.
+  // Lets a coach build week N+1 off week N with only the small tweaks that
+  // actually differ, instead of rebuilding it from scratch.
+  function duplicateWeek(wi) {
+    mutate(prev => {
+      const source = prev[wi]
+      if (!source) return prev
+
+      const altGroupMap = {}
+      const days = (source.days || []).map(day => ({
+        ...day,
+        exercises: (day.exercises || []).map(ex => {
+          let altGroup = ex.altGroup
+          if (altGroup) {
+            if (!altGroupMap[altGroup]) altGroupMap[altGroup] = makeExerciseId()
+            altGroup = altGroupMap[altGroup]
+          }
+          return { ...ex, id: makeExerciseId(), altGroup }
+        }),
+      }))
+
+      const next = [...prev]
+      next.splice(wi + 1, 0, { ...source, days })
+      // Renumber sequentially so the inserted copy — and every week after
+      // it — reads correctly (duplicating week 2 of 3 gives 1, 2, 3, 4).
+      return next.map((week, i) => ({ ...week, weekNum: i + 1 }))
+    })
+  }
+
   function removeWeek(wi) {
     const count = (weeks[wi]?.days || []).reduce((s, d) => s + (d.exercises?.length || 0), 0)
     const doRemove = () => mutate(prev => prev.filter((_, w) => w !== wi))
@@ -382,12 +414,21 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
                 <p className="text-xs font-bold text-sp-ink-300 uppercase tracking-wider">
                   Week {week.weekNum ?? wi + 1}
                 </p>
-                <button
-                  onClick={() => removeWeek(wi)}
-                  className="flex items-center gap-1 text-[11px] text-sp-ink-300/70 hover:text-red-400 transition"
-                >
-                  <Trash2 size={12} /> Delete week
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => duplicateWeek(wi)}
+                    className="flex items-center gap-1 text-[11px] text-sp-ink-300/70 hover:text-sp-green-400 transition"
+                    title="Duplicate this week — inserts a copy right after it"
+                  >
+                    <Copy size={12} /> Duplicate week
+                  </button>
+                  <button
+                    onClick={() => removeWeek(wi)}
+                    className="flex items-center gap-1 text-[11px] text-sp-ink-300/70 hover:text-red-400 transition"
+                  >
+                    <Trash2 size={12} /> Delete week
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-4">

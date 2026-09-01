@@ -35,7 +35,7 @@ coordinates on 260 lines. Never read, edit, or grep it.** `Logo.jsx` imports two
 strings from it and that is the only thing anyone needs to know about it. If the
 wordmark ever changes, the file gets replaced wholesale, not edited.
 
-Static files live in `public/brand/` for anything outside React (emails, PDFs, exports).
+Static files live in `public/brand/` for anything outside React (emails, PDFs, exports) — includes `profile-circle.svg`/`.png`, a circular badge (icon + full wordmark, dark bg touching all four edges) sized for social profile pictures.
 
 **Rules**
 - Full lockup needs **at least 180px of width**. Below that use `variant="icon"`.

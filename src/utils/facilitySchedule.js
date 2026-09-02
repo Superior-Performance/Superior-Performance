@@ -33,3 +33,21 @@ export function generateSeriesDates(series, fromDate, toDate) {
 }
 
 export const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+/**
+ * Formats a stored 'HH:MM' (24h) time as a 12-hour clock time — e.g.
+ * '16:00' -> '4:00 PM'. Slot times are entered and stored as plain local
+ * wall-clock strings with no timezone attached (the facility has one
+ * location), so there's no real conversion happening here, just a
+ * readable format instead of military time.
+ */
+export function formatSlotTime(hhmm) {
+  if (!hhmm) return ''
+  const [h, m] = hhmm.split(':').map(Number)
+  return format(new Date(2000, 0, 1, h, m), 'h:mm a')
+}
+
+/** '16:00', '17:00' -> '4:00 PM–5:00 PM CT' */
+export function formatSlotTimeRange(startTime, endTime) {
+  return `${formatSlotTime(startTime)}–${formatSlotTime(endTime)} CT`
+}

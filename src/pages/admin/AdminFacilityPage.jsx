@@ -3,7 +3,7 @@ import {
   getFacilitySlots, deleteFacilitySlot, createFacilitySlot, getSlotBookings,
   getRecurringSeries, createRecurringSeries, updateRecurringSeries, generateSeriesSlots,
 } from '../../firebase/firestore'
-import { generateSeriesDates, DAY_NAMES } from '../../utils/facilitySchedule'
+import { generateSeriesDates, DAY_NAMES, formatSlotTimeRange } from '../../utils/facilitySchedule'
 import { Calendar, Plus, Trash2, ChevronDown, ChevronUp, Repeat, Users, X, Pause, Play } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
@@ -254,7 +254,7 @@ export default function AdminFacilityPage() {
               <div key={s.id} className="flex items-center justify-between gap-3 bg-sp-ink-900/60 border border-sp-ink-600/50 rounded-lg px-4 py-3">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-white">
-                    Every {DAY_NAMES[s.dayOfWeek]} · {s.startTime}–{s.endTime} · cap {s.capacity}
+                    Every {DAY_NAMES[s.dayOfWeek]} · {formatSlotTimeRange(s.startTime, s.endTime)} · cap {s.capacity}
                     {!s.active && <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-amber-400">Paused</span>}
                   </p>
                   <p className="text-xs text-sp-ink-300 truncate">
@@ -348,7 +348,7 @@ export default function AdminFacilityPage() {
                         <div className="flex items-center justify-between gap-3 px-4 py-3">
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-white">
-                              {slot.startTime}–{slot.endTime}
+                              {formatSlotTimeRange(slot.startTime, slot.endTime)}
                               {slot.seriesId && <Repeat size={11} className="inline-block ml-1.5 mb-0.5 text-sp-ink-300" />}
                             </p>
                             {slot.notes && <p className="text-xs text-sp-ink-300 truncate">{slot.notes}</p>}

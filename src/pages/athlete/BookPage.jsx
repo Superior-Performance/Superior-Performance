@@ -5,6 +5,7 @@ import {
 } from '../../firebase/firestore'
 import { CalendarClock, Clock, Check, X } from 'lucide-react'
 import { format } from 'date-fns'
+import { formatSlotTime, formatSlotTimeRange } from '../../utils/facilitySchedule'
 import toast from 'react-hot-toast'
 import EmptyState from '../../components/EmptyState'
 import Skeleton from '../../components/Skeleton'
@@ -96,7 +97,7 @@ export default function BookPage() {
                   <Check size={15} className="text-sp-green-400 flex-shrink-0" />
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-white">{format(new Date(`${slot.date}T12:00:00`), 'EEE, MMM d')}</p>
-                    <p className="text-xs text-sp-ink-300">{slot.startTime}–{slot.endTime}{slot.notes ? ` · ${slot.notes}` : ''}</p>
+                    <p className="text-xs text-sp-ink-300">{formatSlotTimeRange(slot.startTime, slot.endTime)}{slot.notes ? ` · ${slot.notes}` : ''}</p>
                   </div>
                 </div>
                 <button
@@ -130,7 +131,7 @@ export default function BookPage() {
                         <div className="flex items-center gap-2.5 min-w-0">
                           <Clock size={15} className="text-sp-ink-300 flex-shrink-0" />
                           <div className="min-w-0">
-                            <p className="text-sm font-semibold text-white">{slot.startTime}–{slot.endTime}</p>
+                            <p className="text-sm font-semibold text-white">{formatSlotTimeRange(slot.startTime, slot.endTime)}</p>
                             {slot.notes && <p className="text-xs text-sp-ink-300 truncate">{slot.notes}</p>}
                           </div>
                         </div>
@@ -159,7 +160,7 @@ export default function BookPage() {
       {confirmSlot && (
         <ConfirmDialog
           title="Cancel this booking?"
-          message={`${format(new Date(`${confirmSlot.date}T12:00:00`), 'EEEE, MMM d')} at ${confirmSlot.startTime} — this frees your spot for someone else.`}
+          message={`${format(new Date(`${confirmSlot.date}T12:00:00`), 'EEEE, MMM d')} at ${formatSlotTime(confirmSlot.startTime)} CT — this frees your spot for someone else.`}
           confirmLabel="Cancel Booking"
           danger
           onCancel={() => setConfirmSlot(null)}

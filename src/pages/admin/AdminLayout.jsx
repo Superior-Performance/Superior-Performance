@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Outlet, NavLink } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { LayoutDashboard, Users, LayoutList, MessageCircle, LogOut, Settings, Menu, X } from 'lucide-react'
+import { LayoutDashboard, Users, LayoutList, MessageCircle, LogOut, Settings, Menu, X, CalendarClock } from 'lucide-react'
 import Logo from '../../components/Logo'
 
 const NAV = [
@@ -9,6 +9,7 @@ const NAV = [
   { to: '/admin/athletes', label: 'Athletes',  Icon: Users         },
   { to: '/admin/programs', label: 'Programs',  Icon: LayoutList    },
   { to: '/admin/chat',     label: 'Messages',  Icon: MessageCircle },
+  { to: '/admin/facility', label: 'Facility',  Icon: CalendarClock },
   { to: '/admin/settings', label: 'Settings',  Icon: Settings      },
 ]
 

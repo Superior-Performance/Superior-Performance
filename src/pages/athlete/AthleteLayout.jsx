@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { Outlet, NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import {
-  Flame, MessageCircle, TrendingUp, Activity, LogOut, UserCircle, ExternalLink, RefreshCw,
+  Flame, MessageCircle, TrendingUp, Activity, LogOut, UserCircle, ExternalLink, RefreshCw, CalendarClock,
 } from 'lucide-react'
 import Logo from '../../components/Logo'
 
@@ -21,6 +21,7 @@ const PULL_THRESHOLD = 70
 const NAV = [
   { to: 'schedule', label: 'Today',    Icon: Flame         },
   { to: 'progress', label: 'Progress', Icon: TrendingUp    },
+  { to: 'book',     label: 'Book',     Icon: CalendarClock },
   { to: 'chat',     label: 'Chat',     Icon: MessageCircle },
   { to: 'rapsodo',  label: 'Rapsodo',  Icon: Activity      },
   { to: 'account',  label: 'Account',  Icon: UserCircle    },

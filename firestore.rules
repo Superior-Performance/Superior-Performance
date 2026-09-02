@@ -94,6 +94,52 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Facility scheduling: everyone signed in can browse slots (to see
+    // availability); only admins create/delete a slot or edit its own
+    // fields (date/time/capacity/notes). bookedCount is the one field an
+    // athlete can touch themselves — capped so this rule alone can never
+    // let a slot go over capacity, even if a client's own pre-check (see
+    // bookFacilitySlot in firestore.js) were bypassed. Only ±1 per write,
+    // matching one booking or one cancellation.
+    match /facilitySlots/{slotId} {
+      allow read: if isAuth();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        isAuth() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['bookedCount']) &&
+        request.resource.data.bookedCount >= 0 &&
+        request.resource.data.bookedCount <= resource.data.capacity &&
+        (request.resource.data.bookedCount == resource.data.bookedCount + 1 ||
+         request.resource.data.bookedCount == resource.data.bookedCount - 1)
+      );
+
+      // One doc per athlete (doc id = their uid) under the slot they
+      // booked — admins see the full roster, an athlete only their own.
+      match /bookings/{uid} {
+        allow read:   if isAdmin() || (isAuth() && request.auth.uid == uid);
+        allow create: if isAuth() && request.auth.uid == uid;
+        allow delete: if isAdmin() || (isAuth() && request.auth.uid == uid);
+      }
+    }
+
+    // Denormalized mirror of an athlete's own bookings, written in the same
+    // transaction as the real booking doc above — exists purely so "My
+    // Bookings" is a plain read of the athlete's own subcollection instead
+    // of a collection-group query. Fully scoped to the athlete's own uid,
+    // same shape as dataLogs/completions/exerciseWeights.
+    match /facilityBookingsByAthlete/{uid}/slots/{slotId} {
+      allow read:  if isAdmin() || (isAuth() && request.auth.uid == uid);
+      allow write: if isAdmin() || (isAuth() && request.auth.uid == uid);
+    }
+
+    // Recurring weekly availability patterns a coach generates concrete
+    // facilitySlots from (see generateSeriesSlots in firestore.js).
+    // Admin-only in every direction — athletes only ever see the slots a
+    // series has generated, never the series/pattern itself.
+    match /facilityRecurringSeries/{seriesId} {
+      allow read, write: if isAdmin();
+    }
+
     // App settings: admin-only, except settings/public — the landing page's
     // inquiry form needs to read its Apps Script URL while signed out. Nothing
     // sensitive lives there (an "Anyone can execute" script URL isn't a secret;

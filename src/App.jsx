@@ -12,6 +12,7 @@ import ChatPage       from './pages/athlete/ChatPage'
 import ProgressPage   from './pages/athlete/ProgressPage'
 import RapsodoPage    from './pages/athlete/RapsodoPage'
 import AccountPage    from './pages/athlete/AccountPage'
+import BookPage       from './pages/athlete/BookPage'
 
 // Admin pages
 import AdminLayout       from './pages/admin/AdminLayout'
@@ -21,6 +22,7 @@ import AdminProgramsPage from './pages/admin/AdminProgramsPage'
 import AdminChatPage     from './pages/admin/AdminChatPage'
 import AdminAthleteDetail from './pages/admin/AdminAthleteDetail'
 import AdminSettingsPage  from './pages/admin/AdminSettingsPage'
+import AdminFacilityPage  from './pages/admin/AdminFacilityPage'
 
 function RequireAuth({ children, role }) {
   const { currentUser, userProfile, loading } = useAuth()
@@ -72,6 +74,7 @@ export default function App() {
         <Route path="chat"     element={<ChatPage />} />
         <Route path="progress" element={<ProgressPage />} />
         <Route path="rapsodo"  element={<RapsodoPage />} />
+        <Route path="book"     element={<BookPage />} />
         <Route path="account"  element={<AccountPage />} />
       </Route>
 
@@ -86,6 +89,7 @@ export default function App() {
         <Route path="programs"          element={<AdminProgramsPage />} />
         <Route path="chat"              element={<AdminChatPage />} />
         <Route path="chat/:athleteUid"  element={<AdminChatPage />} />
+        <Route path="facility"          element={<AdminFacilityPage />} />
         <Route path="settings"          element={<AdminSettingsPage />} />
       </Route>
 

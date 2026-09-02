@@ -1,6 +1,25 @@
 import { addDays, format, parseISO, getDay } from 'date-fns'
 
 /**
+ * The Sunday-through-Saturday week 'YYYY-MM-DD' (a plain date, not a full
+ * range) that contains the given date — used as a grouping key so the
+ * athlete's Book page can bucket open slots into weeks. Deliberately its
+ * own tiny function rather than date-fns' startOfWeek/endOfWeek directly:
+ * those return Date objects in local time, and everything else in this
+ * file (and the slot data itself) works in plain 'YYYY-MM-DD' strings, so
+ * this keeps the string-in/string-out contract consistent everywhere.
+ */
+export function weekStartFor(dateStr) {
+  const d = parseISO(dateStr)
+  const sunday = addDays(d, -getDay(d)) // getDay: 0=Sun..6=Sat
+  return format(sunday, 'yyyy-MM-dd')
+}
+
+export function weekEndFor(dateStr) {
+  return format(addDays(parseISO(weekStartFor(dateStr)), 6), 'yyyy-MM-dd')
+}
+
+/**
  * Given a recurring weekly series ({ dayOfWeek: 0-6 (Sun-Sat), startDate,
  * endDate | null }) and a target [fromDate, toDate] window (both
  * 'YYYY-MM-DD'), returns every 'YYYY-MM-DD' the series should have a

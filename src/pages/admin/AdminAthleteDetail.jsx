@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   getUser, getAssessment, saveAssessment,
-  updateUser, deleteUser, getProgramForAthlete, updateProgram,
+  updateUser, deleteAthleteCompletely, getProgramForAthlete, updateProgram,
   updateLiveProgram, migrateCompletionKeys,
   createProgram, deleteProgram, getSettings, getProgramsForAthlete, getGeneralPrograms,
   getCompletions,
 } from '../../firebase/firestore'
 import { getDataLogs, addDataLog, setDataLogFlag } from '../../firebase/firestore'
-import { ensureExerciseIds, completionKey, legacyCompletionKey, makeExerciseId, countProgramProgress } from '../../utils/programIds'
+import { ensureExerciseIds, completionKey, legacyCompletionKey, countProgramProgress } from '../../utils/programIds'
 import Avatar from '../../components/Avatar'
 import { ArrowLeft, Save, Zap, Scale, MessageCircle, Pencil, Trash2, X, Sparkles, KeyRound, XCircle, FileSpreadsheet, Download, ChevronDown, GraduationCap, Search, Plus, Flag, Target } from 'lucide-react'
 import Papa from 'papaparse'
@@ -20,15 +20,10 @@ import ProgramEditorModal from '../../components/ProgramEditorModal'
 import ToggleSwitch from '../../components/ToggleSwitch'
 import Skeleton from '../../components/Skeleton'
 import ConfirmDialog from '../../components/ConfirmDialog'
-import { PROGRAM_TYPES, DAY_TYPES, matchDayType, LIFTING_DAY_TYPES, matchLiftingDayType } from '../../constants/programTypes'
-
-// Each day type's stable position in the draft's day grid — see
-// createDraftFromRows below.
-const DAY_TYPE_DAYNUM = Object.fromEntries(DAY_TYPES.map((dt, i) => [dt.key, i + 1]))
-// Lifting's day types get their own stable day-bucket numbering — separate
-// map, separate vocabulary (Upper/Lower vs. High Intent/Hybrid/Synergy/
-// Recovery), same purpose. See createDraftFromRows.
-const LIFTING_DAY_TYPE_DAYNUM = Object.fromEntries(LIFTING_DAY_TYPES.map((dt, i) => [dt.key, i + 1]))
+import { PROGRAM_TYPES } from '../../constants/programTypes'
+import {
+  OUTPUT_PULL_GROUPS, generateDraftProgram, generateAllDraftPrograms, sendAssessmentToIntakeSheet,
+} from '../../utils/sheetPrograms'
 
 // Mirrors the "Assessment Intake" Google Sheet column-for-column (minus
 // Athlete Name, which the app already tracks) so the saved doc can be handed
@@ -148,6 +143,7 @@ export default function AdminAthleteDetail() {
   const [tab, setTab]               = useState('assessment')
   const [showEdit, setShowEdit]     = useState(false)
   const [showDelete, setShowDelete] = useState(false)
+  const [deleteResult, setDeleteResult] = useState(null) // set once deletion finishes — shows a real summary instead of a toast that vanishes
   const [editName, setEditName]     = useState('')
   const [editEmail, setEditEmail]   = useState('')
   const [togglingType, setTogglingType] = useState(false)
@@ -305,15 +301,20 @@ export default function AdminAthleteDetail() {
   async function handleDelete() {
     setSaving(true)
     try {
-      await deleteUser(uid)
-      toast.success('Athlete deleted.')
-      navigate('/admin/athletes')
-    } catch {
-      toast.error('Delete failed.')
+      const summary = await deleteAthleteCompletely(uid)
+      setDeleteResult(summary)
+    } catch (err) {
+      toast.error('Delete failed: ' + (err.message || 'Unknown error'))
+    } finally {
       setSaving(false)
     }
   }
 
+  // Sheet-sync logic (Week/Day parsing, row→program building, the fetch +
+  // draft-creation calls) lives in utils/sheetPrograms.js, shared with the
+  // roster's bulk "Send to Intake Sheet" / "Generate Programs" actions —
+  // this page just supplies the UI (toasts, per-button loading state,
+  // refreshing this athlete's program list after a draft lands).
   async function sendToIntakeSheet() {
     setSendingToSheet(true)
     try {
@@ -323,14 +324,7 @@ export default function AdminAthleteDetail() {
         toast.error('No Assessment Intake script URL set. Go to Settings first.')
         return
       }
-
-      const params = new URLSearchParams()
-      Object.entries(assessment).forEach(([k, v]) => { if (v) params.set(k, v) })
-      params.set('athleteName', athlete.name)
-
-      const res = await fetch(`${scriptUrl}?${params.toString()}`)
-      const json = await res.json()
-
+      const json = await sendAssessmentToIntakeSheet(scriptUrl, athlete.name, assessment)
       if (!json.success) {
         toast.error(json.error || 'Sheet did not accept the row.')
         return
@@ -343,219 +337,6 @@ export default function AdminAthleteDetail() {
     }
   }
 
-  const WEEKDAY_TO_NUM = { monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6, sunday: 7 }
-
-  // Coaches write Week/Day as either a single number ("2"), a labeled number
-  // ("Day 2", "Week 2"), a repeating range ("1-4", "1-3 (every training
-  // day)") to mean "this block runs on every one of these weeks/days," or —
-  // for in-house athletes with set training days — a weekday name
-  // ("Monday", "Friday (optional)"). Weekday names map to a stable
-  // Mon=1..Sun=7 so each real day lands on its own bucket instead of
-  // collapsing into Day 1 — and "Day 1"/"Day 2"/"Day 3" must have their
-  // label stripped first or they'd all fail to parse and collapse the same way.
-  function parseWeekOrDayRange(raw) {
-    const str = String(raw ?? '').trim().replace(/^(day|week)\s+/i, '')
-    const range = str.match(/^(\d+)\s*-\s*(\d+)/)
-    if (range) {
-      const start = Number(range[1])
-      const end   = Number(range[2])
-      // A stray value in the Week/Day cell (a date serial, an ID, a typo)
-      // can still match this pattern with a huge span — no real program
-      // block runs more than a couple months, so cap it rather than
-      // spinning a loop with millions of iterations and freezing the tab.
-      if (!Number.isFinite(start) || !Number.isFinite(end) || end < start || end - start > 60) {
-        return [1]
-      }
-      const nums = []
-      for (let n = start; n <= end; n++) nums.push(n)
-      return nums.length ? nums : [1]
-    }
-    const single = Number(str.match(/^\d+/)?.[0])
-    if (Number.isFinite(single)) return [single]
-    const weekday = WEEKDAY_TO_NUM[str.replace(/\(.*?\)/g, '').trim().toLowerCase()]
-    return weekday ? [weekday] : [1]
-  }
-
-  // Shared by every Outputs-tab pull — all end up with the same flat row
-  // shape (Week, Day, Category, Exercise, Sets, Reps, Intensity, Notes,
-  // Video URL, plus an optional Alternate Exercise/Sets/Reps/Intensity/
-  // Notes/Video URL for a same-row either/or option). The Outputs tabs call
-  // their category column "Type" and their Day column can be blank (one
-  // session a week) or a weekday name — both are handled here so every pull
-  // path shares one code path. Creates
-  // a DRAFT (active: false) rather than publishing straight to the athlete,
-  // so it can be reviewed and edited first — see the Drafts Awaiting Review
-  // section on the Program tab. programType determines which of the
-  // athlete's 4 concurrent program slots this fills.
-  async function createDraftFromRows(rows, programName, programType = 'correctives') {
-    const weeksMap = {}
-    rows.forEach(row => {
-      const weekNums = parseWeekOrDayRange(row['Week'])
-      // College Remote Athletes' rows put a day-type label ("High Intent
-      // Day", "Medium Day", "Recovery Day" — or, for lifting, "Upper Day 1"
-      // etc., a separate vocabulary) directly in the Day column
-      // instead of a weekday name. parseWeekOrDayRange can't parse that as
-      // a number, so it'd otherwise fall back to [1] for every row —
-      // silently collapsing every day type into one Day 1. Detect it and
-      // give each type its own stable day bucket, tagged automatically so
-      // the athlete's day-type picker (see SchedulePage) works right after
-      // the pull instead of needing the coach to re-tag it by hand.
-      const dayTypeKey = programType === 'lifting' ? matchLiftingDayType(row['Day']) : matchDayType(row['Day'])
-      const dayNumMap = programType === 'lifting' ? LIFTING_DAY_TYPE_DAYNUM : DAY_TYPE_DAYNUM
-      const dayNums = dayTypeKey
-        ? [dayNumMap[dayTypeKey]]
-        : (row['Day'] !== undefined && row['Day'] !== '' ? parseWeekOrDayRange(row['Day']) : [1])
-      const dayOptional = /\(optional\)/i.test(String(row['Day'] ?? ''))
-      weekNums.forEach(wk => {
-        if (!weeksMap[wk]) weeksMap[wk] = { weekNum: wk, days: {} }
-        dayNums.forEach(day => {
-          if (!weeksMap[wk].days[day]) {
-            weeksMap[wk].days[day] = {
-              dayNum: day,
-              optional: dayOptional,
-              exercises: [],
-              ...(dayTypeKey ? { dayType: dayTypeKey } : {}),
-            }
-          }
-          // Lifting Outputs has its own column shape: Block (A/B/C — a
-          // group of lifts done together) and Slot # (order within that
-          // block) replace the other tabs' Category/Type column; its "Type"
-          // column (Upper/Lower) is redundant with the Day column's day
-          // type and is ignored here rather than leaking in as a category.
-          // "Block A" doubles as the exercise's `category` so it reuses the
-          // exact same grouping/accordion machinery every other category
-          // already has — see buildCategoryBlocks (SchedulePage) and
-          // buildDayGroups (ProgramEditorModal); `blockSlot` is a new field
-          // just for ordering exercises within that block correctly.
-          const isLifting = programType === 'lifting'
-          const category = isLifting
-            ? (row['Block'] ? `Block ${String(row['Block']).trim().toUpperCase()}` : '')
-            : (row['Category'] || row['Type'] || '')
-          const slotRaw = row['Slot #'] ?? row['Slot#'] ?? row['Slot']
-          const blockSlot = isLifting && slotRaw !== undefined && slotRaw !== '' ? Number(slotRaw) : NaN
-          weeksMap[wk].days[day].exercises.push({
-            id:        makeExerciseId(),   // stable across later edits — see utils/programIds
-            name:      row['Exercise']  || '',
-            sets:      row['Sets']      || '',
-            reps:      row['Reps']      || '',
-            intensity: row['Intensity'] || '',
-            notes:     row['Notes']     || '',
-            // Per-exercise, not per-day — one day can mix Mobilization,
-            // Correctives, Movement Activation and a plyo routine. See
-            // constants/programTypes.js for the category taxonomy. "Type" is
-            // the outputs tab's name for the same column.
-            category,
-            videoUrl:  row['Video URL'] || row['Video'] || '',
-            ...(Number.isFinite(blockSlot) ? { blockSlot } : {}),
-          })
-
-          // The sheet can carry a second, either/or option on the same
-          // row — same column names with "Alternate " in front (Alternate
-          // Exercise, Alternate Sets, ...). When filled in, pair it with
-          // the exercise just pushed via a shared altGroup so the athlete
-          // sees them as one "choose one" slot instead of two separate
-          // exercises — see utils/programIds and ProgramEditorModal's
-          // "Add alt option".
-          const altName = row['Alternate Exercise'] || ''
-          if (altName.trim()) {
-            const exercises = weeksMap[wk].days[day].exercises
-            const group = makeExerciseId()
-            exercises[exercises.length - 1].altGroup = group
-            exercises.push({
-              id:        makeExerciseId(),
-              name:      altName,
-              sets:      row['Alternate Sets']      || '',
-              reps:      row['Alternate Reps']      || '',
-              intensity: row['Alternate Intensity'] || '',
-              notes:     row['Alternate Notes']     || '',
-              category,
-              videoUrl:  row['Alternate Video URL'] || row['Alternate Video'] || '',
-              altGroup:  group,
-            })
-          }
-        })
-      })
-    })
-
-    const weeks = Object.values(weeksMap)
-      .sort((a, b) => a.weekNum - b.weekNum)
-      .map(w => ({
-        ...w,
-        days: Object.values(w.days).sort((a, b) => a.dayNum - b.dayNum),
-      }))
-
-    // Re-pulling replaces any of this type's previous not-yet-reviewed
-    // drafts instead of stacking a new one alongside them — otherwise every
-    // "Generate Program" click while iterating on the sheet leaves another
-    // untouched draft behind, and Drafts Awaiting Review never actually
-    // empties out even though each one really did get superseded.
-    const staleDrafts = programs.filter(p =>
-      p.athleteId === uid && p.active === false && !p.archived && (p.programType || 'correctives') === programType
-    )
-    await Promise.all(staleDrafts.map(p => deleteProgram(p.id)))
-
-    await createProgram({
-      name:       programName,
-      athleteId:  uid,
-      programType,
-      totalWeeks: weeks.length,
-      weeks,
-      // Defaults to today — the coach can adjust it in the review editor
-      // before publishing, since it's what sets the athlete's Day 1.
-      startDate:  new Date().toISOString().slice(0, 10),
-      active:     false,
-    })
-
-    await refreshPrograms()
-  }
-
-  // The coach's Sheet splits its exercise output across several tabs now —
-  // Mobilization/Correctives/Movement Activation in "Pre-Throw Outputs", the
-  // plyo routines in "Plyo Outputs", and one tab each for Mobility and
-  // Lifting. pullOutputs needs a `tab` param and returns just that tab's
-  // rows. Throwing/Post-Throw and Pre-Throw each pull two tabs and still
-  // land as one program with category tiles, exactly like when it was one
-  // tab; Mobility and Lifting each pull a single tab into their own program.
-  const OUTPUT_PULL_GROUPS = [
-    { tabs: ['Pre-Throw Outputs'],                                  programType: 'correctives', nameSuffix: 'Program',  label: 'Pre-Throw' },
-    { tabs: ['Throwing/Post-Throw Outputs', 'Plyo Outputs'],   programType: 'throwing',    nameSuffix: 'Throwing', label: 'Throwing/Post-Throw' },
-    { tabs: ['Lifting Outputs'],                                    programType: 'lifting',     nameSuffix: 'Lifting',  label: 'Lifting' },
-    { tabs: ['Mobility Outputs'],                                   programType: 'mobility',    nameSuffix: 'Mobility', label: 'Mobility' },
-  ]
-
-  // No toast here — callers decide how to report results, since the
-  // "combined" pull needs one summary toast instead of one per group.
-  async function fetchOutputDraft(scriptUrl, { tabs, programType, nameSuffix, label }) {
-    const results = await Promise.all(tabs.map(async (tabName) => {
-      const params = new URLSearchParams()
-      params.set('action', 'pullOutputs')
-      params.set('tab', tabName)
-      params.set('athleteName', athlete.name)
-      // Apps Script occasionally just never responds — a hard timeout so
-      // the button surfaces an error instead of sitting on "Working…"
-      // forever with no way out but a page refresh.
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 30000)
-      let res
-      try {
-        res = await fetch(`${scriptUrl}?${params.toString()}`, { signal: controller.signal })
-      } catch (err) {
-        if (err.name === 'AbortError') throw new Error(`The sheet took too long to respond (${tabName}). Try again.`)
-        throw err
-      } finally {
-        clearTimeout(timeoutId)
-      }
-      return res.json()
-    }))
-
-    const failed = results.find(r => !r.success)
-    const rows = results.flatMap(r => r.program || [])
-    if (!rows.length) return { label, ok: false, error: failed?.error || `No rows in ${tabs.join(' or ')}` }
-
-    await createDraftFromRows(rows, `${athlete.name} — ${nameSuffix}`, programType)
-    return { label, ok: true, count: rows.length }
-  }
-
   async function pullOneGroup(group, setPulling) {
     setPulling(true)
     try {
@@ -565,11 +346,12 @@ export default function AdminAthleteDetail() {
         toast.error('No Assessment Intake script URL set. Go to Settings first.')
         return
       }
-      const result = await fetchOutputDraft(scriptUrl, group)
+      const result = await generateDraftProgram(scriptUrl, uid, athlete.name, group, programs)
       if (!result.ok) {
         toast.error(result.error)
         return
       }
+      await refreshPrograms()
       toast.success(`Draft pulled from ${group.tabs.join(' + ')} — review it below before publishing.`)
     } catch (err) {
       console.error(err)
@@ -598,7 +380,7 @@ export default function AdminAthleteDetail() {
         return
       }
 
-      const results = await Promise.all(OUTPUT_PULL_GROUPS.map(group => fetchOutputDraft(scriptUrl, group)))
+      const results = await generateAllDraftPrograms(scriptUrl, uid, athlete.name, programs)
       const succeeded = results.filter(r => r.ok)
       const failed = results.filter(r => !r.ok)
 
@@ -606,6 +388,7 @@ export default function AdminAthleteDetail() {
         toast.error('No rows found for this athlete in any Outputs tab.')
         return
       }
+      await refreshPrograms()
       toast.success(
         `Pulled ${succeeded.length} of ${results.length} programs (${succeeded.map(r => r.label).join(', ')})` +
         (failed.length ? ` — nothing yet for ${failed.map(r => r.label).join(', ')}.` : '.')
@@ -1349,23 +1132,65 @@ export default function AdminAthleteDetail() {
         </div>
       )}
 
-      {/* Delete confirmation modal */}
+      {/* Delete confirmation modal — becomes a results summary once deleteResult is set,
+          rather than closing straight to a toast that could overstate what actually happened. */}
       {showDelete && (
         <div className="animate-modal-backdrop fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <div className="animate-modal-panel bg-sp-ink-800 border border-sp-ink-600 rounded-2xl w-full max-w-sm p-6 shadow-xl">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-white">Delete Athlete?</h2>
-              <button onClick={() => setShowDelete(false)} className="p-1 hover:bg-white/10 text-sp-ink-300 rounded-lg"><X size={18} /></button>
-            </div>
-            <p className="text-sm text-sp-ink-300 mb-5">
-              This will permanently remove <span className="font-semibold text-white">{athlete.name}</span> and all their data. This cannot be undone.
-            </p>
-            <div className="flex gap-3">
-              <button onClick={() => setShowDelete(false)} className="flex-1 py-2.5 border border-sp-ink-600 text-sp-ink-100 rounded-xl text-sm font-medium hover:bg-white/5 transition">Cancel</button>
-              <button onClick={handleDelete} disabled={saving} className="flex-1 py-2.5 bg-red-500 text-white rounded-xl text-sm font-semibold hover:bg-red-600 disabled:opacity-60 transition">
-                {saving ? 'Deleting…' : 'Delete'}
-              </button>
-            </div>
+            {!deleteResult ? (
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-bold text-white">Delete Athlete?</h2>
+                  <button onClick={() => setShowDelete(false)} className="p-1 hover:bg-white/10 text-sp-ink-300 rounded-lg"><X size={18} /></button>
+                </div>
+                <p className="text-sm text-sp-ink-300 mb-5">
+                  This will permanently remove <span className="font-semibold text-white">{athlete.name}</span>'s profile, assessment, chat history, workout completions, logged velo/weight, programs, and facility bookings. This cannot be undone.
+                </p>
+                <p className="text-xs text-sp-ink-400 mb-5">
+                  Two things this won't touch: their login (Firebase Auth account) and any rows already pushed to your Google Sheets — you'll get a checklist for those after.
+                </p>
+                <div className="flex gap-3">
+                  <button onClick={() => setShowDelete(false)} className="flex-1 py-2.5 border border-sp-ink-600 text-sp-ink-100 rounded-xl text-sm font-medium hover:bg-white/5 transition">Cancel</button>
+                  <button onClick={handleDelete} disabled={saving} className="flex-1 py-2.5 bg-red-500 text-white rounded-xl text-sm font-semibold hover:bg-red-600 disabled:opacity-60 transition">
+                    {saving ? 'Deleting…' : 'Delete'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 className="text-lg font-bold text-white mb-4">{athlete.name}'s data removed</h2>
+                <ul className="text-sm text-sp-ink-300 space-y-1.5 mb-5">
+                  <li>✓ Profile, assessment, chat history, completions, logs, and {deleteResult.programs} program{deleteResult.programs === 1 ? '' : 's'} deleted</li>
+                  {deleteResult.facilityBookings > 0 && <li>✓ {deleteResult.facilityBookings} facility booking{deleteResult.facilityBookings === 1 ? '' : 's'} cancelled and released</li>}
+                  {deleteResult.storagePhoto && <li>✓ Profile photo removed</li>}
+                  {deleteResult.errors.length > 0 && (
+                    <li className="text-amber-400">⚠ Some data couldn't be removed automatically — see below.</li>
+                  )}
+                </ul>
+                {deleteResult.errors.length > 0 && (
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 mb-4 text-xs text-amber-300 space-y-1">
+                    {deleteResult.errors.map((e, i) => <p key={i}>{e}</p>)}
+                  </div>
+                )}
+                <div className="bg-white/5 rounded-xl p-3 mb-5 text-xs text-sp-ink-300 space-y-2">
+                  <p className="font-semibold text-sp-ink-100">Two manual steps remain:</p>
+                  <p>
+                    1. Remove their login in{' '}
+                    <a href="https://console.firebase.google.com/project/superior-performance-ba102/authentication/users" target="_blank" rel="noreferrer" className="text-sp-green-400 underline">
+                      Firebase Console → Authentication
+                    </a>
+                    {athlete.email && <> — search for <span className="font-mono text-sp-ink-100">{athlete.email}</span></>}.
+                  </p>
+                  <p>2. Remove any matching rows from your Assessment Intake / Outputs sheets by athlete name, if you push data there.</p>
+                </div>
+                <button
+                  onClick={() => { setShowDelete(false); setDeleteResult(null); navigate('/admin/athletes') }}
+                  className="w-full py-2.5 bg-sp-green-500 text-white rounded-xl text-sm font-semibold hover:bg-sp-green-600 transition"
+                >
+                  Done
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}

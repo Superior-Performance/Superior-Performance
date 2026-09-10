@@ -25,6 +25,7 @@ import {
   updateDoc, deleteDoc, query, where, orderBy, onSnapshot,
   serverTimestamp, Timestamp, writeBatch, runTransaction,
 } from 'firebase/firestore'
+import { getStorage, ref as storageRef, deleteObject } from 'firebase/storage'
 import { db } from './config'
 
 // ── Users ──────────────────────────────────────────────────────────────────
@@ -41,6 +42,109 @@ export const deleteUser = (uid) =>
 
 export const getAllAthletes = () =>
   getDocs(query(collection(db, 'users'), where('role', '==', 'athlete')))
+
+// Deletes every piece of this athlete's data that lives in Firestore or
+// Storage — not just the users/{uid} profile doc. Before this existed,
+// "Delete Athlete" only removed that one doc and silently left assessments
+// (injury history, screening results), chat history, workout completions,
+// velo/weight logs, programs, and facility bookings all still in place,
+// despite the confirmation dialog promising otherwise.
+//
+// Two things this deliberately CANNOT reach, and the caller should surface
+// to the admin explicitly rather than imply are handled:
+//  - The athlete's Firebase Auth login itself. Deleting another user's auth
+//    account needs the Admin SDK (a Cloud Function), which this project
+//    doesn't have (no Blaze plan yet). The athlete already can't get past
+//    RequireAuth once their users/{uid} doc is gone — this just means their
+//    credential technically still exists in Firebase's user pool until an
+//    admin removes it by hand in the Firebase Console.
+//  - Rows in the coach's Google Sheets (Assessment Intake, Outputs tabs).
+//    That's a separate, best-effort network call — see
+//    deleteAthleteFromSheets below — not part of this function, since a
+//    Sheets failure shouldn't be able to leave Firestore half-deleted.
+//
+// Returns a summary of what was actually removed, so the caller can show an
+// honest result instead of a blanket "deleted everything" toast.
+export async function deleteAthleteCompletely(uid) {
+  const summary = { subcollections: {}, programs: 0, facilityBookings: 0, storagePhoto: false, errors: [] }
+
+  async function deleteSubcollection(...pathSegments) {
+    const label = pathSegments.join('/')
+    try {
+      const snap = await getDocs(collection(db, ...pathSegments))
+      if (snap.empty) { summary.subcollections[label] = 0; return }
+      const batch = writeBatch(db)
+      snap.docs.forEach(d => batch.delete(d.ref))
+      await batch.commit()
+      summary.subcollections[label] = snap.size
+    } catch (err) {
+      summary.errors.push(`${label}: ${err.message}`)
+    }
+  }
+
+  // Subcollections keyed by this athlete's uid.
+  await deleteSubcollection('dataLogs', uid, 'entries')
+  await deleteSubcollection('completions', uid, 'weeks')
+  await deleteSubcollection('exerciseWeights', uid, 'entries')
+  await deleteSubcollection('chats', uid, 'messages')
+
+  // Facility bookings — cancelFacilityBooking already does the correct
+  // transactional cleanup (decrement bookedCount, delete the booking, delete
+  // the athlete-side mirror) for one slot; reuse it for every slot this
+  // athlete has booked rather than duplicating that transaction here.
+  try {
+    const bookingsSnap = await getDocs(collection(db, 'facilityBookingsByAthlete', uid, 'slots'))
+    const slotIds = bookingsSnap.docs.map(d => d.id)
+    await Promise.all(slotIds.map(slotId => cancelFacilityBooking(slotId, uid)))
+    summary.facilityBookings = slotIds.length
+  } catch (err) {
+    summary.errors.push(`facility bookings: ${err.message}`)
+  }
+
+  // Top-level docs.
+  try {
+    const batch = writeBatch(db)
+    batch.delete(doc(db, 'assessments', uid))
+    batch.delete(doc(db, 'athletePrefs', uid))
+    batch.delete(doc(db, 'chatReads', uid))
+    batch.delete(doc(db, 'users', uid))
+    await batch.commit()
+  } catch (err) {
+    summary.errors.push(`profile docs: ${err.message}`)
+  }
+
+  // Programs — a query, not a fixed path, since there's no way to know a
+  // uid's program IDs up front.
+  try {
+    const programsSnap = await getDocs(query(collection(db, 'programs'), where('athleteId', '==', uid)))
+    if (!programsSnap.empty) {
+      const batch = writeBatch(db)
+      programsSnap.docs.forEach(d => batch.delete(d.ref))
+      await batch.commit()
+    }
+    summary.programs = programsSnap.size
+  } catch (err) {
+    summary.errors.push(`programs: ${err.message}`)
+  }
+
+  // Profile photo — best-effort. Storage isn't activated in this project's
+  // console yet (per project notes); confirmed by testing that an
+  // unprovisioned bucket doesn't reject the SDK call with a clean error, it
+  // just hangs forever. Race it against a timeout so a bucket that's still
+  // off (or just slow) can never block the rest of this function — a
+  // timeout here just means "couldn't confirm," not "failed."
+  try {
+    await Promise.race([
+      deleteObject(storageRef(getStorage(), `profilePhotos/${uid}/avatar.jpg`)),
+      new Promise((_, reject) => setTimeout(() => reject({ code: 'storage/timeout' }), 5000)),
+    ])
+    summary.storagePhoto = true
+  } catch (err) {
+    if (err?.code !== 'storage/object-not-found' && err?.code !== 'storage/timeout') summary.errors.push(`profile photo: ${err.message}`)
+  }
+
+  return summary
+}
 
 // ── Programs ────────────────────────────────────────────────────────────────
 export const getProgram = (programId) =>
@@ -150,6 +254,14 @@ export const getAssessment = (uid) =>
 
 export const saveAssessment = (uid, data) =>
   setDoc(doc(db, 'assessments', uid), { ...data, updatedAt: serverTimestamp() }, { merge: true })
+
+// Every assessment doc, keyed by uid (the doc ID) — used by the roster's
+// bulk actions to show each athlete's assessment date and to filter a
+// date range without opening each athlete individually. `assessmentDate` is
+// a plain 'YYYY-MM-DD' string from the date input, so it sorts and
+// range-compares correctly as a string.
+export const getAllAssessments = () =>
+  getDocs(collection(db, 'assessments'))
 
 // ── Athlete preferences ──────────────────────────────────────────────────────
 // athletePrefs/{uid} — { programNoticesSeen: { [programId]: millis } }
@@ -289,6 +401,14 @@ export const saveExerciseWeight = (uid, key, data) =>
 
 export const subscribeExerciseWeights = (uid, callback) =>
   onSnapshot(collection(db, 'exerciseWeights', uid, 'entries'), callback)
+
+// One-time (non-subscribing) read — for the admin dashboard's per-athlete
+// fan-out, where logging a working weight inline needs to count as activity
+// alongside completions and data logs (see lastActivityMillis in
+// AdminDashboardPage.jsx). subscribeExerciseWeights above is for the
+// athlete's own live-updating schedule view.
+export const getExerciseWeights = (uid) =>
+  getDocs(collection(db, 'exerciseWeights', uid, 'entries'))
 
 // ── Facility scheduling ──────────────────────────────────────────────────────
 // facilitySlots/{slotId} — { date: 'YYYY-MM-DD', startTime: 'HH:MM',

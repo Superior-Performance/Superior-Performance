@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   getAllAthletes, getAllPrograms, getCompletions, getDataLogs, setDataLogFlag,
-  getChatMessages, getAllChatReads,
+  getExerciseWeights, getChatMessages, getAllChatReads,
 } from '../../firebase/firestore'
 import { buildSlots, isSlotComplete, countProgramProgress } from '../../utils/programIds'
 import { computeStreak } from '../../utils/programSchedule'
@@ -56,10 +56,15 @@ function athleteProgress(programs, completions) {
   return total ? Math.round((done / total) * 100) : null
 }
 
-function lastActivityMillis(completionsSnap, logsSnap) {
+function lastActivityMillis(completionsSnap, logsSnap, weightsSnap) {
   let max = 0
   completionsSnap.forEach(d => { const t = d.data().completedAt?.toMillis?.(); if (t && t > max) max = t })
   logsSnap.forEach(d => { const t = d.data().createdAt?.toMillis?.(); if (t && t > max) max = t })
+  // Logging a working weight inline on a lift (WeightField, SchedulePage) is
+  // real engagement too — without this, an athlete who tracks weights but
+  // rarely taps the completion checkmark reads as "Inactive" despite
+  // training every session. See saveExerciseWeight in firebase/firestore.js.
+  weightsSnap.forEach(d => { const t = d.data().updatedAt?.toMillis?.(); if (t && t > max) max = t })
   return max || null
 }
 
@@ -114,9 +119,12 @@ export default function AdminDashboardPage() {
         activeProgramsByAthlete[a.id] = allPrograms.filter(p => p.athleteId === a.id && p.active === true)
       })
 
-      const [completionsSnaps, logsSnaps, messagesSnaps] = await Promise.all([
+      const [completionsSnaps, weightsSnaps, logsSnaps, messagesSnaps] = await Promise.all([
         Promise.all(athletes.map(a =>
           activeProgramsByAthlete[a.id].length > 0 ? getCompletions(a.id) : Promise.resolve(EMPTY_SNAPSHOT)
+        )),
+        Promise.all(athletes.map(a =>
+          activeProgramsByAthlete[a.id].length > 0 ? getExerciseWeights(a.id) : Promise.resolve(EMPTY_SNAPSHOT)
         )),
         Promise.all(athletes.map(a => getDataLogs(a.id))),
         // Narrowed to "created after this athlete's chatReads.lastReadAt" —
@@ -141,7 +149,7 @@ export default function AdminDashboardPage() {
         })
 
         const pct = athleteProgress(activePrograms, completions)
-        const lastActivityMs = lastActivityMillis(completionsSnaps[i], logsSnaps[i])
+        const lastActivityMs = lastActivityMillis(completionsSnaps[i], logsSnaps[i], weightsSnaps[i])
         const inactive = activePrograms.length > 0 &&
           (!lastActivityMs || Date.now() - lastActivityMs > INACTIVE_DAYS * 86400000)
         const behind = pct != null && pct < BEHIND_THRESHOLD

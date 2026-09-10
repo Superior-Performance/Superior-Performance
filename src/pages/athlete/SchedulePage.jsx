@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import {
   getProgramForAthlete, subscribeCompletions, setExerciseComplete, getAthletePrefs, saveAthletePrefs,
@@ -76,14 +76,16 @@ function toEmbedUrl(url) {
   try {
     const u = new URL(url)
     const host = u.hostname.replace(/^www\./, '')
+    // youtube-nocookie.com is YouTube's privacy-enhanced embed domain — it
+    // skips setting tracking cookies until the athlete actually presses play.
     if (host === 'youtube.com' || host === 'm.youtube.com') {
       let id = u.searchParams.get('v')
       if (!id && u.pathname.startsWith('/shorts/')) id = u.pathname.split('/')[2]
-      return id ? `https://www.youtube.com/embed/${id}` : url
+      return id ? `https://www.youtube-nocookie.com/embed/${id}` : url
     }
     if (host === 'youtu.be') {
       const id = u.pathname.slice(1)
-      return id ? `https://www.youtube.com/embed/${id}` : url
+      return id ? `https://www.youtube-nocookie.com/embed/${id}` : url
     }
     if (host === 'vimeo.com') {
       const id = u.pathname.split('/').filter(Boolean).pop()
@@ -1132,24 +1134,69 @@ function ExerciseDetailModal({ detail, onClose }) {
   )
 }
 
-// Inline "this week's weight" field next to an exercise — saves on blur/Enter
-// so the athlete can log it mid-workout without leaving the program tab.
+// Inline "this week's weight" field next to an exercise — auto-saves shortly
+// after the athlete stops typing (not just on blur/Enter), and flushes any
+// still-pending save if the field disappears mid-debounce. Blur-only saving
+// lost real entries: switching days/tabs mid-workout unmounts this
+// component without ever firing blur, so a weight typed right before
+// tapping away silently vanished. The debounce means it's saved within a
+// fraction of a second either way, so nothing depends on the athlete
+// tapping out of the field first.
 function WeightField({ value, onSave }) {
   const [draft, setDraft] = useState(value || '')
   const [saving, setSaving] = useState(false)
+  const draftRef = useRef(value || '')
+  const savedRef = useRef(value || '')
+  const timerRef = useRef(null)
 
-  useEffect(() => { setDraft(value || '') }, [value])
+  useEffect(() => {
+    setDraft(value || '')
+    draftRef.current = value || ''
+    savedRef.current = value || ''
+  }, [value])
 
-  async function commit() {
-    const trimmed = draft.trim()
-    if (trimmed === (value || '')) return
+  // Bare fire-and-forget write, no local "saving" state — used from the
+  // unmount cleanup below, where the component (and its spinner) is
+  // already gone.
+  function persist(raw) {
+    const trimmed = raw.trim()
+    if (trimmed === savedRef.current) return
+    savedRef.current = trimmed
+    onSave(trimmed)
+  }
+
+  async function commitWithSpinner(raw) {
+    const trimmed = raw.trim()
+    if (trimmed === savedRef.current) return
     setSaving(true)
     try {
+      savedRef.current = trimmed
       await onSave(trimmed)
     } finally {
       setSaving(false)
     }
   }
+
+  function handleChange(e) {
+    const next = e.target.value
+    setDraft(next)
+    draftRef.current = next
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => commitWithSpinner(next), 600)
+  }
+
+  function handleBlur() {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    commitWithSpinner(draft)
+  }
+
+  useEffect(() => () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current)
+      persist(draftRef.current)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <div className="flex-shrink-0 flex items-center">
@@ -1157,8 +1204,8 @@ function WeightField({ value, onSave }) {
         type="text"
         inputMode="decimal"
         value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
+        onChange={handleChange}
+        onBlur={handleBlur}
         onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
         placeholder="lbs"
         disabled={saving}

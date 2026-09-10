@@ -4,6 +4,9 @@ import { useAuth } from './context/AuthContext'
 // Pages
 import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
+import PrivacyPolicyPage from './pages/legal/PrivacyPolicyPage'
+import TermsPage from './pages/legal/TermsPage'
+import RefundPolicyPage from './pages/legal/RefundPolicyPage'
 
 // Athlete pages
 import AthleteLayout from './pages/athlete/AthleteLayout'
@@ -54,6 +57,11 @@ export default function App() {
     <Routes>
       {/* Landing */}
       <Route path="/" element={<LandingPage />} />
+
+      {/* Legal */}
+      <Route path="/privacy" element={<PrivacyPolicyPage />} />
+      <Route path="/terms" element={<TermsPage />} />
+      <Route path="/refund-policy" element={<RefundPolicyPage />} />
 
       {/* Login */}
       <Route

@@ -4,7 +4,7 @@ import {
   getAllPrograms, getExerciseLibrary, upsertExerciseLibraryEntries,
 } from '../../firebase/firestore'
 import { buildLibraryEntries } from '../../utils/exerciseLibrary'
-import { Settings, Save, CheckCircle, Lock, Sparkles, ListChecks } from 'lucide-react'
+import { Settings, Save, CheckCircle, Lock, Sparkles, ListChecks, CalendarClock } from 'lucide-react'
 import {
   EmailAuthProvider,
   reauthenticateWithCredential,
@@ -19,10 +19,12 @@ export default function AdminSettingsPage() {
   const [scriptUrl, setScriptUrl] = useState('')
   const [assessmentScriptUrl, setAssessmentScriptUrl] = useState('')
   const [inquiryScriptUrl, setInquiryScriptUrl] = useState('')
+  const [bookingNotifyScriptUrl, setBookingNotifyScriptUrl] = useState('')
   const [loading, setLoading]     = useState(true)
   const [saving, setSaving]       = useState(false)
   const [savingAssessment, setSavingAssessment] = useState(false)
   const [savingInquiry, setSavingInquiry] = useState(false)
+  const [savingBookingNotify, setSavingBookingNotify] = useState(false)
   const [libraryCount, setLibraryCount] = useState(null)
   const [backfilling, setBackfilling]   = useState(false)
 
@@ -63,6 +65,7 @@ export default function AdminSettingsPage() {
       }
       if (publicSnap.exists()) {
         setInquiryScriptUrl(publicSnap.data().inquiryScriptUrl || '')
+        setBookingNotifyScriptUrl(publicSnap.data().bookingNotifyScriptUrl || '')
       }
       setLoading(false)
     })
@@ -132,6 +135,19 @@ export default function AdminSettingsPage() {
       toast.error('Save failed.')
     } finally {
       setSavingInquiry(false)
+    }
+  }
+
+  async function handleSaveBookingNotifyUrl(e) {
+    e.preventDefault()
+    setSavingBookingNotify(true)
+    try {
+      await savePublicSettings({ bookingNotifyScriptUrl: bookingNotifyScriptUrl.trim() })
+      toast.success('Settings saved!')
+    } catch {
+      toast.error('Save failed.')
+    } finally {
+      setSavingBookingNotify(false)
     }
   }
 
@@ -427,6 +443,94 @@ export default function AdminSettingsPage() {
             </div>
             <pre className="bg-gray-950 text-green-400 text-xs rounded-xl p-4 overflow-x-auto leading-relaxed">
               {INQUIRY_APPS_SCRIPT_CODE}
+            </pre>
+          </div>
+        </div>
+      </div>
+
+      {/* Facility Booking Notifications */}
+      <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 p-6 mt-5">
+        <div className="flex items-start justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <CalendarClock size={16} className="text-sp-ink-300" />
+            <h2 className="font-semibold text-white">Facility Booking Alerts</h2>
+          </div>
+          {bookingNotifyScriptUrl && (
+            <span className="flex items-center gap-1 text-xs text-sp-green-400 font-medium">
+              <CheckCircle size={13} /> Connected
+            </span>
+          )}
+        </div>
+        <p className="text-sm text-sp-ink-300 mb-6">
+          Paste the Apps Script web app URL here to get an email the moment an athlete books a
+          facility slot — athlete name, the day and time, and how full the slot now is. You'll also
+          get one when an athlete cancels within 24 hours of the session. Goes to{' '}
+          <strong>superiorperformance.sp@gmail.com</strong>. Nothing extra is stored; if this is
+          blank, bookings still work, you just won't be notified.
+        </p>
+
+        <form onSubmit={handleSaveBookingNotifyUrl} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-sp-ink-100 mb-1.5">
+              Apps Script Web App URL
+            </label>
+            <input
+              type="url"
+              value={bookingNotifyScriptUrl}
+              onChange={e => setBookingNotifyScriptUrl(e.target.value)}
+              placeholder="https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec"
+              className="w-full px-3.5 py-2.5 border border-sp-ink-600 rounded-xl text-sm text-sp-ink-50 placeholder-sp-ink-300 bg-sp-ink-900 focus:outline-none focus:ring-2 focus:ring-sp-green-500 font-mono"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={savingBookingNotify || loading}
+            className="btn-brand flex items-center gap-2 px-4 py-2.5 text-sm rounded-xl"
+          >
+            <Save size={14} />
+            {savingBookingNotify ? 'Saving…' : 'Save'}
+          </button>
+        </form>
+
+        {/* Setup guide */}
+        <div className="mt-8 pt-6 border-t border-sp-ink-600">
+          <h3 className="text-sm font-semibold text-sp-ink-100 mb-4">How to set this up</h3>
+          <ol className="space-y-3 text-sm text-sp-ink-300">
+            <li className="flex gap-3">
+              <span className="w-5 h-5 rounded-full bg-sp-green-500/20 text-sp-green-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
+              <span>Go to <a href="https://script.google.com" target="_blank" rel="noreferrer" className="text-sp-green-400 underline">script.google.com</a> and start a blank project — no spreadsheet needed, it only sends mail. Sign in as <strong>superiorperformance.sp@gmail.com</strong> so the alerts come from the same address they're sent to.</span>
+            </li>
+            <li className="flex gap-3">
+              <span className="w-5 h-5 rounded-full bg-sp-green-500/20 text-sp-green-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
+              <span>Delete the placeholder code and paste the script below.</span>
+            </li>
+            <li className="flex gap-3">
+              <span className="w-5 h-5 rounded-full bg-sp-green-500/20 text-sp-green-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
+              <span>Click <strong>Deploy → New deployment → Web app</strong>. Set "Who has access" to <em>Anyone</em>. Approve the one-time prompt letting the script send mail on your behalf.</span>
+            </li>
+            <li className="flex gap-3">
+              <span className="w-5 h-5 rounded-full bg-sp-green-500/20 text-sp-green-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">4</span>
+              <span>Copy the resulting URL, paste it above, and Save. Booking alerts start immediately — no redeploy needed. Test it by opening the URL in a browser with <code className="text-sp-ink-100">?athlete=Test&amp;date=2026-09-15&amp;startTime=15:00&amp;endTime=16:00&amp;booked=1&amp;capacity=4</code> on the end — you should get the email.</span>
+            </li>
+          </ol>
+
+          {/* Apps Script code */}
+          <div className="mt-5">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-sp-ink-300 uppercase tracking-wider">Apps Script Code</p>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(BOOKING_NOTIFY_APPS_SCRIPT_CODE)
+                  toast.success('Copied to clipboard!')
+                }}
+                className="text-xs text-sp-green-400 hover:text-sp-green-300 font-medium"
+              >
+                Copy
+              </button>
+            </div>
+            <pre className="bg-gray-950 text-green-400 text-xs rounded-xl p-4 overflow-x-auto leading-relaxed">
+              {BOOKING_NOTIFY_APPS_SCRIPT_CODE}
             </pre>
           </div>
         </div>
@@ -905,6 +1009,73 @@ const INQUIRY_APPS_SCRIPT_CODE = `function doGet(e) {
   } catch (err) {
     return respond({ success: false, error: err.message });
   }
+}
+
+function respond(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}`;
+
+const BOOKING_NOTIFY_APPS_SCRIPT_CODE = `function doGet(e) {
+  try {
+    var p = e.parameter || {};
+    var type      = (p.type      || 'book').trim();  // 'book' or 'cancel'
+    var athlete   = (p.athlete   || 'An athlete').trim();
+    var date      = (p.date      || '').trim();   // YYYY-MM-DD
+    var startTime = (p.startTime || '').trim();   // HH:MM (24h, facility local time)
+    var endTime   = (p.endTime   || '').trim();
+    var booked    = (p.booked    || '').trim();
+    var capacity  = (p.capacity  || '').trim();
+    var notes     = (p.notes     || '').trim();
+
+    if (!date || !startTime) {
+      return respond({ success: false, error: 'Missing slot date or start time.' });
+    }
+
+    var when = formatWhen(date, startTime, endTime);
+    var fill = (booked && capacity) ? (booked + ' of ' + capacity + ' booked') : '';
+    var isCancel = type === 'cancel';
+
+    var body =
+      (isCancel
+        ? athlete + ' cancelled a booking less than 24 hours before the session.'
+        : athlete + ' just booked a facility slot.') + '\\n\\n' +
+      'When:  ' + when + '\\n' +
+      (fill ? (isCancel ? 'Now:   ' : 'Fill:  ') + fill + '\\n' : '') +
+      (notes ? 'Slot notes:  ' + notes + '\\n' : '') +
+      '\\nSent automatically by the Superior Performance app.';
+
+    MailApp.sendEmail({
+      to: 'superiorperformance.sp@gmail.com',
+      subject: (isCancel ? 'Late cancellation - ' : 'Facility booking - ') + athlete + ' - ' + when,
+      body: body,
+    });
+
+    return respond({ success: true });
+
+  } catch (err) {
+    return respond({ success: false, error: err.message });
+  }
+}
+
+// 'YYYY-MM-DD' + 'HH:MM' 24h  ->  'Mon, Sep 15 * 3:00-4:00 PM'
+function formatWhen(date, startTime, endTime) {
+  var d = date.split('-');
+  var dt = new Date(Number(d[0]), Number(d[1]) - 1, Number(d[2]));
+  var day = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  var range = to12h(startTime) + (endTime ? '\\u2013' + to12h(endTime) : '');
+  return day + ' \\u00b7 ' + range;
+}
+
+function to12h(hhmm) {
+  var q = hhmm.split(':');
+  var h = Number(q[0]);
+  var m = q[1] || '00';
+  var ampm = h >= 12 ? 'PM' : 'AM';
+  var h12 = h % 12;
+  if (h12 === 0) h12 = 12;
+  return h12 + ':' + m + ' ' + ampm;
 }
 
 function respond(obj) {

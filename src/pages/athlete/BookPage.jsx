@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import {
   getFacilitySlots, getMyFacilityBookings, bookFacilitySlot, cancelFacilityBooking,
+  notifyFacilityBooking,
 } from '../../firebase/firestore'
 import { CalendarClock, Clock, Check, X, ChevronDown, ChevronUp } from 'lucide-react'
 import { format } from 'date-fns'
@@ -53,6 +54,17 @@ export default function BookPage() {
       setSlots(prev => prev.map(s => s.id === slot.id ? { ...s, bookedCount: s.bookedCount + 1 } : s))
       setMyBookingIds(prev => new Set(prev).add(slot.id))
       toast.success('Booked!')
+      // Fire-and-forget: email the coach. Never awaited — a notify failure must
+      // not touch the booking the athlete just made.
+      notifyFacilityBooking({
+        athleteName: userProfile?.name || 'Athlete',
+        date: slot.date,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        bookedCount: (slot.bookedCount ?? 0) + 1,
+        capacity: slot.capacity,
+        notes: slot.notes,
+      })
     } catch (err) {
       if (err.message === 'FULL') toast.error('That slot just filled up.')
       else if (err.message === 'ALREADY_BOOKED') toast.error('You already have this one booked.')
@@ -70,6 +82,18 @@ export default function BookPage() {
       setSlots(prev => prev.map(s => s.id === slot.id ? { ...s, bookedCount: Math.max(0, s.bookedCount - 1) } : s))
       setMyBookingIds(prev => { const next = new Set(prev); next.delete(slot.id); return next })
       toast.success('Booking cancelled.')
+      // Fire-and-forget: notifyFacilityBooking only actually emails the coach
+      // when the session is inside 24h (late cancel), otherwise it's a no-op.
+      notifyFacilityBooking({
+        kind: 'cancellation',
+        athleteName: userProfile?.name || 'Athlete',
+        date: slot.date,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        bookedCount: Math.max(0, (slot.bookedCount ?? 0) - 1),
+        capacity: slot.capacity,
+        notes: slot.notes,
+      })
     } catch {
       toast.error('Could not cancel that booking.')
     } finally {

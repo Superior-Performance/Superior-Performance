@@ -281,13 +281,64 @@ export const getSettings = () =>
 export const saveSettings = (data) =>
   setDoc(doc(db, 'settings', 'global'), data, { merge: true })
 
-// settings/public — { inquiryScriptUrl: string }. Readable while signed out
-// (see firestore.rules) so the landing page's inquiry form can reach it.
+// settings/public — { inquiryScriptUrl: string, bookingNotifyScriptUrl: string }.
+// Readable while signed out (see firestore.rules) so the landing page's inquiry
+// form and the facility-booking notification ping can reach their Apps Script
+// URLs. Neither URL is a secret — an "Anyone can execute" script is already
+// callable by anyone who has the link.
 export const getPublicSettings = () =>
   getDoc(doc(db, 'settings', 'public'))
 
 export const savePublicSettings = (data) =>
   setDoc(doc(db, 'settings', 'public'), data, { merge: true })
+
+// Hours between now and a slot's start. Slot date/time are stored as
+// facility-local (America/Chicago) wall clock, so "now" is projected into that
+// same zone before the subtraction — the athlete's own device timezone drops
+// out. Returns Infinity if the inputs are missing (so a cancellation with no
+// timing info stays silent rather than always paging the coach).
+function hoursUntilSlot(date, startTime) {
+  if (!date || !startTime) return Infinity
+  const [y, m, d] = date.split('-').map(Number)
+  const [hh, mm] = startTime.split(':').map(Number)
+  if ([y, m, d, hh, mm].some(Number.isNaN)) return Infinity
+  const start = new Date(y, m - 1, d, hh, mm)
+  const centralNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' }))
+  return (start - centralNow) / 3_600_000
+}
+
+// Pings the coach's Apps Script so facility bookings email
+// superiorperformance.sp@gmail.com. Mirrors the inquiry-form pattern (GET +
+// URLSearchParams, the Apps Script sends the mail) so nothing here needs Cloud
+// Functions or the Blaze plan. Fire-and-forget: a booking/cancellation must
+// never fail or block because this ping did, so callers don't await it and
+// every error is swallowed after logging.
+//
+// kind: 'booking' (default) always notifies. 'cancellation' only notifies when
+// it lands inside the 24h window before the session — a same-day drop the coach
+// needs to know about and may want to backfill. Earlier cancellations are
+// silent; the spot just quietly reopens.
+export async function notifyFacilityBooking({ kind = 'booking', athleteName, date, startTime, endTime, bookedCount, capacity, notes }) {
+  try {
+    if (kind === 'cancellation' && hoursUntilSlot(date, startTime) > 24) return
+    const snap = await getPublicSettings()
+    const scriptUrl = snap.exists() ? snap.data().bookingNotifyScriptUrl : ''
+    if (!scriptUrl) return
+    const params = new URLSearchParams({
+      type: kind === 'cancellation' ? 'cancel' : 'book',
+      athlete: athleteName || 'Athlete',
+      date: date || '',
+      startTime: startTime || '',
+      endTime: endTime || '',
+      booked: String(bookedCount ?? ''),
+      capacity: String(capacity ?? ''),
+      notes: notes || '',
+    })
+    await fetch(`${scriptUrl}?${params.toString()}`)
+  } catch (err) {
+    console.error('Facility booking notification failed (the booking itself is fine):', err)
+  }
+}
 
 // ── Workout completion ────────────────────────────────────────────────────────
 // completions/{uid}/weeks/{completionKey}  — { completed: true, completedAt }

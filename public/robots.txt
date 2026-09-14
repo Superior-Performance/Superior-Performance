@@ -1,0 +1,10 @@
+# Public marketing site is open to crawl. Everything behind /login
+# (athlete/admin dashboards) requires auth anyway, so it's excluded —
+# nothing there is ever indexable content, just noise for a crawler.
+User-agent: *
+Allow: /
+Disallow: /athlete
+Disallow: /admin
+Disallow: /login
+
+Sitemap: https://superior-performance-ba102.web.app/sitemap.xml

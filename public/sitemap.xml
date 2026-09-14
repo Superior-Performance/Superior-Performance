@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Kept to just the public marketing page for now. /privacy, /terms, and
+  /refund-policy aren't routed yet (see src/pages/legal/) — add them here
+  once they ship with real business details instead of placeholder text.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://superior-performance-ba102.web.app/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>

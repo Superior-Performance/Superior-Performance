@@ -500,13 +500,24 @@ function Process() {
 }
 
 // ── 3.5 Full-bleed image band ────────────────────────────────────────────────
+// Real facility photo, duotone-treated to the brand green per
+// BUILD_LANDING_PAGE.md's spec ("near-black + #2FA968") — replaces the
+// placeholder hatch block that shipped with the rebuild.
 function ImageBand() {
   return (
-    <section style={{ minHeight: 'clamp(320px, 44vw, 560px)', ...hatch, padding: 'clamp(24px,4vw,56px)', position: 'relative', display: 'flex', alignItems: 'flex-end', borderBottom: HAIRLINE }}>
-      <span style={{ position: 'absolute', top: 'clamp(24px,4vw,56px)', left: 'clamp(24px,4vw,56px)', fontFamily: MONO, fontSize: 10, color: 'rgba(242,244,243,.58)', lineHeight: 1.9, maxWidth: '90%' }}>
-        [ full-bleed image band ] / bullpen wide shot, 21:9 crop, 2400px+ / duotone: near-black + #2FA968
-      </span>
-      <Reveal as="h2" style={{ fontFamily: DISPLAY, fontWeight: 700, textTransform: 'uppercase', fontSize: 'clamp(28px,3.6vw,52px)', lineHeight: 1, letterSpacing: '-.01em', maxWidth: '24ch', margin: 0 }}>
+    <section style={{ minHeight: 'clamp(320px, 44vw, 560px)', padding: 'clamp(24px,4vw,56px)', position: 'relative', display: 'flex', alignItems: 'flex-end', borderBottom: HAIRLINE, overflow: 'hidden', background: C.ink }}>
+      <img
+        src="/photos/baseballs-bucket.jpg"
+        alt="A bucket of practice baseballs on the turf at the Superior Performance training facility"
+        loading="lazy"
+        style={{
+          position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover',
+          filter: 'grayscale(1) contrast(1.15) brightness(.55)',
+        }}
+      />
+      <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: C.green, mixBlendMode: 'color', opacity: 0.85 }} />
+      <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(14,17,19,.15) 0%, rgba(14,17,19,.75) 100%)' }} />
+      <Reveal as="h2" style={{ position: 'relative', fontFamily: DISPLAY, fontWeight: 700, textTransform: 'uppercase', fontSize: 'clamp(28px,3.6vw,52px)', lineHeight: 1, letterSpacing: '-.01em', maxWidth: '24ch', margin: 0, color: C.paper }}>
         Every rep<br />gets logged.
       </Reveal>
     </section>

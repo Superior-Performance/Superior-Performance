@@ -4,6 +4,8 @@ import toast from 'react-hot-toast'
 import { makeExerciseId, groupIntoSlots } from '../utils/programIds'
 import { libraryEntryId, buildLibraryEntries, matchLibraryEntries } from '../utils/exerciseLibrary'
 import ConfirmDialog from './ConfirmDialog'
+import ProgramMonthView from './ProgramMonthView'
+import { computeTodayPosition } from '../utils/programSchedule'
 import { getExerciseLibrary, upsertExerciseLibraryEntries } from '../firebase/firestore'
 import { EXERCISE_CATEGORIES, exerciseCategoryInfo, categoryRank, DAY_TYPES, LIFTING_DAY_TYPES } from '../constants/programTypes'
 
@@ -95,6 +97,27 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
   // that day instead of the editor turning into one long exercise list.
   // Keyed by `${wi}_${di}` -> the open group's key, or undefined.
   const [openGroup, setOpenGroup] = useState({})
+
+  // Which week the editor body is showing. null = every week, the old
+  // behaviour, kept because bulk edits across weeks are easier in one column.
+  // Opens on the week containing today so a coach editing a running program
+  // lands where the athlete actually is instead of back at week 1.
+  const [viewWeek, setViewWeek] = useState(() => {
+    const total = program.weeks?.length || 0
+    if (total === 0) return null
+    const pos = computeTodayPosition([program], total)
+    return pos.hasStart && !pos.notStartedYet && !pos.pastProgram ? pos.weekIdx : 0
+  })
+
+  // Jump to a day from the overview grid. The scroll waits a frame because the
+  // week it lives in may only be mounting now as a result of this same click.
+  function goToDay(wi, di) {
+    setViewWeek(wi)
+    requestAnimationFrame(() => {
+      document.getElementById(`program-day-${wi}-${di}`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+  }
   // Pending window.confirm()-style prompt — { title, message, confirmLabel,
   // danger, onConfirm } | null. See ConfirmDialog for why this is state
   // instead of a synchronous confirm() call.
@@ -270,6 +293,9 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
       weekNum: prev.length + 1,
       days: [{ dayNum: 1, category: '', exercises: [] }],
     }])
+    // Follow it. While the body is filtered to one week, a new week appended
+    // at the end would otherwise be added invisibly.
+    setViewWeek(prev => (prev === null ? null : weeks.length))
   }
 
   // Deep-copies a week and inserts it directly after itself — every
@@ -302,11 +328,23 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
       // it — reads correctly (duplicating week 2 of 3 gives 1, 2, 3, 4).
       return next.map((week, i) => ({ ...week, weekNum: i + 1 }))
     })
+    // Land on the copy — it's the one about to be edited.
+    setViewWeek(prev => (prev === null ? null : wi + 1))
   }
 
   function removeWeek(wi) {
     const count = (weeks[wi]?.days || []).reduce((s, d) => s + (d.exercises?.length || 0), 0)
-    const doRemove = () => mutate(prev => prev.filter((_, w) => w !== wi))
+    const doRemove = () => {
+      mutate(prev => prev.filter((_, w) => w !== wi))
+      // Deleting the week being viewed (or any before it) would otherwise
+      // leave the body pointed at an index that no longer exists.
+      setViewWeek(prev => {
+        if (prev === null) return null
+        const remaining = weeks.length - 1
+        if (remaining <= 0) return null
+        return Math.min(prev > wi ? prev - 1 : prev, remaining - 1)
+      })
+    }
     if (count > 0) {
       askConfirm(`Delete week ${wi + 1}?`, `This also removes ${count} exercise${count === 1 ? '' : 's'} on it.`, doRemove)
     } else {
@@ -408,8 +446,19 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+          {weeks.length > 0 && (
+            <ProgramMonthView
+              weeks={weeks}
+              startDate={startDate}
+              programType={program.programType}
+              viewWeek={viewWeek}
+              onSelectWeek={setViewWeek}
+              onSelectDay={goToDay}
+            />
+          )}
+
           {weeks.map((week, wi) => (
-            <div key={wi}>
+            <div key={wi} hidden={viewWeek !== null && viewWeek !== wi}>
               <div className="flex items-center justify-between mb-3">
                 <p className="text-xs font-bold text-sp-ink-300 uppercase tracking-wider">
                   Week {week.weekNum ?? wi + 1}
@@ -433,7 +482,7 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
 
               <div className="space-y-4">
                 {week.days?.map((day, di) => (
-                  <div key={di} className="bg-sp-ink-900/60 border border-sp-ink-600/50 rounded-xl p-4">
+                  <div key={di} id={`program-day-${wi}-${di}`} className="bg-sp-ink-900/60 border border-sp-ink-600/50 rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-3">
                       <span className="text-sm font-semibold text-sp-ink-50 flex-shrink-0">
                         Day {day.dayNum ?? di + 1}

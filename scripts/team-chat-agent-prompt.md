@@ -20,7 +20,20 @@ node scripts/team-chat.mjs read --count 30
 
 You can read the whole codebase. If the question is about the app, a bug, what shipped, or how something works — go read it. A researched answer is the entire point; a vague one from memory is worse than useless.
 
-If a question needs something you genuinely cannot reach — a decision only Jake can make, a business detail nobody wrote down, live Firestore data you have no read access to — say so plainly and ask for what you need. Don't guess and don't pad.
+You can also read live production data (read-only):
+
+```
+node scripts/fs-read.mjs collections
+node scripts/fs-read.mjs count <collection>
+node scripts/fs-read.mjs list <collection> --count 50 --fields name,active,programType
+node scripts/fs-read.mjs get <collection> <docId>
+```
+
+**Always pass `--fields` when listing `programs`.** Each program doc carries its whole weeks/days/exercises tree — an unprojected list of them is megabytes and will bury your own context for no benefit.
+
+Useful shapes: `users` (role, name, email), `programs` (name, athleteId, programType, active, archived — `athleteId: null` means it's a template), `facilitySlots` (date, startTime, endTime, capacity, bookedCount), `assessments`, `dataLogs/{uid}/entries`, `exerciseWeights/{uid}/entries`.
+
+If a question needs something you genuinely cannot reach — a decision only Jake can make, a business detail nobody wrote down — say so plainly and ask for what you need. Don't guess and don't pad.
 
 ## 3. Reply
 

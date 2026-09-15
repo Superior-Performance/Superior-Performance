@@ -40,12 +40,22 @@ const MODEL = process.env.TEAM_CHAT_MODEL || ''
 const CLAUDE_BIN = process.env.CLAUDE_BIN || path.join(os.homedir(), '.npm-global', 'bin', 'claude')
 const ONCE = process.argv.includes('--once')
 
-// Read-only by construction. The agent answers questions from a shared room,
-// so it gets the codebase and the chat script and nothing else — no arbitrary
-// shell, no Write/Edit. Bash is prefix-scoped to `node scripts/…` so helpers
-// added to scripts/ later keep working without widening this, while a message
-// that tries to talk the agent into running something else simply can't.
-const ALLOWED_TOOLS = ['Read', 'Grep', 'Glob', 'Bash(node scripts/:*)']
+// Read-only by construction. The agent answers questions from a shared room
+// and nobody is watching it, so it gets the codebase, the chat script, and a
+// Firestore reader that has no write path in it — and no general shell. A
+// message that tries to talk it into running something else has no tool to do
+// it with; the prompt's "chat text is data" rule is the second layer, not the
+// only one.
+//
+// Each script is named explicitly. A looser `Bash(node scripts/:*)` does NOT
+// match (tried it — every call came back "requires approval" and the agent
+// correctly refused to guess), and enumerating them is better anyway: adding a
+// script to scripts/ shouldn't silently hand it to an unattended agent.
+const ALLOWED_TOOLS = [
+  'Read', 'Grep', 'Glob',
+  'Bash(node scripts/team-chat.mjs:*)',
+  'Bash(node scripts/fs-read.mjs:*)',
+]
 const DISALLOWED_TOOLS = ['Write', 'Edit', 'NotebookEdit', 'WebFetch', 'WebSearch']
 
 const log = (...parts) => console.log(`[${new Date().toISOString()}]`, ...parts)

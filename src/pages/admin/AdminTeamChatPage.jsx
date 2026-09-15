@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import {
   subscribeTeamChat, sendTeamChatMessage, markTeamChatRead, TEAM_CHAT_WINDOW,
 } from '../../firebase/firestore'
-import { parseMentions, splitOnMentions, agentMentions } from '../../utils/teamChat'
+import { parseMentions, splitOnMentions, agentMentions, effectiveMentions } from '../../utils/teamChat'
 import { Send, Bot, Users, AtSign, Clock } from 'lucide-react'
 import { format, isToday, isYesterday } from 'date-fns'
 import EmptyState from '../../components/EmptyState'
@@ -103,7 +103,7 @@ export default function AdminTeamChatPage() {
           // dropped message — say so, since replies arrive on a cadence
           // rather than instantly and silence otherwise reads as broken.
           const awaitingAgent =
-            msg.authorType === 'human' && agentMentions(msg.mentions).length > 0 && !msg.answeredBy
+            msg.authorType === 'human' && agentMentions(effectiveMentions(msg)).length > 0 && !msg.answeredBy
 
           return (
             <div key={msg.id}>
@@ -144,7 +144,7 @@ export default function AdminTeamChatPage() {
                     {ts && <span className="text-[9px] text-sp-ink-300/70">{format(ts, 'h:mm a')}</span>}
                     {awaitingAgent && (
                       <span className="text-[9px] text-sp-ink-300/70 flex items-center gap-1">
-                        <Clock size={9} /> waiting on {agentMentions(msg.mentions).join(' + ')}
+                        <Clock size={9} /> waiting on {agentMentions(effectiveMentions(msg)).join(' + ')}
                       </span>
                     )}
                   </div>

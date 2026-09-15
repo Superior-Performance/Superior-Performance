@@ -114,6 +114,16 @@ const parseMentions = (text) =>
 const addressesMe = (mentions, handle) =>
   Array.isArray(mentions) && mentions.includes(handle)
 
+// Stored `mentions` is written once by whichever client posted, so a stale
+// deployment bakes its parser's blind spots into the data permanently — a
+// client built before the agents were named wrote `mentions: []` for
+// "@atlas …", and the message was silently never answered. Re-parsing the body
+// costs nothing and makes the stored array an optimization, not a single point
+// of failure. Mirrors effectiveMentions() in src/utils/teamChat.js.
+const effectiveMentions = (m) => [
+  ...new Set([...(Array.isArray(m.mentions) ? m.mentions : []), ...parseMentions(m.text)]),
+]
+
 // ── data ─────────────────────────────────────────────────────────────────────
 async function recentMessages(token, count) {
   // runQuery rather than a plain collection GET: the REST list endpoint has no
@@ -183,7 +193,7 @@ try {
   } else if (command === 'pending') {
     const messages = await recentMessages(token, COUNT)
     const pending = messages.filter(m =>
-      m.authorType === 'human' && !m.answeredBy && addressesMe(m.mentions, HANDLE))
+      m.authorType === 'human' && !m.answeredBy && addressesMe(effectiveMentions(m), HANDLE))
     console.log(JSON.stringify(pending, null, 2))
 
   } else if (command === 'post') {

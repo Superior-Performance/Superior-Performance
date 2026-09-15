@@ -48,6 +48,22 @@ export function parseMentions(text) {
   return [...found]
 }
 
+/**
+ * The handles a message actually addresses — stored array unioned with a fresh
+ * parse of the body.
+ *
+ * `mentions` is written once by whichever client posted, so a stale deployment
+ * bakes its parser's blind spots into the data permanently. That bit: a client
+ * built before the agents were named wrote `mentions: []` for "@atlas …", the
+ * message never showed up as pending, and it was silently dropped rather than
+ * answered late. Re-parsing costs nothing and makes the stored array an
+ * optimization instead of a single point of failure.
+ */
+export function effectiveMentions(message) {
+  const stored = Array.isArray(message?.mentions) ? message.mentions : []
+  return [...new Set([...stored, ...parseMentions(message?.text)])]
+}
+
 /** Just the mentions that name an agent who will actually respond. */
 export function agentMentions(mentions) {
   if (!Array.isArray(mentions)) return []

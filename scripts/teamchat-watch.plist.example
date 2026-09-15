@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd template for the team-chat watcher.
+
+  Copy to ~/Library/LaunchAgents/com.superiorperformance.teamchat-watch.plist
+  and replace every REPLACE_ME value, then:
+
+      launchctl load ~/Library/LaunchAgents/com.superiorperformance.teamchat-watch.plist
+      tail -f ~/Library/Logs/superior-teamchat-watch.log
+
+  TEAM_CHAT_HANDLE / TEAM_CHAT_NAME are the only lines that differ between
+  machines — they're what makes this agent Atlas (Jake) or Skip (Ian). The
+  committed scripts are identical on both; identity lives here, not in the repo.
+
+  launchd does not inherit your shell environment, so PATH and the absolute
+  paths below have to be spelled out. Get them with `which node` and by
+  confirming the claude CLI location.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.superiorperformance.teamchat-watch</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>REPLACE_ME_NODE_PATH</string>
+    <string>REPLACE_ME_REPO_PATH/scripts/team-chat-watch.mjs</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>REPLACE_ME_REPO_PATH</string>
+
+  <!-- Start at login and restart if it dies, so a crash or a bad network
+       stretch doesn't silently leave the room unanswered. -->
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>30</integer>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>CLAUDE_BIN</key>
+    <string>REPLACE_ME_HOME/.npm-global/bin/claude</string>
+    <!-- Which stored `firebase login` account to use. Must be one with
+         Editor/Owner on superior-performance-ba102. -->
+    <key>FB_ACCOUNT</key>
+    <string>REPLACE_ME_GOOGLE_ADDRESS</string>
+    <key>TEAM_CHAT_HANDLE</key>
+    <string>REPLACE_ME_HANDLE</string>
+    <key>TEAM_CHAT_NAME</key>
+    <string>REPLACE_ME_DISPLAY_NAME</string>
+    <key>TEAM_CHAT_POLL_MS</key>
+    <string>20000</string>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>REPLACE_ME_HOME/Library/Logs/superior-teamchat-watch.log</string>
+  <key>StandardErrorPath</key>
+  <string>REPLACE_ME_HOME/Library/Logs/superior-teamchat-watch.log</string>
+</dict>
+</plist>

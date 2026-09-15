@@ -86,6 +86,30 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // Team chat: the staff room. Admin-only end to end — athletes have no
+    // business reading it and there is deliberately no athlete branch, unlike
+    // /chats above. Scheduled Claude agents reach this through an admin
+    // credential too, so they need no separate carve-out.
+    //
+    // Update is restricted to `answeredBy` alone: an agent marks a message
+    // as handled, but nobody (agent or human) gets to silently rewrite the
+    // text of a message already sitting in everyone else's scrollback.
+    // Deletes are refused outright for the same reason.
+    match /teamChat/{messageId} {
+      allow read:   if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['answeredBy']);
+      allow delete: if false;
+    }
+
+    // Per-admin "last opened the staff room" marker. Keyed by the reader's own
+    // uid — every admin is a participant here, so each needs their own unread
+    // state rather than one shared per-thread marker.
+    match /teamChatReads/{uid} {
+      allow read, write: if isAdmin() && request.auth.uid == uid;
+    }
+
     // Exercise library: coach-tooling data (name/category -> last-used
     // sets/reps/notes/video URL) that powers the Program Editor's autofill
     // suggestions. Admin-only — athletes never see or need this.

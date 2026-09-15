@@ -17,8 +17,8 @@
  *
  * Env:
  *   TEAM_CHAT_POLL_MS   poll interval, default 20000
- *   TEAM_CHAT_HANDLE    agent handle, default claude-jake
- *   TEAM_CHAT_NAME      display name, default "Claude (Jake)"
+ *   TEAM_CHAT_HANDLE    agent handle, default atlas
+ *   TEAM_CHAT_NAME      display name, default "Atlas"
  *   CLAUDE_BIN          path to the claude CLI
  *   TEAM_CHAT_MODEL     model for the spawned session (default: CLI default)
  */
@@ -34,8 +34,8 @@ const execFileAsync = promisify(execFile)
 const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const PROMPT_FILE = path.join(PROJECT_DIR, 'scripts', 'team-chat-agent-prompt.md')
 const POLL_MS = Number(process.env.TEAM_CHAT_POLL_MS || 20_000)
-const HANDLE = process.env.TEAM_CHAT_HANDLE || 'claude-jake'
-const NAME = process.env.TEAM_CHAT_NAME || 'Claude (Jake)'
+const HANDLE = process.env.TEAM_CHAT_HANDLE || 'atlas'
+const NAME = process.env.TEAM_CHAT_NAME || 'Atlas'
 const MODEL = process.env.TEAM_CHAT_MODEL || ''
 const CLAUDE_BIN = process.env.CLAUDE_BIN || path.join(os.homedir(), '.npm-global', 'bin', 'claude')
 const ONCE = process.argv.includes('--once')

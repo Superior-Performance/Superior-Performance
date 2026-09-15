@@ -1,45 +1,70 @@
 /**
  * Team chat @-mention parsing.
  *
- * Handles look like `@claude` (any agent) or `@claude-jake` (one specific
- * agent). Parsed once at write time and stored on the message so the
- * scheduled agent can tell "someone asked me something" from "someone said
- * the word claude" without re-parsing every message body on every wake-up.
+ * Each agent in the room has a name rather than a generic one: Atlas answers
+ * for Jake, Skip answers for Ian. Naming them matters — with two agents, a
+ * single shared handle means either both reply to the same question or neither
+ * is sure it owns it.
  *
- * Kept as pure functions in their own module because both sides need them:
- * the composer parses before writing, the renderer splits for highlighting,
- * and the agent script (which runs outside React entirely) matches its own
- * handle against the stored array.
+ * Parsed once at write time and stored on the message so an agent can tell
+ * "someone asked me something" from "someone said my name" without re-parsing
+ * every message body on every wake-up.
+ *
+ * Pure functions in their own module because three places need them: the
+ * composer parses before writing, the renderer splits for highlighting, and
+ * the agent scripts (which run outside React entirely) match their own handle
+ * against the stored array.
  */
 
-// Trailing punctuation must not get swallowed into the handle — "@claude,"
-// and "@claude?" both mention `claude`. The optional -suffix allows
-// per-person agents (@claude-jake) without a hardcoded roster.
-const MENTION_RE = /@(claude(?:-[a-z0-9_]+)?)\b/gi
+/**
+ * Agents that actually answer in this room.
+ *
+ * The UI uses this to decide whether an unanswered mention is real queued work
+ * — without it, typing a human's name like `@ian` would render "waiting on
+ * Atlas" forever, since no agent is ever going to claim it.
+ */
+export const AGENT_HANDLES = ['atlas', 'skip']
 
-/** Every distinct agent handle mentioned in `text`, lowercased. */
+/**
+ * The room addressed a single agent as `@claude` before the agents were named.
+ * Kept so the habit doesn't silently fail — it resolves to Atlas, which is who
+ * `@claude` always meant on Jake's side.
+ */
+const HANDLE_ALIASES = { claude: 'atlas' }
+
+// Any @handle, not just known agents: storing unknown ones is harmless and
+// means adding an agent later doesn't need old messages reparsed. Trailing
+// punctuation must not get swallowed — "@atlas," and "@atlas?" both mention
+// atlas.
+const MENTION_RE = /@([a-z][a-z0-9_-]{0,30})\b/gi
+
+/** Every distinct handle mentioned in `text`, lowercased and alias-resolved. */
 export function parseMentions(text) {
   const found = new Set()
   for (const match of String(text || '').matchAll(MENTION_RE)) {
-    found.add(match[1].toLowerCase())
+    const handle = match[1].toLowerCase()
+    found.add(HANDLE_ALIASES[handle] || handle)
   }
   return [...found]
 }
 
-/**
- * Does `mentions` address the agent identified by `handle`?
- * A bare `@claude` addresses every agent; `@claude-jake` only that one.
- */
+/** Just the mentions that name an agent who will actually respond. */
+export function agentMentions(mentions) {
+  if (!Array.isArray(mentions)) return []
+  return mentions.filter(m => AGENT_HANDLES.includes(m))
+}
+
+/** Does `mentions` address the agent identified by `handle`? */
 export function mentionsAgent(mentions, handle) {
   if (!Array.isArray(mentions) || mentions.length === 0) return false
-  const me = String(handle || '').toLowerCase()
-  return mentions.includes('claude') || mentions.includes(me)
+  return mentions.includes(String(handle || '').toLowerCase())
 }
 
 /**
- * Split `text` into ordered segments for rendering, so mentions can be
- * styled without dangerously setting innerHTML.
- * Returns [{ type: 'text' | 'mention', value }].
+ * Split `text` into ordered segments for rendering, so mentions can be styled
+ * without dangerously setting innerHTML. Agent handles are marked separately
+ * from ordinary @-text so only real mentions get the accent treatment.
+ * Returns [{ type: 'text' | 'mention', value, isAgent }].
  */
 export function splitOnMentions(text) {
   const str = String(text || '')
@@ -50,7 +75,12 @@ export function splitOnMentions(text) {
     if (match.index > cursor) {
       segments.push({ type: 'text', value: str.slice(cursor, match.index) })
     }
-    segments.push({ type: 'mention', value: match[0] })
+    const resolved = HANDLE_ALIASES[match[1].toLowerCase()] || match[1].toLowerCase()
+    segments.push({
+      type: 'mention',
+      value: match[0],
+      isAgent: AGENT_HANDLES.includes(resolved),
+    })
     cursor = match.index + match[0].length
   }
   if (cursor < str.length) segments.push({ type: 'text', value: str.slice(cursor) })

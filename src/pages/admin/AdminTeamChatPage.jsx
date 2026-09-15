@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import {
   subscribeTeamChat, sendTeamChatMessage, markTeamChatRead, TEAM_CHAT_WINDOW,
 } from '../../firebase/firestore'
-import { parseMentions, splitOnMentions } from '../../utils/teamChat'
+import { parseMentions, splitOnMentions, agentMentions } from '../../utils/teamChat'
 import { Send, Bot, Users, AtSign, Clock } from 'lucide-react'
 import { format, isToday, isYesterday } from 'date-fns'
 import EmptyState from '../../components/EmptyState'
@@ -56,7 +56,7 @@ export default function AdminTeamChatPage() {
   }
 
   function insertMention() {
-    setText(t => (t.trim() ? `${t.replace(/\s+$/, '')} @claude ` : '@claude '))
+    setText(t => (t.trim() ? `${t.replace(/\s+$/, '')} @atlas ` : '@atlas '))
     inputRef.current?.focus()
   }
 
@@ -68,8 +68,9 @@ export default function AdminTeamChatPage() {
           <h1 className="font-semibold text-white">Team Chat</h1>
         </div>
         <p className="text-xs text-sp-ink-300 mt-1">
-          Staff-only room. Type <span className="text-sp-green-400 font-medium">@claude</span> to pull
-          Claude into a thread — it checks in periodically and replies to mentions.
+          Staff-only room. Tag <span className="text-sp-green-400 font-medium">@atlas</span> (Jake's)
+          or <span className="text-sp-green-400 font-medium">@skip</span> (Ian's) to pull one into a
+          thread — they pick it up within about a minute and reply here.
         </p>
       </header>
 
@@ -101,8 +102,8 @@ export default function AdminTeamChatPage() {
           // A mention that no agent has claimed yet is queued work, not a
           // dropped message — say so, since replies arrive on a cadence
           // rather than instantly and silence otherwise reads as broken.
-          const awaitingClaude =
-            msg.authorType === 'human' && msg.mentions?.length > 0 && !msg.answeredBy
+          const awaitingAgent =
+            msg.authorType === 'human' && agentMentions(msg.mentions).length > 0 && !msg.answeredBy
 
           return (
             <div key={msg.id}>
@@ -133,7 +134,7 @@ export default function AdminTeamChatPage() {
                         : 'bg-sp-ink-800 border border-sp-ink-600 text-sp-ink-50 rounded-bl-sm'
                   }`}>
                     {splitOnMentions(msg.text).map((seg, si) =>
-                      seg.type === 'mention'
+                      seg.type === 'mention' && seg.isAgent
                         ? <span key={si} className={isMe ? 'font-semibold underline underline-offset-2' : 'text-sp-green-400 font-semibold'}>{seg.value}</span>
                         : <span key={si}>{seg.value}</span>
                     )}
@@ -141,9 +142,9 @@ export default function AdminTeamChatPage() {
 
                   <div className="flex items-center gap-2 mt-0.5 mx-1">
                     {ts && <span className="text-[9px] text-sp-ink-300/70">{format(ts, 'h:mm a')}</span>}
-                    {awaitingClaude && (
+                    {awaitingAgent && (
                       <span className="text-[9px] text-sp-ink-300/70 flex items-center gap-1">
-                        <Clock size={9} /> waiting on Claude
+                        <Clock size={9} /> waiting on {agentMentions(msg.mentions).join(' + ')}
                       </span>
                     )}
                   </div>

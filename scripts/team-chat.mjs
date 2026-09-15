@@ -14,18 +14,18 @@
  *   node scripts/team-chat.mjs read [--count 50]
  *       Recent messages, oldest first, as JSON.
  *
- *   node scripts/team-chat.mjs pending [--handle claude-jake] [--count 50]
+ *   node scripts/team-chat.mjs pending [--handle atlas] [--count 50]
  *       Only messages that @-mention this agent and nobody has answered yet.
  *       This is the "do I have work?" call — exits 0 with [] when idle.
  *
- *   node scripts/team-chat.mjs post --text "..." [--handle claude-jake]
- *                                   [--name "Claude (Jake)"] [--answers <msgId>]
+ *   node scripts/team-chat.mjs post --text "..." [--handle atlas]
+ *                                   [--name "Atlas"] [--answers <msgId>]
  *       Post a reply. --answers marks that message handled so the next
  *       wake-up doesn't answer it a second time.
  *
  * Env:
- *   TEAM_CHAT_HANDLE   default agent handle (else "claude-jake")
- *   TEAM_CHAT_NAME     default display name (else "Claude")
+ *   TEAM_CHAT_HANDLE   default agent handle (else "atlas")
+ *   TEAM_CHAT_NAME     default display name (else "Atlas")
  *   FB_ACCOUNT         which stored firebase login to use
  *                      (else superiorperformance.sp@gmail.com, else the first)
  */
@@ -48,8 +48,8 @@ const args = {}
 for (let i = 0; i < rest.length; i += 2) {
   if (rest[i]?.startsWith('--')) args[rest[i].slice(2)] = rest[i + 1]
 }
-const HANDLE = (args.handle || process.env.TEAM_CHAT_HANDLE || 'claude-jake').toLowerCase()
-const NAME = args.name || process.env.TEAM_CHAT_NAME || 'Claude'
+const HANDLE = (args.handle || process.env.TEAM_CHAT_HANDLE || 'atlas').toLowerCase()
+const NAME = args.name || process.env.TEAM_CHAT_NAME || 'Atlas'
 const COUNT = Number(args.count || 50)
 
 // ── auth ─────────────────────────────────────────────────────────────────────
@@ -105,11 +105,14 @@ const docToObj = (d) => ({
 // Mirrors parseMentions/mentionsAgent in src/utils/teamChat.js. Duplicated
 // rather than imported because that module is ESM inside the Vite app and this
 // script runs standalone — if the handle grammar changes, change both.
-const MENTION_RE = /@(claude(?:-[a-z0-9_]+)?)\b/gi
+const MENTION_RE = /@([a-z][a-z0-9_-]{0,30})\b/gi
+const HANDLE_ALIASES = { claude: 'atlas' }   // pre-naming habit, resolves to Jake's agent
 const parseMentions = (text) =>
-  [...new Set([...String(text || '').matchAll(MENTION_RE)].map(m => m[1].toLowerCase()))]
+  [...new Set([...String(text || '').matchAll(MENTION_RE)]
+    .map(m => m[1].toLowerCase())
+    .map(h => HANDLE_ALIASES[h] || h))]
 const addressesMe = (mentions, handle) =>
-  Array.isArray(mentions) && (mentions.includes('claude') || mentions.includes(handle))
+  Array.isArray(mentions) && mentions.includes(handle)
 
 // ── data ─────────────────────────────────────────────────────────────────────
 async function recentMessages(token, count) {

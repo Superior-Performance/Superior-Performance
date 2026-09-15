@@ -41,20 +41,35 @@ export function computeTodayPosition(programs, totalWeeks) {
  * today itself is already fully done. Days with nothing scheduled (rest
  * days) are skipped rather than breaking the streak.
  */
+/**
+ * How much of one day is scheduled and how much is done, summed across every
+ * program the athlete is running that day.
+ *
+ * Exported because the day strip needs exactly this to mark a day complete,
+ * partial, or missed — and a second implementation of "is this day done" would
+ * be a place for the strip and the streak to quietly disagree.
+ *
+ * `total: 0` means nothing was scheduled: a rest day, not an unfinished one.
+ */
+export function dayStats(programs, completions, wi, di) {
+  let total = 0, done = 0
+  programs.forEach(p => {
+    const slots = buildSlots(p.weeks?.[wi]?.days?.[di]?.exercises)
+    total += slots.length
+    done += slots.filter(s => isSlotComplete(completions, p.id, s, wi, di)).length
+  })
+  return { total, done }
+}
+
+/** Days in a given week — the longest, since programs can differ in length. */
+export function dayCountForWeek(programs, wi) {
+  return Math.max(0, ...programs.map(p => p.weeks?.[wi]?.days?.length || 0))
+}
+
 export function computeStreak(programs, completions, totalWeeks) {
   const pos = computeTodayPosition(programs, totalWeeks)
-
-  function dayStats(wi, di) {
-    let total = 0, done = 0
-    programs.forEach(p => {
-      const slots = buildSlots(p.weeks?.[wi]?.days?.[di]?.exercises)
-      total += slots.length
-      done += slots.filter(s => isSlotComplete(completions, p.id, s, wi, di)).length
-    })
-    return { total, done }
-  }
-
-  const dayCount = (wi) => Math.max(0, ...programs.map(p => p.weeks?.[wi]?.days?.length || 0))
+  const stats = (wi, di) => dayStats(programs, completions, wi, di)
+  const dayCount = (wi) => dayCountForWeek(programs, wi)
 
   let streak = 0
   let wi = pos.weekIdx
@@ -62,7 +77,7 @@ export function computeStreak(programs, completions, totalWeeks) {
   let stopped = false
   while (wi >= 0 && !stopped) {
     while (di >= 0) {
-      const { total, done } = dayStats(wi, di)
+      const { total, done } = stats(wi, di)
       if (total > 0) {
         if (done === total) streak++
         else { stopped = true; break }
@@ -74,7 +89,7 @@ export function computeStreak(programs, completions, totalWeeks) {
     di = wi >= 0 ? dayCount(wi) - 1 : -1
   }
 
-  const todayStats = dayStats(pos.weekIdx, pos.dayNum - 1)
+  const todayStats = stats(pos.weekIdx, pos.dayNum - 1)
   const todayDone = todayStats.total > 0 && todayStats.done === todayStats.total
   if (todayDone) streak++
 

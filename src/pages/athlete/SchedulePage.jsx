@@ -15,7 +15,8 @@ import ProgressRing from '../../components/ProgressRing'
 import Skeleton from '../../components/Skeleton'
 import { programTypeInfo, exerciseCategoryInfo, categoryRank, DAY_TYPES, LIFTING_DAY_TYPES } from '../../constants/programTypes'
 import { isExerciseComplete, keyForWrite, groupIntoSlots, buildSlots, isSlotComplete } from '../../utils/programIds'
-import { computeStreak } from '../../utils/programSchedule'
+import { computeStreak, dayStats } from '../../utils/programSchedule'
+import DayStrip from './DayStrip'
 
 const CATEGORY_ICONS = { Wind, Heart, Zap, Flame, CircleDot, ListChecks, Dumbbell }
 const DAY_TYPE_ICONS = { Moon, Flame, Zap, Sparkles }
@@ -127,6 +128,10 @@ export default function SchedulePage() {
   // Programs the coach has edited since this athlete last acknowledged them.
   const [noticesSeen, setNoticesSeen] = useState(null)   // null until loaded
   const [dismissing, setDismissing]   = useState(false)
+  // Which day the Today tab is showing. null means "follow today", so the page
+  // rolls over at midnight on its own instead of pinning to whatever date
+  // happened to be current when it mounted.
+  const [selectedDay, setSelectedDay]   = useState(null)
 
   useEffect(() => {
     if (!currentUser) return
@@ -315,12 +320,18 @@ export default function SchedulePage() {
   const nonLiftingPrograms = programs.filter(p => (p.programType || 'correctives') !== 'lifting')
 
   // Week → Day → (if more than one program lands on that day) program tab.
+  // What the page is actually showing — today unless the athlete has picked
+  // another day off the strip.
+  const view = selectedDay ?? { weekIdx: pos.weekIdx, dayNum: pos.dayNum }
+  const viewingToday = view.weekIdx === pos.weekIdx && view.dayNum === pos.dayNum
+  const viewStats = dayStats(programs, completions, view.weekIdx, view.dayNum - 1)
+
   const dayMap = new Map() // dayNum -> [{ program, day }]
   nonLiftingPrograms.forEach(program => {
-    (program.weeks?.[pos.weekIdx]?.days || []).forEach((day, i) => {
+    (program.weeks?.[view.weekIdx]?.days || []).forEach((day, i) => {
       if (!day.exercises?.length) return
       const dayNum = day.dayNum ?? i + 1
-      if (dayNum !== pos.dayNum) return
+      if (dayNum !== view.dayNum) return
       if (!dayMap.has(dayNum)) dayMap.set(dayNum, [])
       dayMap.get(dayNum).push({ program, day })
     })
@@ -334,13 +345,25 @@ export default function SchedulePage() {
       <UpdateNotice programs={updatedPrograms} onDismiss={dismissUpdateNotice} dismissing={dismissing} />
 
       <TodayHero
-        weekIdx={pos.weekIdx}
-        dayNum={pos.dayNum}
+        weekIdx={view.weekIdx}
+        dayNum={view.dayNum}
         pastProgram={pos.pastProgram}
         streak={streak}
-        todayDone={todayDone}
-        todayDoneCount={todayDoneCount}
-        todayTotal={todayTotal}
+        todayDone={viewingToday ? todayDone : viewStats.total > 0 && viewStats.done === viewStats.total}
+        todayDoneCount={viewingToday ? todayDoneCount : viewStats.done}
+        todayTotal={viewingToday ? todayTotal : viewStats.total}
+        viewingToday={viewingToday}
+        viewDate={pos.hasStart ? dayDate(pos.startDate, view.weekIdx, view.dayNum) : null}
+        onBackToToday={() => setSelectedDay(null)}
+      />
+
+      <DayStrip
+        programs={programs}
+        completions={completions}
+        totalWeeks={totalWeeks}
+        pos={pos}
+        selected={view}
+        onSelect={setSelectedDay}
       />
 
       {days.length === 0 && liftingPrograms.length === 0 ? (
@@ -352,8 +375,8 @@ export default function SchedulePage() {
       ) : (
         <DayBody
           entries={days[0]?.entries || []}
-          weekIdx={pos.weekIdx}
-          dayIdx={pos.dayNum - 1}
+          weekIdx={view.weekIdx}
+          dayIdx={view.dayNum - 1}
           groupPrefix="today"
           completions={completions}
           weights={weights}
@@ -401,11 +424,25 @@ function UpdateNotice({ programs, onDismiss, dismissing }) {
   )
 }
 
-// The hero card — today's date, a big completion ring, and a streak badge.
+// Calendar date of a week/day, using the same startDate + (week * 7) +
+// (dayNum - 1) mapping computeTodayPosition walks in reverse.
+function dayDate(startDate, weekIdx, dayNum) {
+  if (!startDate) return null
+  const d = new Date(`${startDate}T00:00:00`)
+  if (Number.isNaN(d.getTime())) return null
+  d.setDate(d.getDate() + weekIdx * 7 + (dayNum - 1))
+  return d
+}
+
+// The hero card — the viewed day's date, a big completion ring, and a streak
+// badge (today only — a streak isn't a property of some other day).
 // This is the whole point of the "gamified" pass: the athlete's very first
 // glance at the tab tells them where they stand today and how many days
 // in a row they've kept it up.
-function TodayHero({ weekIdx, dayNum, pastProgram, streak, todayDone, todayDoneCount, todayTotal }) {
+function TodayHero({
+  weekIdx, dayNum, pastProgram, streak, todayDone, todayDoneCount, todayTotal,
+  viewingToday = true, viewDate = null, onBackToToday,
+}) {
   const pct = todayTotal ? Math.round((todayDoneCount / todayTotal) * 100) : 0
 
   if (pastProgram) {
@@ -433,20 +470,34 @@ function TodayHero({ weekIdx, dayNum, pastProgram, streak, todayDone, todayDoneC
       <div className="relative flex items-center gap-4">
         <ProgressRing pct={pct} size={72} strokeWidth={7} />
         <div className="flex-1 min-w-0">
-          <p className="text-xs text-white/60">{format(new Date(), 'EEEE, MMM d')}</p>
+          <p className="text-xs text-white/60">
+            {format(viewDate || new Date(), 'EEEE, MMM d')}
+            {!viewingToday && <span className="text-white/40"> · not today</span>}
+          </p>
           <p className="font-display text-lg font-bold truncate">
             Week {weekIdx + 1} · Day {dayNum}
           </p>
           <p className="text-xs text-white/70 mt-0.5">
             {todayTotal > 0
               ? `${todayDoneCount}/${todayTotal} done${todayDone ? ' — nailed it 💪' : ''}`
-              : "Nothing logged yet — let's go"}
+              : viewingToday ? "Nothing logged yet — let's go" : 'Rest day — nothing scheduled'}
           </p>
-          {streak > 0 && (
-            <div className="inline-flex items-center gap-1.5 mt-2 bg-white/10 rounded-full px-2.5 py-1">
-              <Flame size={13} className="text-amber-400" />
-              <span className="text-xs font-semibold">{streak} day{streak === 1 ? '' : 's'} streak</span>
-            </div>
+          {viewingToday ? (
+            streak > 0 && (
+              <div className="inline-flex items-center gap-1.5 mt-2 bg-white/10 rounded-full px-2.5 py-1">
+                <Flame size={13} className="text-amber-400" />
+                <span className="text-xs font-semibold">{streak} day{streak === 1 ? '' : 's'} streak</span>
+              </div>
+            )
+          ) : (
+            <button
+              type="button"
+              onClick={onBackToToday}
+              className="inline-flex items-center gap-1.5 mt-2 bg-white/10 hover:bg-white/20 rounded-full px-2.5 py-1 transition"
+            >
+              <CalendarClock size={13} className="text-sp-green-300" />
+              <span className="text-xs font-semibold">Back to today</span>
+            </button>
           )}
         </div>
       </div>

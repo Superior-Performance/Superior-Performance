@@ -422,7 +422,7 @@ export default function AdminSettingsPage() {
             </li>
             <li className="flex gap-3">
               <span className="w-5 h-5 rounded-full bg-sp-green-500/20 text-sp-green-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
-              <span>Click <strong>Deploy → New deployment → Web app</strong>. Set "Who has access" to <em>Anyone</em>. The first time, Google will ask you to authorize the script to send mail on your behalf — approve it. Updating an existing script instead? Use <strong>Deploy → Manage deployments → Edit → New version</strong> so the URL stays the same.</span>
+              <span>Click <strong>Deploy → New deployment → Web app</strong>. Set "Who has access" to <em>Anyone</em>. Before that, pick <code className="text-sp-ink-100">authorize</code> in the function dropdown and click <strong>Run</strong> once, approving the prompt (mail, plus Sheets for the overflow log). Updating an existing script instead? Use <strong>Deploy → Manage deployments → Edit → New version</strong> so the URL stays the same.</span>
             </li>
             <li className="flex gap-3">
               <span className="w-5 h-5 rounded-full bg-sp-green-500/20 text-sp-green-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">4</span>

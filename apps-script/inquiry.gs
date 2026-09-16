@@ -107,3 +107,11 @@ function respond(obj) {
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }
+
+// Run once from the editor after pasting this in: the overflow log needs
+// Sheets access on top of mail, and the web app fails every request until
+// the owner has granted it.
+function authorize() {
+  MailApp.getRemainingDailyQuota();
+  SpreadsheetApp.getActiveSpreadsheet();
+}

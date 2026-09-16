@@ -121,28 +121,58 @@ service cloud.firestore {
     // Facility scheduling: everyone signed in can browse slots (to see
     // availability); only admins create/delete a slot or edit its own
     // fields (date/time/capacity/notes). bookedCount is the one field an
-    // athlete can touch themselves — capped so this rule alone can never
-    // let a slot go over capacity, even if a client's own pre-check (see
-    // bookFacilitySlot in firestore.js) were bypassed. Only ±1 per write,
-    // matching one booking or one cancellation.
+    // athlete can touch themselves, and only in lockstep with their own
+    // booking doc in the same transaction (see bookFacilitySlot /
+    // cancelFacilityBooking in firestore.js):
+    //   +1 only if their booking doc didn't exist before and does after,
+    //   -1 only if it existed before and doesn't after.
+    // Without that pairing an athlete could fake-fill a slot to lock others
+    // out, or decrement it to overbook. The booking rules below enforce the
+    // same pairing from the other side, so neither write can land alone.
+    //
+    // isAthlete(), not isAuth(): the web API key is public, so anyone can
+    // mint a role-less Auth account over REST.
+    function slotPath(slotId) {
+      return /databases/$(database)/documents/facilitySlots/$(slotId);
+    }
+    function myBookingPath(slotId) {
+      return /databases/$(database)/documents/facilitySlots/$(slotId)/bookings/$(request.auth.uid);
+    }
+
     match /facilitySlots/{slotId} {
       allow read: if isAuth();
       allow create, delete: if isAdmin();
       allow update: if isAdmin() || (
-        isAuth() &&
+        isAthlete() &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['bookedCount']) &&
         request.resource.data.bookedCount >= 0 &&
         request.resource.data.bookedCount <= resource.data.capacity &&
-        (request.resource.data.bookedCount == resource.data.bookedCount + 1 ||
-         request.resource.data.bookedCount == resource.data.bookedCount - 1)
+        (
+          (request.resource.data.bookedCount == resource.data.bookedCount + 1 &&
+           !exists(myBookingPath(slotId)) && existsAfter(myBookingPath(slotId))) ||
+          (request.resource.data.bookedCount == resource.data.bookedCount - 1 &&
+           exists(myBookingPath(slotId)) && !existsAfter(myBookingPath(slotId)))
+        )
       );
 
       // One doc per athlete (doc id = their uid) under the slot they
       // booked — admins see the full roster, an athlete only their own.
+      // No update rule: a booking is created or deleted, never edited.
       match /bookings/{uid} {
         allow read:   if isAdmin() || (isAuth() && request.auth.uid == uid);
-        allow create: if isAuth() && request.auth.uid == uid;
-        allow delete: if isAdmin() || (isAuth() && request.auth.uid == uid);
+        allow create: if isAdmin() || (
+          isAthlete() && request.auth.uid == uid &&
+          request.resource.data.keys().hasOnly(['bookedAt', 'athleteName']) &&
+          getAfter(slotPath(slotId)).data.bookedCount == get(slotPath(slotId)).data.bookedCount + 1
+        );
+        // The slot-gone branch lets an athlete clear a booking left behind
+        // when a coach deletes a slot that still had people in it.
+        allow delete: if isAdmin() || (
+          isAthlete() && request.auth.uid == uid && (
+            !exists(slotPath(slotId)) ||
+            getAfter(slotPath(slotId)).data.bookedCount == get(slotPath(slotId)).data.bookedCount - 1
+          )
+        );
       }
     }
 
@@ -165,9 +195,9 @@ service cloud.firestore {
     }
 
     // App settings: admin-only, except settings/public — the landing page's
-    // inquiry form needs to read its Apps Script URL while signed out. Nothing
-    // sensitive lives there (an "Anyone can execute" script URL isn't a secret;
-    // it's already callable by anyone who has it, same as the other integrations).
+    // inquiry form needs to read its Apps Script URL while signed out. Treat
+    // everything there as public: the scripts behind those URLs have to
+    // defend themselves (see apps-script/), not rely on the URL staying hidden.
     match /settings/{docId} {
       allow read:  if isAdmin() || docId == 'public';
       allow write: if isAdmin();

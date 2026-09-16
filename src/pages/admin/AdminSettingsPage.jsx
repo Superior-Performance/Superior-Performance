@@ -13,6 +13,10 @@ import {
 import { auth } from '../../firebase/config'
 import { useAuth } from '../../context/AuthContext'
 import toast from 'react-hot-toast'
+// Source of truth for the two mail-sending scripts — pasted into Apps Script
+// by hand, so they live as plain files the repo can diff and test.
+import INQUIRY_APPS_SCRIPT_CODE from '../../../apps-script/inquiry.gs?raw'
+import BOOKING_NOTIFY_APPS_SCRIPT_CODE from '../../../apps-script/booking-notify.gs?raw'
 
 export default function AdminSettingsPage() {
   const { userProfile } = useAuth()
@@ -418,11 +422,15 @@ export default function AdminSettingsPage() {
             </li>
             <li className="flex gap-3">
               <span className="w-5 h-5 rounded-full bg-sp-green-500/20 text-sp-green-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
-              <span>Click <strong>Deploy → New deployment → Web app</strong>. Set "Who has access" to <em>Anyone</em>. The first time, Google will ask you to authorize the script to send mail on your behalf — approve it.</span>
+              <span>Click <strong>Deploy → New deployment → Web app</strong>. Set "Who has access" to <em>Anyone</em>. The first time, Google will ask you to authorize the script to send mail on your behalf — approve it. Updating an existing script instead? Use <strong>Deploy → Manage deployments → Edit → New version</strong> so the URL stays the same.</span>
             </li>
             <li className="flex gap-3">
               <span className="w-5 h-5 rounded-full bg-sp-green-500/20 text-sp-green-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">4</span>
               <span>Copy the resulting URL and paste it above, then Save. The "Inquire" button on the landing page will start working immediately — no redeploy needed.</span>
+            </li>
+            <li className="flex gap-3">
+              <span className="w-5 h-5 rounded-full bg-sp-green-500/20 text-sp-green-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">5</span>
+              <span>Optional but recommended: the script caps how many inquiry emails it sends so a spammer can't use up the account's daily mail limit. To keep over-limit inquiries instead of dropping them, make a blank Google Sheet and add its ID as a Script property named <code className="text-sp-ink-100">OVERFLOW_SHEET_ID</code> (Project Settings → Script properties).</span>
             </li>
           </ol>
 
@@ -506,11 +514,11 @@ export default function AdminSettingsPage() {
             </li>
             <li className="flex gap-3">
               <span className="w-5 h-5 rounded-full bg-sp-green-500/20 text-sp-green-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
-              <span>Click <strong>Deploy → New deployment → Web app</strong>. Set "Who has access" to <em>Anyone</em>. Approve the one-time prompt letting the script send mail on your behalf.</span>
+              <span>Pick <code className="text-sp-ink-100">authorize</code> in the function dropdown and click <strong>Run</strong> once, approving the prompt (the script needs to send mail and to check bookings in the app). Then <strong>Deploy → New deployment → Web app</strong> with "Who has access" set to <em>Anyone</em> — the script turns away anyone who isn't a signed-in athlete with a real booking. Updating an existing script instead? Use <strong>Deploy → Manage deployments → Edit → New version</strong> so the URL stays the same.</span>
             </li>
             <li className="flex gap-3">
               <span className="w-5 h-5 rounded-full bg-sp-green-500/20 text-sp-green-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">4</span>
-              <span>Copy the resulting URL, paste it above, and Save. Booking alerts start immediately — no redeploy needed. Test it by opening the URL in a browser with <code className="text-sp-ink-100">?athlete=Test&amp;date=2026-09-15&amp;startTime=15:00&amp;endTime=16:00&amp;booked=1&amp;capacity=4</code> on the end — you should get the email.</span>
+              <span>Copy the resulting URL, paste it above, and Save. Booking alerts start immediately — no redeploy needed. To test, book a slot from an athlete account; opening the URL directly will just show an error, by design.</span>
             </li>
           </ol>
 
@@ -981,105 +989,3 @@ function setupOutputTabs() {
   return respond({ success: true, tabs: OUTPUT_TABS });
 }`;
 
-const INQUIRY_APPS_SCRIPT_CODE = `function doGet(e) {
-  try {
-    const name    = (e.parameter.name    || '').trim();
-    const email   = (e.parameter.email   || '').trim();
-    const phone   = (e.parameter.phone   || '').trim();
-    const message = (e.parameter.message || '').trim();
-
-    if (!name || !email || !message) {
-      return respond({ success: false, error: 'Name, email, and message are required.' });
-    }
-
-    MailApp.sendEmail({
-      to: 'superiorperformance.sp@gmail.com',
-      replyTo: email,
-      subject: 'New inquiry from ' + name,
-      body:
-        'New inquiry from the Superior Performance website\\n\\n' +
-        'Name: ' + name + '\\n' +
-        'Email: ' + email + '\\n' +
-        'Phone: ' + (phone || '—') + '\\n\\n' +
-        'Message:\\n' + message,
-    });
-
-    return respond({ success: true });
-
-  } catch (err) {
-    return respond({ success: false, error: err.message });
-  }
-}
-
-function respond(obj) {
-  return ContentService
-    .createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
-}`;
-
-const BOOKING_NOTIFY_APPS_SCRIPT_CODE = `function doGet(e) {
-  try {
-    var p = e.parameter || {};
-    var type      = (p.type      || 'book').trim();  // 'book' or 'cancel'
-    var athlete   = (p.athlete   || 'An athlete').trim();
-    var date      = (p.date      || '').trim();   // YYYY-MM-DD
-    var startTime = (p.startTime || '').trim();   // HH:MM (24h, facility local time)
-    var endTime   = (p.endTime   || '').trim();
-    var booked    = (p.booked    || '').trim();
-    var capacity  = (p.capacity  || '').trim();
-    var notes     = (p.notes     || '').trim();
-
-    if (!date || !startTime) {
-      return respond({ success: false, error: 'Missing slot date or start time.' });
-    }
-
-    var when = formatWhen(date, startTime, endTime);
-    var fill = (booked && capacity) ? (booked + ' of ' + capacity + ' booked') : '';
-    var isCancel = type === 'cancel';
-
-    var body =
-      (isCancel
-        ? athlete + ' cancelled a booking less than 24 hours before the session.'
-        : athlete + ' just booked a facility slot.') + '\\n\\n' +
-      'When:  ' + when + '\\n' +
-      (fill ? (isCancel ? 'Now:   ' : 'Fill:  ') + fill + '\\n' : '') +
-      (notes ? 'Slot notes:  ' + notes + '\\n' : '') +
-      '\\nSent automatically by the Superior Performance app.';
-
-    MailApp.sendEmail({
-      to: 'superiorperformance.sp@gmail.com',
-      subject: (isCancel ? 'Late cancellation - ' : 'Facility booking - ') + athlete + ' - ' + when,
-      body: body,
-    });
-
-    return respond({ success: true });
-
-  } catch (err) {
-    return respond({ success: false, error: err.message });
-  }
-}
-
-// 'YYYY-MM-DD' + 'HH:MM' 24h  ->  'Mon, Sep 15 * 3:00-4:00 PM'
-function formatWhen(date, startTime, endTime) {
-  var d = date.split('-');
-  var dt = new Date(Number(d[0]), Number(d[1]) - 1, Number(d[2]));
-  var day = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  var range = to12h(startTime) + (endTime ? '\\u2013' + to12h(endTime) : '');
-  return day + ' \\u00b7 ' + range;
-}
-
-function to12h(hhmm) {
-  var q = hhmm.split(':');
-  var h = Number(q[0]);
-  var m = q[1] || '00';
-  var ampm = h >= 12 ? 'PM' : 'AM';
-  var h12 = h % 12;
-  if (h12 === 0) h12 = 12;
-  return h12 + ':' + m + ' ' + ampm;
-}
-
-function respond(obj) {
-  return ContentService
-    .createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
-}`;

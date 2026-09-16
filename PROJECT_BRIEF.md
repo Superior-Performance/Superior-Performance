@@ -164,21 +164,23 @@ Firestore security rules are written and role-aware (admins read/write all; athl
 
 ## Open work, roughly in priority order
 
-**Exploitable today** (found by the security agent, confirmed twice, still unfixed)
+**Fixed in code, waiting on deploy** (see "Deploying the booking/webhook fix" below)
 
-1. `firestore.rules` lets any signed-in athlete change a facility slot's `bookedCount`
-   by ±1 without holding a booking — fake-fill a slot to block people, or decrement it
-   to overbook. The rule checks the delta but never that a matching `bookings/{uid}`
-   doc exists.
-2. Both Apps Script webhooks are unauthenticated and their URLs are world-readable from
-   `settings/public`. Anyone can hit them to spam the coach or burn the daily Gmail
-   quota, which silently kills real inquiry and booking emails.
+1. ~~Athletes could change a slot's `bookedCount` without holding a booking.~~
+   `firestore.rules` now only allows ±1 in the same write as creating/deleting
+   the athlete's own booking doc, and requires the athlete role. Covered by
+   `npm run test:rules`.
+2. ~~Apps Script webhooks unauthenticated.~~ Script source now lives in
+   `apps-script/` (the Settings page shows it from there). The booking script
+   only emails for a verified athlete's real booking, reading every detail from
+   Firestore with the athlete's ID token. The inquiry script (which has to stay
+   anonymous) caps volume, dedupes senders, and never uses the last 40 of the
+   account's daily mail quota, so booking alerts keep working.
+3. ~~Late-cancellation timezone bug.~~ The 24h check moved into the booking
+   script, which parses the slot time in America/Chicago.
 
 **Known bugs**
 
-3. Late-cancellation timezone bug — `hoursUntilSlot` converts *now* to Central but not
-   the slot's own start time, so an athlete on a non-Central device can trigger a false
-   late-cancel alert or miss a real one.
 4. `WeightField` stomps an in-progress keystroke when the Firestore listener echoes back
    a just-saved value. Nothing is lost, but it reads as data loss.
 5. Deleting a facility slot with active bookings orphans the `bookings` subcollection
@@ -203,3 +205,24 @@ Firestore security rules are written and role-aware (admins read/write all; athl
    three times in `AdminAthleteDetail.jsx`.
 10. No custom domain — everything canonical points at `*.web.app`, which caps local SEO.
     The origin is hardcoded in four files with no single source of truth.
+
+---
+
+## Deploying the booking/webhook fix
+
+The rules, the app, and the two Apps Scripts have to go out together. The new
+app sends booking alerts as a signed-in POST, which the old script ignores.
+The new script refuses the old app's GET. Either mismatch just drops alert
+emails (bookings themselves still work), so do all three in one sitting:
+
+1. `firebase deploy --only firestore:rules`. This is safe on its own because
+   the current app already writes bookings the way the new rules require.
+2. Build and deploy hosting, with the legal-pages carve-out.
+3. In the superiorperformance.sp account, open each Apps Script, paste the new
+   code from Admin → Settings (or `apps-script/*.gs`), then use Deploy →
+   Manage deployments → Edit → New version so the URL stays the same. For the
+   booking script, run `authorize` once first; it now needs permission to
+   make external requests. Optionally set `OVERFLOW_SHEET_ID` on the inquiry
+   script.
+4. Book and cancel a slot inside 24h from a test athlete account. That should
+   send two emails. Opening the booking URL in a browser should show an error.

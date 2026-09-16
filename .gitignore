@@ -8,3 +8,6 @@ dist
 
 # Raw source photos — optimized copies used by the site live in public/photos
 Images/
+
+# emulator
+firestore-debug.log

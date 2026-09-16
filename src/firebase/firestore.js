@@ -30,7 +30,7 @@ import {
   serverTimestamp, Timestamp, writeBatch, runTransaction,
 } from 'firebase/firestore'
 import { getStorage, ref as storageRef, deleteObject } from 'firebase/storage'
-import { db } from './config'
+import { auth, db } from './config'
 
 // ── Users ──────────────────────────────────────────────────────────────────
 export const getUser = (uid) => getDoc(doc(db, 'users', uid))
@@ -287,58 +287,39 @@ export const saveSettings = (data) =>
 
 // settings/public — { inquiryScriptUrl: string, bookingNotifyScriptUrl: string }.
 // Readable while signed out (see firestore.rules) so the landing page's inquiry
-// form and the facility-booking notification ping can reach their Apps Script
-// URLs. Neither URL is a secret — an "Anyone can execute" script is already
-// callable by anyone who has the link.
+// form can reach its Apps Script URL. Both URLs are effectively public, so the
+// scripts defend themselves: the booking one only acts on a verified athlete's
+// real booking, the inquiry one rate-limits (see apps-script/).
 export const getPublicSettings = () =>
   getDoc(doc(db, 'settings', 'public'))
 
 export const savePublicSettings = (data) =>
   setDoc(doc(db, 'settings', 'public'), data, { merge: true })
 
-// Hours between now and a slot's start. Slot date/time are stored as
-// facility-local (America/Chicago) wall clock, so "now" is projected into that
-// same zone before the subtraction — the athlete's own device timezone drops
-// out. Returns Infinity if the inputs are missing (so a cancellation with no
-// timing info stays silent rather than always paging the coach).
-function hoursUntilSlot(date, startTime) {
-  if (!date || !startTime) return Infinity
-  const [y, m, d] = date.split('-').map(Number)
-  const [hh, mm] = startTime.split(':').map(Number)
-  if ([y, m, d, hh, mm].some(Number.isNaN)) return Infinity
-  const start = new Date(y, m - 1, d, hh, mm)
-  const centralNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' }))
-  return (start - centralNow) / 3_600_000
-}
-
-// Pings the coach's Apps Script so facility bookings email
-// superiorperformance.sp@gmail.com. Mirrors the inquiry-form pattern (GET +
-// URLSearchParams, the Apps Script sends the mail) so nothing here needs Cloud
-// Functions or the Blaze plan. Fire-and-forget: a booking/cancellation must
-// never fail or block because this ping did, so callers don't await it and
-// every error is swallowed after logging.
+// Pings the coach's Apps Script (apps-script/booking-notify.gs) so facility
+// bookings email superiorperformance.sp@gmail.com — no Cloud Functions or
+// Blaze plan needed. Sends only the slot id and the athlete's ID token: the
+// script reads the booking, athlete name, and slot time from Firestore as
+// that athlete, so a request can't make it email anything that isn't real.
+// It also decides whether a cancellation is late enough (inside 24h) to be
+// worth an email, in facility time.
 //
-// kind: 'booking' (default) always notifies. 'cancellation' only notifies when
-// it lands inside the 24h window before the session — a same-day drop the coach
-// needs to know about and may want to backfill. Earlier cancellations are
-// silent; the spot just quietly reopens.
-export async function notifyFacilityBooking({ kind = 'booking', athleteName, date, startTime, endTime, bookedCount, capacity, notes }) {
+// POST with a text/plain body keeps this a "simple" request — Apps Script
+// can't answer a CORS preflight. no-cors because nothing reads the reply.
+// Fire-and-forget: a booking/cancellation must never fail or block because
+// this ping did, so callers don't await it and every error is swallowed.
+export async function notifyFacilityBooking({ kind = 'booking', slotId }) {
   try {
-    if (kind === 'cancellation' && hoursUntilSlot(date, startTime) > 24) return
     const snap = await getPublicSettings()
     const scriptUrl = snap.exists() ? snap.data().bookingNotifyScriptUrl : ''
-    if (!scriptUrl) return
-    const params = new URLSearchParams({
-      type: kind === 'cancellation' ? 'cancel' : 'book',
-      athlete: athleteName || 'Athlete',
-      date: date || '',
-      startTime: startTime || '',
-      endTime: endTime || '',
-      booked: String(bookedCount ?? ''),
-      capacity: String(capacity ?? ''),
-      notes: notes || '',
+    if (!scriptUrl || !auth.currentUser) return
+    const idToken = await auth.currentUser.getIdToken()
+    await fetch(scriptUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ type: kind === 'cancellation' ? 'cancel' : 'book', slotId, idToken }),
     })
-    await fetch(`${scriptUrl}?${params.toString()}`)
   } catch (err) {
     console.error('Facility booking notification failed (the booking itself is fine):', err)
   }

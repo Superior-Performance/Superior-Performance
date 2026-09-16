@@ -56,15 +56,7 @@ export default function BookPage() {
       toast.success('Booked!')
       // Fire-and-forget: email the coach. Never awaited — a notify failure must
       // not touch the booking the athlete just made.
-      notifyFacilityBooking({
-        athleteName: userProfile?.name || 'Athlete',
-        date: slot.date,
-        startTime: slot.startTime,
-        endTime: slot.endTime,
-        bookedCount: (slot.bookedCount ?? 0) + 1,
-        capacity: slot.capacity,
-        notes: slot.notes,
-      })
+      notifyFacilityBooking({ slotId: slot.id })
     } catch (err) {
       if (err.message === 'FULL') toast.error('That slot just filled up.')
       else if (err.message === 'ALREADY_BOOKED') toast.error('You already have this one booked.')
@@ -82,18 +74,9 @@ export default function BookPage() {
       setSlots(prev => prev.map(s => s.id === slot.id ? { ...s, bookedCount: Math.max(0, s.bookedCount - 1) } : s))
       setMyBookingIds(prev => { const next = new Set(prev); next.delete(slot.id); return next })
       toast.success('Booking cancelled.')
-      // Fire-and-forget: notifyFacilityBooking only actually emails the coach
-      // when the session is inside 24h (late cancel), otherwise it's a no-op.
-      notifyFacilityBooking({
-        kind: 'cancellation',
-        athleteName: userProfile?.name || 'Athlete',
-        date: slot.date,
-        startTime: slot.startTime,
-        endTime: slot.endTime,
-        bookedCount: Math.max(0, (slot.bookedCount ?? 0) - 1),
-        capacity: slot.capacity,
-        notes: slot.notes,
-      })
+      // Fire-and-forget: the script only actually emails the coach when the
+      // session is inside 24h (late cancel); earlier cancels are silent.
+      notifyFacilityBooking({ kind: 'cancellation', slotId: slot.id })
     } catch {
       toast.error('Could not cancel that booking.')
     } finally {

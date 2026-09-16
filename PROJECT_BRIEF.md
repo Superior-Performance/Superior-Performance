@@ -164,7 +164,7 @@ Firestore security rules are written and role-aware (admins read/write all; athl
 
 ## Open work, roughly in priority order
 
-**Fixed in code, waiting on deploy** (see "Deploying the booking/webhook fix" below)
+**Fixed.** Rules and app deployed 2026-09-16; the Apps Scripts still need re-pasting (see "Deploying the booking/webhook fix" below)
 
 1. ~~Athletes could change a slot's `bookedCount` without holding a booking.~~
    `firestore.rules` now only allows ±1 in the same write as creating/deleting

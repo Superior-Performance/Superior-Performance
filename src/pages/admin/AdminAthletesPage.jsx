@@ -1,16 +1,22 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { getAllAthletes, getAllAssessments, getSettings, createUser } from '../../firebase/firestore'
+import {
+  getAllAthletes, getAllAssessments, getSettings, createUser,
+  getAthleteGroups, setGroupMembership,
+} from '../../firebase/firestore'
 import { createAthleteAuth } from '../../firebase/adminAuth'
 import {
   OUTPUT_PULL_GROUPS, generateDraftProgram, generateAllDraftPrograms, sendAssessmentToIntakeSheet,
 } from '../../utils/sheetPrograms'
-import { Users, Plus, Search, ChevronRight, ChevronDown, X, FileSpreadsheet, Sparkles, CalendarRange } from 'lucide-react'
+import { Users, Users2, Plus, Search, ChevronRight, ChevronDown, X, FileSpreadsheet, Sparkles, CalendarRange } from 'lucide-react'
 import toast from 'react-hot-toast'
 import EmptyState from '../../components/EmptyState'
 import Skeleton from '../../components/Skeleton'
 import { programTypeInfo } from '../../constants/programTypes'
 import Avatar from '../../components/Avatar'
+import GroupFilterBar from '../../components/GroupFilterBar'
+import ManageGroupsModal from '../../components/ManageGroupsModal'
+import { ALL_GROUPS, matchesGroupFilter, groupsOf, groupColor } from '../../constants/athleteGroups'
 
 // "Generate Programs" bulk menu — same 5 choices as the single-athlete
 // page's "Generate Program" dropdown, so a coach who already knows that
@@ -27,6 +33,12 @@ export default function AdminAthletesPage() {
   const [loading, setLoading]   = useState(true)
   const [search, setSearch]     = useState('')
   const [showModal, setShowModal] = useState(false)
+  // Roster groups (winter camp, travel team) and which one the list is
+  // narrowed to. null = every athlete; see constants/athleteGroups.
+  const [groups, setGroups] = useState([])
+  const [groupFilter, setGroupFilter] = useState(ALL_GROUPS)
+  const [showGroups, setShowGroups] = useState(false)
+  const [showGroupMenu, setShowGroupMenu] = useState(false)
 
   // New user form
   const [name, setName]         = useState('')
@@ -47,7 +59,7 @@ export default function AdminAthletesPage() {
   // live progress instead of one opaque spinner for the whole batch.
   const [bulkRunning, setBulkRunning] = useState(null)
 
-  useEffect(() => { fetchAthletes(); fetchAssessments() }, [])
+  useEffect(() => { fetchAthletes(); fetchAssessments(); fetchGroups() }, [])
 
   async function fetchAthletes() {
     setLoading(true)
@@ -56,6 +68,32 @@ export default function AdminAthletesPage() {
       setAthletes(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function fetchGroups() {
+    const snap = await getAthleteGroups()
+    setGroups(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+  }
+
+  // Membership lives on the athlete doc, so both lists have to come back —
+  // otherwise the chip counts and the rows disagree until the next reload.
+  async function refreshGroupsAndAthletes() {
+    await Promise.all([fetchGroups(), fetchAthletes()])
+  }
+
+  async function bulkSetGroup(group, remove) {
+    const uids = athletes.filter(a => selected.has(a.id)).map(a => a.id)
+    if (!uids.length) return
+    setShowGroupMenu(false)
+    try {
+      await setGroupMembership(uids, group.id, { remove })
+      await fetchAthletes()
+      toast.success(remove
+        ? `Removed ${uids.length} from ${group.name}.`
+        : `Added ${uids.length} to ${group.name}.`)
+    } catch (err) {
+      toast.error(err.message || 'Could not update that group.')
     }
   }
 
@@ -84,9 +122,13 @@ export default function AdminAthletesPage() {
     }
   }
 
+  // Search and group narrow together — a coach filtered to Winter Camp who
+  // then types a name expects to search within the camp, not jump out of it.
   const filtered = athletes.filter(a =>
-    a.name?.toLowerCase().includes(search.toLowerCase()) ||
-    a.email?.toLowerCase().includes(search.toLowerCase())
+    matchesGroupFilter(a, groupFilter) && (
+      a.name?.toLowerCase().includes(search.toLowerCase()) ||
+      a.email?.toLowerCase().includes(search.toLowerCase())
+    )
   )
 
   const allVisibleSelected = filtered.length > 0 && filtered.every(a => selected.has(a.id))
@@ -154,6 +196,12 @@ export default function AdminAthletesPage() {
     const targets = athletes.filter(a => selected.has(a.id))
     if (!targets.length) return
     setShowGenerateMenu(false)
+    // Generating while filtered to a group whose block has a start date:
+    // that date is the whole point of putting a cohort on one on-ramp, so
+    // the drafts start there rather than today. Still editable per program
+    // in the review editor before anything is published.
+    const activeGroup = groups.find(g => g.id === groupFilter)
+    const groupStart = activeGroup?.startDate || null
     await withScriptUrl(async (scriptUrl) => {
       setBulkRunning({ total: targets.length, current: 0, label: '', results: [] })
       const results = []
@@ -162,11 +210,11 @@ export default function AdminAthletesPage() {
         setBulkRunning(prev => ({ ...prev, current: i + 1, label: a.name }))
         try {
           if (item.kind === 'all') {
-            const groupResults = await generateAllDraftPrograms(scriptUrl, a.id, a.name)
+            const groupResults = await generateAllDraftPrograms(scriptUrl, a.id, a.name, null, groupStart)
             const ok = groupResults.filter(r => r.ok)
             results.push({ name: a.name, ok: ok.length > 0, detail: ok.length ? `${ok.length}/${groupResults.length} types` : 'No rows found' })
           } else {
-            const r = await generateDraftProgram(scriptUrl, a.id, a.name, item.group)
+            const r = await generateDraftProgram(scriptUrl, a.id, a.name, item.group, null, groupStart)
             results.push({ name: a.name, ok: r.ok, detail: r.ok ? `${r.count} rows` : r.error })
           }
         } catch (err) {
@@ -174,7 +222,7 @@ export default function AdminAthletesPage() {
         }
       }
       finishBulk(results, (n, total) =>
-        `Generated drafts for ${n} of ${total} athletes — review each in Drafts Awaiting Review before publishing.` +
+        `Generated drafts for ${n} of ${total} athletes${groupStart ? ` starting ${groupStart}` : ''} — review each in Drafts Awaiting Review before publishing.` +
         (n < total ? ` ${total - n} had no matching rows.` : '')
       )
     })
@@ -210,6 +258,17 @@ export default function AdminAthletesPage() {
           Add Athlete
         </button>
       </div>
+
+      {/* Groups — the roster's primary lens: pick a cohort and everything
+          below (search, selection, bulk actions) works within it. */}
+      <GroupFilterBar
+        groups={groups}
+        athletes={athletes}
+        value={groupFilter}
+        onChange={setGroupFilter}
+        onManage={() => setShowGroups(true)}
+        className="mb-4"
+      />
 
       {/* Search */}
       <div className="relative mb-4">
@@ -264,6 +323,45 @@ export default function AdminAthletesPage() {
             <strong>{selected.size}</strong> athlete{selected.size === 1 ? '' : 's'} selected
           </span>
           <div className="ml-auto flex items-center gap-2">
+            {groups.length > 0 && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowGroupMenu(v => !v)}
+                  disabled={!!bulkRunning}
+                  className="flex items-center gap-2 px-3.5 py-2 border border-sp-ink-600 text-sp-ink-100 rounded-xl text-sm font-medium hover:bg-white/5 disabled:opacity-50 transition"
+                >
+                  <Users2 size={15} />
+                  Group
+                  <ChevronDown size={14} />
+                </button>
+                {showGroupMenu && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setShowGroupMenu(false)} />
+                    <div className="absolute right-0 top-full mt-1 w-60 bg-sp-ink-800 border border-sp-ink-600 rounded-xl shadow-xl z-20 overflow-hidden">
+                      {groups.map(g => (
+                        <div key={g.id} className="flex items-center border-b border-sp-ink-600/60 last:border-b-0">
+                          <button
+                            onClick={() => bulkSetGroup(g, false)}
+                            className="flex-1 flex items-center gap-2 text-left px-4 py-2.5 text-sm text-sp-ink-100 hover:bg-white/5 transition"
+                          >
+                            <span className={`w-2 h-2 rounded-full ${groupColor(g.color).dotClass}`} />
+                            <span className="truncate">Add to {g.name}</span>
+                          </button>
+                          <button
+                            onClick={() => bulkSetGroup(g, true)}
+                            title={`Remove selected from ${g.name}`}
+                            aria-label={`Remove selected from ${g.name}`}
+                            className="px-3 py-2.5 text-sp-ink-300/70 hover:text-red-400 transition"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
             <button
               onClick={bulkSendToIntakeSheet}
               disabled={!!bulkRunning}
@@ -375,7 +473,21 @@ export default function AdminAthletesPage() {
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
                       <Avatar name={a.name} photoURL={a.photoURL} size={8} />
-                      <span className="font-medium text-white hover:text-sp-green-400 transition">{a.name}</span>
+                      <div className="min-w-0">
+                        <span className="font-medium text-white hover:text-sp-green-400 transition">{a.name}</span>
+                        {groupsOf(a, groups).length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-0.5">
+                            {groupsOf(a, groups).map(g => (
+                              <span
+                                key={g.id}
+                                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-medium whitespace-nowrap ${groupColor(g.color).badgeClass}`}
+                              >
+                                {g.name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="px-5 py-3.5 text-sp-ink-300">{a.email}</td>
@@ -444,6 +556,16 @@ export default function AdminAthletesPage() {
           </form>
         </Modal>
       )}
+
+      {showGroups && (
+        <ManageGroupsModal
+          groups={groups}
+          athletes={athletes}
+          onClose={() => setShowGroups(false)}
+          onChanged={refreshGroupsAndAthletes}
+        />
+      )}
+
     </div>
   )
 }

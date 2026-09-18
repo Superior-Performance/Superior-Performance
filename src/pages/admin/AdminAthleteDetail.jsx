@@ -1,16 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
-  getUser, getAssessment, saveAssessment,
-  updateUser, deleteAthleteCompletely, getProgramForAthlete, updateProgram,
-  updateLiveProgram, migrateCompletionKeys,
-  createProgram, deleteProgram, getSettings, getProgramsForAthlete, getGeneralPrograms,
-  getCompletions,
+  getUser, getAssessment, saveAssessment, updateUser, deleteAthleteCompletely, getProgramForAthlete, updateProgram, updateLiveProgram, migrateCompletionKeys, createProgram, deleteProgram, getSettings, getProgramsForAthlete, getGeneralPrograms, getCompletions, getAthleteGroups, addAthleteToGroup, removeAthleteFromGroup,
 } from '../../firebase/firestore'
 import { getDataLogs, addDataLog, setDataLogFlag } from '../../firebase/firestore'
 import { ensureExerciseIds, completionKey, legacyCompletionKey, countProgramProgress } from '../../utils/programIds'
 import Avatar from '../../components/Avatar'
-import { ArrowLeft, Save, Zap, Scale, MessageCircle, Pencil, Trash2, X, Sparkles, KeyRound, XCircle, FileSpreadsheet, Download, ChevronDown, GraduationCap, Search, Plus, Flag, Target } from 'lucide-react'
+import { ArrowLeft, Save, Zap, Scale, MessageCircle, Pencil, Trash2, X, Sparkles, KeyRound, XCircle, FileSpreadsheet, Download, ChevronDown, GraduationCap, Users2, Search, Plus, Flag, Target } from 'lucide-react'
 import Papa from 'papaparse'
 import { sendPasswordResetEmail } from 'firebase/auth'
 import { auth } from '../../firebase/config'
@@ -21,6 +17,7 @@ import Skeleton from '../../components/Skeleton'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { PROGRAM_TYPES, ATHLETE_TYPES, athleteTypeOf } from '../../constants/programTypes'
 import { compactWeeks } from '../../utils/programSize'
+import { groupColor } from '../../constants/athleteGroups'
 import {
   OUTPUT_PULL_GROUPS, generateDraftProgram, generateAllDraftPrograms, sendAssessmentToIntakeSheet,
 } from '../../utils/sheetPrograms'
@@ -147,6 +144,8 @@ export default function AdminAthleteDetail() {
   const [editName, setEditName]     = useState('')
   const [editEmail, setEditEmail]   = useState('')
   const [togglingType, setTogglingType] = useState(false)
+  const [groups, setGroups] = useState([])
+  const [savingGroup, setSavingGroup] = useState(null)
   // Program tab shows one program type at a time (a sub-tab) instead of all
   // four stacked, and "Assign Existing" is a search modal instead of an
   // always-open list — both purely to keep this page from ballooning as an
@@ -178,6 +177,12 @@ export default function AdminAthleteDetail() {
   useEffect(() => {
     load()
   }, [uid])
+
+  useEffect(() => {
+    getAthleteGroups()
+      .then(snap => setGroups(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+      .catch(() => {}) // groups are a convenience here; the page works without them
+  }, [])
 
   // Sync the goal inputs whenever a fresh athlete doc comes in (initial
   // load, or after load() re-runs) — not on every keystroke.
@@ -285,6 +290,29 @@ export default function AdminAthleteDetail() {
   // apply across the whole program, not any specific week — see the
   // isRemote branch in SchedulePage.
   const athleteType = athleteTypeOf(athlete)
+
+  // Which groups exist, so the chips below can offer every one of them —
+  // membership itself is on the athlete doc (groupIds).
+  const memberGroupIds = new Set(athlete?.groupIds || [])
+
+  async function toggleGroup(group) {
+    const isMember = memberGroupIds.has(group.id)
+    setSavingGroup(group.id)
+    const prev = athlete.groupIds || []
+    setAthlete(a => ({
+      ...a,
+      groupIds: isMember ? prev.filter(id => id !== group.id) : [...prev, group.id],
+    })) // optimistic
+    try {
+      if (isMember) await removeAthleteFromGroup(uid, group.id)
+      else await addAthleteToGroup(uid, group.id)
+    } catch {
+      setAthlete(a => ({ ...a, groupIds: prev }))
+      toast.error('Could not update groups.')
+    } finally {
+      setSavingGroup(null)
+    }
+  }
 
   async function setAthleteType(nextType) {
     if (nextType === athleteType) return
@@ -847,6 +875,45 @@ export default function AdminAthleteDetail() {
           })}
         </div>
       </div>
+
+      {/* Groups — membership is a tag, so this is a row of toggles rather
+          than a form: tap to add, tap again to remove, saved immediately. */}
+      {groups.length > 0 && (
+        <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 px-5 py-4 mb-6">
+          <div className="flex items-start gap-3 mb-3">
+            <div className="w-9 h-9 rounded-full bg-sp-green-500/15 text-sp-green-400 flex items-center justify-center flex-shrink-0">
+              <Users2 size={17} />
+            </div>
+            <div>
+              <p className="font-semibold text-white text-sm">Groups</p>
+              <p className="text-xs text-sp-ink-300 mt-0.5">
+                Cohorts this athlete trains with. They can be in more than one.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {groups.map(g => {
+              const c = groupColor(g.color)
+              const member = memberGroupIds.has(g.id)
+              return (
+                <button
+                  key={g.id}
+                  type="button"
+                  onClick={() => toggleGroup(g)}
+                  disabled={savingGroup === g.id}
+                  aria-pressed={member}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition disabled:opacity-50 ${
+                    member ? c.activeClass : 'bg-sp-ink-900/40 border-sp-ink-600 text-sp-ink-300 hover:border-sp-ink-300/40'
+                  }`}
+                >
+                  <span className={`w-2 h-2 rounded-full ${member ? c.dotClass : 'bg-sp-ink-600'}`} />
+                  {g.name}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 bg-sp-ink-800 border border-sp-ink-600 rounded-xl p-1 w-fit">

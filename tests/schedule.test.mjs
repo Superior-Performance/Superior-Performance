@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const { computeTodayPosition, dayStatsByType, dayCountForWeek } = await import(`${ROOT}src/utils/programSchedule.js`)
 const { compactWeeks, estimateBytes, sizeStatus, FIRESTORE_DOC_LIMIT } = await import(`${ROOT}src/utils/programSize.js`)
+const { matchesGroupFilter, groupsOf, suggestGroupColor, ALL_GROUPS, UNGROUPED } = await import(`${ROOT}src/constants/athleteGroups.js`)
 
 let failures = 0
 function t(name, fn) {
@@ -127,6 +128,40 @@ t('size status crosses over at the Firestore limit', () => {
 t('estimateBytes counts a string as its bytes plus one', () => {
   // {a: 'hi'} -> key 'a' (1+1) + value 'hi' (2+1) = 5
   eq(estimateBytes({ a: 'hi' }), 5)
+})
+
+// ── roster groups ────────────────────────────────────────────────────────────
+const camp = { id: 'g-camp', name: 'Winter Camp', color: 'blue' }
+const team = { id: 'g-team', name: 'Travel Team', color: 'purple' }
+const groups = [camp, team]
+const inBoth = { id: 'a1', groupIds: ['g-camp', 'g-team'] }
+const campOnly = { id: 'a2', groupIds: ['g-camp'] }
+const unfiled = { id: 'a3' }
+
+t('all-athletes filter matches everyone, filed or not', () => {
+  eq([inBoth, campOnly, unfiled].every(a => matchesGroupFilter(a, ALL_GROUPS)), true)
+})
+t('a group filter matches only its members', () => {
+  eq([matchesGroupFilter(inBoth, 'g-camp'), matchesGroupFilter(campOnly, 'g-camp'), matchesGroupFilter(unfiled, 'g-camp')], [true, true, false])
+})
+t('an athlete in two groups shows up under each', () => {
+  eq([matchesGroupFilter(inBoth, 'g-camp'), matchesGroupFilter(inBoth, 'g-team')], [true, true])
+})
+t('ungrouped finds exactly the unfiled', () => {
+  eq([matchesGroupFilter(unfiled, UNGROUPED), matchesGroupFilter(campOnly, UNGROUPED)], [true, false])
+})
+t('an empty groupIds array still counts as ungrouped', () => {
+  eq(matchesGroupFilter({ id: 'a4', groupIds: [] }, UNGROUPED), true)
+})
+t('a membership pointing at a deleted group shows no chip', () => {
+  eq(groupsOf({ groupIds: ['g-gone'] }, groups), [])
+})
+t('chips come back in group order, not membership order', () => {
+  eq(groupsOf({ groupIds: ['g-team', 'g-camp'] }, groups).map(g => g.id), ['g-camp', 'g-team'])
+})
+t('a new group is offered a colour nothing else uses', () => {
+  const next = suggestGroupColor(groups)
+  eq(groups.some(g => g.color === next), false)
 })
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

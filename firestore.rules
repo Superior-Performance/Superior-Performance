@@ -110,6 +110,16 @@ service cloud.firestore {
       allow read, write: if isAdmin() && request.auth.uid == uid;
     }
 
+    // Athlete groups: the coach's roster cohorts (a winter camp, a travel
+    // team). Admin-only in both directions — an athlete has no view that
+    // shows a group, and membership itself lives on users/{uid}.groupIds,
+    // which is already admin-write-only (the athlete's self-write there is
+    // capped to photoURL). Nothing to add on the athlete side.
+    match /athleteGroups/{groupId} {
+      allow read:  if isAdmin();
+      allow write: if isAdmin();
+    }
+
     // Exercise library: coach-tooling data (name/category -> last-used
     // sets/reps/notes/video URL) that powers the Program Editor's autofill
     // suggestions. Admin-only — athletes never see or need this.

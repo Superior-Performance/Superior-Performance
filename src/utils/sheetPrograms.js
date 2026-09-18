@@ -207,7 +207,7 @@ export async function fetchOutputRows(scriptUrl, athleteName, tabs) {
 // re-pulling while iterating on the sheet leaves stale drafts stacking up.
 // `existingPrograms` lets a caller that already has this athlete's programs
 // loaded (the detail page) skip a redundant read; bulk callers can omit it.
-export async function generateDraftProgram(scriptUrl, uid, athleteName, group, existingPrograms = null) {
+export async function generateDraftProgram(scriptUrl, uid, athleteName, group, existingPrograms = null, startDate = null) {
   const { rows, error } = await fetchOutputRows(scriptUrl, athleteName, group.tabs)
   if (!rows.length) return { label: group.label, ok: false, error: error || `No rows in ${group.tabs.join(' or ')}` }
 
@@ -224,9 +224,11 @@ export async function generateDraftProgram(scriptUrl, uid, athleteName, group, e
     programType: group.programType,
     totalWeeks: weeks.length,
     weeks,
-    // Defaults to today — the coach can adjust it in the review editor
-    // before publishing, since it's what sets the athlete's Day 1.
-    startDate:  new Date().toISOString().slice(0, 10),
+    // A group's block start date when generating for a cohort (see the
+    // roster's bulk actions), otherwise today. Either way the coach can
+    // adjust it in the review editor before publishing, since it's what
+    // sets the athlete's Day 1.
+    startDate:  startDate || new Date().toISOString().slice(0, 10),
     active:     false,
   })
   return { label: group.label, ok: true, count: rows.length }
@@ -236,9 +238,9 @@ export async function generateDraftProgram(scriptUrl, uid, athleteName, group, e
 // each still becomes its own draft (an athlete can have one active program
 // per type at once, so there's no such thing as a single program spanning
 // all of them).
-export async function generateAllDraftPrograms(scriptUrl, uid, athleteName, existingPrograms = null) {
+export async function generateAllDraftPrograms(scriptUrl, uid, athleteName, existingPrograms = null, startDate = null) {
   const programs = existingPrograms ?? (await getProgramsForAthlete(uid)).docs.map(d => ({ id: d.id, ...d.data() }))
-  return Promise.all(OUTPUT_PULL_GROUPS.map(group => generateDraftProgram(scriptUrl, uid, athleteName, group, programs)))
+  return Promise.all(OUTPUT_PULL_GROUPS.map(group => generateDraftProgram(scriptUrl, uid, athleteName, group, programs, startDate)))
 }
 
 // Logs one athlete's assessment to the "Assessment Intake" sheet. Returns

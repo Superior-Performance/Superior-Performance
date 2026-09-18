@@ -27,7 +27,7 @@
 import {
   collection, doc, getDoc, getDocs, setDoc, addDoc,
   updateDoc, deleteDoc, query, where, orderBy, limit, onSnapshot,
-  serverTimestamp, Timestamp, writeBatch, runTransaction,
+  serverTimestamp, Timestamp, writeBatch, runTransaction, arrayUnion, arrayRemove,
 } from 'firebase/firestore'
 import { getStorage, ref as storageRef, deleteObject } from 'firebase/storage'
 import { auth, db } from './config'
@@ -197,6 +197,66 @@ export const getGeneralPrograms = () =>
 
 export const deleteProgram = (programId) =>
   deleteDoc(doc(db, 'programs', programId))
+
+// ── Athlete groups ───────────────────────────────────────────────────────────
+// athleteGroups/{groupId} — { name, color, startDate?, notes?, createdAt }
+//
+// A roster grouping the coach runs training by: a winter camp cohort, a
+// travel team training out of another facility. Membership lives on the
+// athlete (users/{uid}.groupIds) rather than as a member list here, so
+// adding someone to a group is one write to the doc that already has to be
+// read to show them, and deleting a group can't strand a membership list.
+// An athlete can be in several groups at once.
+//
+// `startDate` is optional and advisory — the date the group's block starts,
+// offered as the default when assigning programs to the group. The program's
+// own startDate still drives every calendar; this is just the coach's note
+// of when the cohort begins so they don't retype it per athlete.
+export const getAthleteGroups = () =>
+  getDocs(query(collection(db, 'athleteGroups'), orderBy('createdAt', 'asc')))
+
+export const createAthleteGroup = (data) =>
+  addDoc(collection(db, 'athleteGroups'), { ...data, createdAt: serverTimestamp() })
+
+export const updateAthleteGroup = (groupId, data) =>
+  updateDoc(doc(db, 'athleteGroups', groupId), data)
+
+// Deleting a group also has to clear it from every athlete carrying it, or
+// they keep a membership pointing at nothing — which reads as an athlete
+// who is in "a group" that no filter can ever show.
+export const deleteAthleteGroup = async (groupId, memberUids = []) => {
+  const batch = writeBatch(db)
+  memberUids.forEach(uid => {
+    batch.update(doc(db, 'users', uid), { groupIds: arrayRemove(groupId) })
+  })
+  batch.delete(doc(db, 'athleteGroups', groupId))
+  await batch.commit()
+}
+
+// Membership edits are arrayUnion/arrayRemove rather than a read-modify-write
+// of the whole list, so two coaches editing different groups at the same time
+// can't clobber each other's change.
+export const addAthleteToGroup = (uid, groupId) =>
+  updateDoc(doc(db, 'users', uid), { groupIds: arrayUnion(groupId) })
+
+export const removeAthleteFromGroup = (uid, groupId) =>
+  updateDoc(doc(db, 'users', uid), { groupIds: arrayRemove(groupId) })
+
+// Bulk version for the roster's "add selected to group" action — one commit
+// instead of N round trips. Firestore caps a batch at 500 writes.
+export const setGroupMembership = async (uids, groupId, { remove = false } = {}) => {
+  const chunks = []
+  for (let i = 0; i < uids.length; i += 450) chunks.push(uids.slice(i, i + 450))
+  for (const chunk of chunks) {
+    const batch = writeBatch(db)
+    chunk.forEach(uid => {
+      batch.update(doc(db, 'users', uid), {
+        groupIds: remove ? arrayRemove(groupId) : arrayUnion(groupId),
+      })
+    })
+    await batch.commit()
+  }
+}
 
 // ── Exercise library ─────────────────────────────────────────────────────────
 // exerciseLibrary/{id} — { name, category, sets, reps, intensity, notes,

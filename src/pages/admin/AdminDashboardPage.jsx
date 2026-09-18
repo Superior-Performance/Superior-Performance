@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   getAllAthletes, getAllPrograms, getCompletions, getDataLogs, setDataLogFlag,
-  getExerciseWeights, getChatMessages, getAllChatReads,
+  getExerciseWeights, getChatMessages, getAllChatReads, getAthleteGroups,
 } from '../../firebase/firestore'
 import { buildSlots, isSlotComplete, countProgramProgress } from '../../utils/programIds'
 import { computeStreak } from '../../utils/programSchedule'
@@ -11,6 +11,9 @@ import { LayoutDashboard, Flag, Clock, TrendingDown, FileClock, MessageCircle, Z
 import { format, formatDistanceToNow } from 'date-fns'
 import toast from 'react-hot-toast'
 import EmptyState from '../../components/EmptyState'
+import GroupFilterBar from '../../components/GroupFilterBar'
+import ManageGroupsModal from '../../components/ManageGroupsModal'
+import { ALL_GROUPS, matchesGroupFilter, groupsOf, groupColor } from '../../constants/athleteGroups'
 
 // Below this elapsed-completion % an athlete shows as "Behind" — elapsed
 // meaning weeks that have actually started, not the whole program, so
@@ -89,6 +92,12 @@ export default function AdminDashboardPage() {
   const [flagged, setFlagged] = useState(dashboardCache?.flagged || []) // flattened flagged log entries, newest first
   const [unread, setUnread] = useState(dashboardCache?.unread || [])   // one per athlete with unread messages, newest first
   const [activeFilter, setActiveFilter] = useState(null) // one of FILTERS' keys, or null
+  // Roster groups — a second, independent lens: which cohort the page is
+  // about (Winter Camp), where the tiles above answer what needs attention.
+  // The two compose: Winter Camp + Behind on program is a real question.
+  const [groups, setGroups] = useState(dashboardCache?.groups || [])
+  const [groupFilter, setGroupFilter] = useState(ALL_GROUPS)
+  const [showGroups, setShowGroups] = useState(false)
 
   function toggleFilter(key) {
     setActiveFilter(prev => prev === key ? null : key)
@@ -103,9 +112,10 @@ export default function AdminDashboardPage() {
       // chatReads doesn't depend on the athlete list, so it rides along with
       // wave 1 instead of waiting for it — one fewer round trip in the
       // critical path.
-      const [athletesSnap, programsSnap, chatReadsSnap] = await Promise.all([
-        getAllAthletes(), getAllPrograms(), getAllChatReads(),
+      const [athletesSnap, programsSnap, chatReadsSnap, groupsSnap] = await Promise.all([
+        getAllAthletes(), getAllPrograms(), getAllChatReads(), getAthleteGroups(),
       ])
+      setGroups(groupsSnap.docs.map(d => ({ id: d.id, ...d.data() })))
       const athletes = athletesSnap.docs.map(d => ({ id: d.id, ...d.data() }))
       const allPrograms = programsSnap.docs.map(d => ({ id: d.id, ...d.data() }))
       const chatReadByAthlete = {}
@@ -176,7 +186,7 @@ export default function AdminDashboardPage() {
 
       flaggedFeed.sort((a, b) => toMillis(b.entry.date) - toMillis(a.entry.date))
       unreadFeed.sort((a, b) => toMillis(b.latest.createdAt) - toMillis(a.latest.createdAt))
-      dashboardCache = { rows: nextRows, flagged: flaggedFeed, unread: unreadFeed }
+      dashboardCache = { rows: nextRows, flagged: flaggedFeed, unread: unreadFeed, groups: groupsSnap.docs.map(d => ({ id: d.id, ...d.data() })) }
       setRows(nextRows)
       setFlagged(flaggedFeed)
       setUnread(unreadFeed)
@@ -217,10 +227,19 @@ export default function AdminDashboardPage() {
     )
   }
 
-  const inactiveCount = rows.filter(r => r.inactive).length
-  const behindCount = rows.filter(r => r.behind).length
-  const draftTotal = rows.reduce((s, r) => s + r.draftCount, 0)
-  const unreadCount = rows.reduce((s, r) => s + r.unreadCount, 0)
+  // The group lens applies first: every tile count, feed and roster row below
+  // is about the selected cohort. A coach who clicks Winter Camp and sees "3
+  // behind" means 3 of the camp, not 3 of the gym.
+  const groupRows = rows.filter(r => matchesGroupFilter(r.athlete, groupFilter))
+  const selectedGroup = groups.find(g => g.id === groupFilter) || null
+  const inGroup = new Set(groupRows.map(r => r.athlete.id))
+  const visibleFlagged = flagged.filter(f => inGroup.has(f.athleteId))
+  const visibleUnread = unread.filter(u => inGroup.has(u.athleteId))
+
+  const inactiveCount = groupRows.filter(r => r.inactive).length
+  const behindCount = groupRows.filter(r => r.behind).length
+  const draftTotal = groupRows.reduce((s, r) => s + r.draftCount, 0)
+  const unreadCount = groupRows.reduce((s, r) => s + r.unreadCount, 0)
 
   // Selecting a tile narrows the page to just that category. The two feed
   // categories (unread/flagged) already have a richer list than the roster
@@ -230,7 +249,7 @@ export default function AdminDashboardPage() {
   const showUnreadFeed = !activeFilter || activeFilter === 'unread'
   const showFlaggedFeed = !activeFilter || activeFilter === 'flagged'
   const showRoster = !activeFilter || !FILTERS[activeFilter].hasFeed
-  const rosterRows = activeFilter ? rows.filter(FILTERS[activeFilter].test) : rows
+  const rosterRows = activeFilter ? groupRows.filter(FILTERS[activeFilter].test) : groupRows
 
   return (
     <div className="p-8 bg-sp-ink-900 min-h-full">
@@ -249,10 +268,19 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
+      <GroupFilterBar
+        groups={groups}
+        athletes={rows.map(r => r.athlete)}
+        value={groupFilter}
+        onChange={setGroupFilter}
+        onManage={() => setShowGroups(true)}
+        className="mb-4"
+      />
+
       {/* Needs attention tiles — each doubles as a filter, click to narrow the page */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
         <Tile Icon={MessageCircle} value={unreadCount} label="Unread messages" tone="amber" active={activeFilter === 'unread'} onClick={() => toggleFilter('unread')} />
-        <Tile Icon={Flag} value={flagged.length} label="Flagged notes" tone="amber" active={activeFilter === 'flagged'} onClick={() => toggleFilter('flagged')} />
+        <Tile Icon={Flag} value={visibleFlagged.length} label="Flagged notes" tone="amber" active={activeFilter === 'flagged'} onClick={() => toggleFilter('flagged')} />
         <Tile Icon={Clock} value={inactiveCount} label={`Inactive ${INACTIVE_DAYS}+ days`} tone="red" active={activeFilter === 'inactive'} onClick={() => toggleFilter('inactive')} />
         <Tile Icon={TrendingDown} value={behindCount} label="Behind on program" tone="amber" active={activeFilter === 'behind'} onClick={() => toggleFilter('behind')} />
         <Tile Icon={FileClock} value={draftTotal} label="Drafts awaiting review" tone="neutral" active={activeFilter === 'drafts'} onClick={() => toggleFilter('drafts')} />
@@ -271,13 +299,13 @@ export default function AdminDashboardPage() {
       {showUnreadFeed && (
       <div className="mb-8">
         <p className="text-xs font-bold text-sp-ink-300 uppercase tracking-wider mb-3">Unread messages</p>
-        {unread.length === 0 ? (
+        {visibleUnread.length === 0 ? (
           <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 p-6 text-center text-sm text-sp-ink-300">
             No unread messages.
           </div>
         ) : (
           <div className="space-y-2">
-            {unread.map(({ athleteId, athleteName, latest, count }) => (
+            {visibleUnread.map(({ athleteId, athleteName, latest, count }) => (
               <Link
                 key={athleteId}
                 to={`/admin/chat/${athleteId}`}
@@ -307,13 +335,13 @@ export default function AdminDashboardPage() {
       {showFlaggedFeed && (
       <div className="mb-8">
         <p className="text-xs font-bold text-sp-ink-300 uppercase tracking-wider mb-3">Flagged notes</p>
-        {flagged.length === 0 ? (
+        {visibleFlagged.length === 0 ? (
           <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 p-6 text-center text-sm text-sp-ink-300">
             Nothing flagged right now.
           </div>
         ) : (
           <div className="space-y-2">
-            {flagged.map(({ athleteId, athleteName, entry }) => (
+            {visibleFlagged.map(({ athleteId, athleteName, entry }) => (
               <div key={entry.id} className="bg-sp-ink-800 border border-amber-500/30 rounded-xl px-4 py-3 flex items-center gap-3">
                 <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
@@ -345,13 +373,21 @@ export default function AdminDashboardPage() {
       {showRoster && (
       <div>
         <p className="text-xs font-bold text-sp-ink-300 uppercase tracking-wider mb-3">
-          Roster{activeFilter ? ` — ${FILTERS[activeFilter].label} (${rosterRows.length})` : ''}
+          Roster
+          {selectedGroup ? ` — ${selectedGroup.name}` : ''}
+          {activeFilter ? ` — ${FILTERS[activeFilter].label} (${rosterRows.length})` : ''}
         </p>
         {rosterRows.length === 0 ? (
           <EmptyState
             icon={LayoutDashboard}
-            title={activeFilter ? 'Nothing here' : 'No athletes yet'}
-            subtitle={activeFilter ? 'No athletes match this filter.' : 'Add an athlete to see them here.'}
+            title={activeFilter ? 'Nothing here' : selectedGroup ? `Nobody in ${selectedGroup.name} yet` : 'No athletes yet'}
+            subtitle={
+              activeFilter
+                ? `No athletes match this filter${selectedGroup ? ` in ${selectedGroup.name}` : ''}.`
+                : selectedGroup
+                  ? 'Add athletes to this group from the Athletes page — select them, then Group.'
+                  : 'Add an athlete to see them here.'
+            }
             compact dark
           />
         ) : (
@@ -373,7 +409,23 @@ export default function AdminDashboardPage() {
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-3">
                         <Avatar name={athlete.name} photoURL={athlete.photoURL} size={8} />
-                        <span className="font-medium text-white">{athlete.name}</span>
+                        <div className="min-w-0">
+                          <span className="font-medium text-white">{athlete.name}</span>
+                          {/* Only worth showing when looking across groups —
+                              inside one, every row would carry the same chip. */}
+                          {groupFilter === ALL_GROUPS && groupsOf(athlete, groups).length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-0.5">
+                              {groupsOf(athlete, groups).map(g => (
+                                <span
+                                  key={g.id}
+                                  className={`inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-medium whitespace-nowrap ${groupColor(g.color).badgeClass}`}
+                                >
+                                  {g.name}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="px-5 py-3 text-sp-ink-300">
@@ -404,6 +456,15 @@ export default function AdminDashboardPage() {
         )}
       </div>
       )}
+      {showGroups && (
+        <ManageGroupsModal
+          groups={groups}
+          athletes={rows.map(r => r.athlete)}
+          onClose={() => setShowGroups(false)}
+          onChanged={() => load(true)}
+        />
+      )}
+
     </div>
   )
 }

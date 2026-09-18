@@ -89,6 +89,38 @@ await t('booking update denied', async () => { await seed({ count: 1, booked: ['
 await t('role-less account cannot book', async () => { await seed(); await assertFails(book(db('rando'), 'rando')) })
 await t('role-less account can still browse slots', async () => { await seed(); await assertSucceeds(getDoc(doc(db('rando'), 'facilitySlots/s1'))) })
 
+// ── athlete groups ──
+async function seedGroups() {
+  await env.clearFirestore()
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore()
+    await setDoc(doc(db, 'users/ath'), { role: 'athlete', groupIds: ['g1'] })
+    await setDoc(doc(db, 'users/adm'), { role: 'admin' })
+    await setDoc(doc(db, 'athleteGroups/g1'), { name: 'Winter Camp', color: 'blue' })
+  })
+}
+await t('admin reads and writes groups', async () => {
+  await seedGroups()
+  await assertSucceeds(getDoc(doc(db('adm'), 'athleteGroups/g1')))
+  await assertSucceeds(setDoc(doc(db('adm'), 'athleteGroups/g2'), { name: 'Travel Team', color: 'teal' }))
+})
+await t('athlete cannot read the coach\'s groups', async () => {
+  await seedGroups()
+  await assertFails(getDoc(doc(db('ath'), 'athleteGroups/g1')))
+})
+await t('athlete cannot create a group', async () => {
+  await seedGroups()
+  await assertFails(setDoc(doc(db('ath'), 'athleteGroups/g9'), { name: 'Mine' }))
+})
+await t('athlete cannot put themselves in a group', async () => {
+  await seedGroups()
+  await assertFails(updateDoc(doc(db('ath'), 'users/ath'), { groupIds: ['g1', 'g2'] }))
+})
+await t('admin can set membership on an athlete', async () => {
+  await seedGroups()
+  await assertSucceeds(updateDoc(doc(db('adm'), 'users/ath'), { groupIds: ['g1', 'g2'] }))
+})
+
 await env.cleanup()
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')
 process.exit(failures ? 1 : 0)

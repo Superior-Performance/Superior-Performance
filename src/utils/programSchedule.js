@@ -1,4 +1,7 @@
-import { buildSlots, isSlotComplete } from './programIds'
+import { buildSlots, isSlotComplete } from './programIds.js'
+import { PROGRAM_TYPES } from '../constants/programTypes.js'
+
+const PROGRAM_TYPE_ORDER = PROGRAM_TYPES.map(t => t.key)
 
 /**
  * Where "today" falls inside a program's week/day grid.
@@ -59,6 +62,34 @@ export function dayStats(programs, completions, wi, di) {
     done += slots.filter(s => isSlotComplete(completions, p.id, s, wi, di)).length
   })
   return { total, done }
+}
+
+/**
+ * Same day, broken out per program type — what the athlete actually has on
+ * that date, so the schedule can colour a day by the work in it rather than
+ * reducing everything to one dot.
+ *
+ * Lifting is deliberately excluded: a lift day is Upper/Lower, not a calendar
+ * weekday, so its dayNum is a 1-4 bucket with no relationship to this date
+ * (see LIFTING_DAY_TYPE_DAYNUM and LiftingBrowser). Including it would paint
+ * lifting onto days it has nothing to do with.
+ *
+ * Returns one entry per type present that day, in PROGRAM_TYPES order, each
+ * `{ type, total, done }`. A day with nothing scheduled returns [].
+ */
+export function dayStatsByType(programs, completions, wi, di) {
+  const byType = new Map()
+  programs.forEach(p => {
+    const type = p.programType || 'correctives'
+    if (type === 'lifting') return
+    const slots = buildSlots(p.weeks?.[wi]?.days?.[di]?.exercises)
+    if (slots.length === 0) return
+    const entry = byType.get(type) || { type, total: 0, done: 0 }
+    entry.total += slots.length
+    entry.done += slots.filter(s => isSlotComplete(completions, p.id, s, wi, di)).length
+    byType.set(type, entry)
+  })
+  return PROGRAM_TYPE_ORDER.filter(t => byType.has(t)).map(t => byType.get(t))
 }
 
 /** Days in a given week — the longest, since programs can differ in length. */

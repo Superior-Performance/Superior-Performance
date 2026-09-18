@@ -13,7 +13,7 @@ import { format } from 'date-fns'
 import EmptyState from '../../components/EmptyState'
 import ProgressRing from '../../components/ProgressRing'
 import Skeleton from '../../components/Skeleton'
-import { programTypeInfo, exerciseCategoryInfo, categoryRank, DAY_TYPES, LIFTING_DAY_TYPES } from '../../constants/programTypes'
+import { PROGRAM_TYPES, programTypeInfo, exerciseCategoryInfo, categoryRank, DAY_TYPES, LIFTING_DAY_TYPES } from '../../constants/programTypes'
 import { isExerciseComplete, keyForWrite, groupIntoSlots, buildSlots, isSlotComplete } from '../../utils/programIds'
 import { computeStreak, dayStats } from '../../utils/programSchedule'
 import DayStrip from './DayStrip'
@@ -366,6 +366,10 @@ export default function SchedulePage() {
         onSelect={setSelectedDay}
       />
 
+      {/* What the strip's colours mean. Only the types this athlete actually
+          has — a legend listing programs they aren't running is noise. */}
+      <TypeLegend programs={nonLiftingPrograms} />
+
       {days.length === 0 && liftingPrograms.length === 0 ? (
         <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 p-8 text-center">
           <Moon size={26} className="mx-auto mb-2 text-sp-ink-300" />
@@ -395,6 +399,24 @@ export default function SchedulePage() {
       )}
 
       <ExerciseDetailModal detail={detail} onClose={() => setDetail(null)} />
+    </div>
+  )
+}
+
+// Colour key for the day strip's per-type dots. Same colours as the program
+// tabs and badges (PROGRAM_TYPES), so the dot on a day and the tab it opens
+// match rather than being two unrelated colour systems.
+function TypeLegend({ programs }) {
+  const types = PROGRAM_TYPES.filter(t => programs.some(p => (p.programType || 'correctives') === t.key))
+  if (types.length < 2) return null // one type needs no key
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 px-0.5">
+      {types.map(t => (
+        <span key={t.key} className="flex items-center gap-1.5">
+          <span className={`w-1.5 h-1.5 rounded-full ${t.dotClass}`} />
+          <span className="text-[10px] text-sp-ink-300">{t.shortLabel}</span>
+        </span>
+      ))}
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Check } from 'lucide-react'
-import { dayStats, dayCountForWeek } from '../../utils/programSchedule'
+import { dayStats, dayStatsByType, dayCountForWeek } from '../../utils/programSchedule'
+import { programTypeInfo } from '../../constants/programTypes'
 
 /**
  * Horizontally scrollable day picker for the athlete's schedule.
@@ -16,6 +17,13 @@ import { dayStats, dayCountForWeek } from '../../utils/programSchedule'
  *
  * Status per day comes from the same dayStats() the streak uses, so a day that
  * reads "done" here is done by exactly the definition the streak counts.
+ *
+ * Each day carries one dot per program type scheduled on it, in that type's
+ * own colour (the same colours the program tabs and badges use — see
+ * PROGRAM_TYPES), so the athlete can see at a glance that Tuesday is throwing
+ * and mobility while Wednesday is pre-throw only. A filled dot means that
+ * type is finished, a hollow one means it isn't; a day with nothing scheduled
+ * shows no dots at all rather than a row of empties.
  */
 
 const WEEKDAY_INITIALS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
@@ -72,6 +80,7 @@ export default function DayStrip({
           // Only a past day with unfinished work is "missed" — a rest day
           // isn't missed, and today isn't missed while it's still today.
           const missed = past && total > 0 && done < total
+          const typeStats = dayStatsByType(programs, completions, weekIdx, dayNum - 1)
           const date = cellDate(pos.startDate, weekIdx, dayNum)
           const startOfWeek = dayNum === 1
 
@@ -100,7 +109,9 @@ export default function DayStrip({
                 className={`w-[52px] py-2 rounded-xl border flex flex-col items-center gap-1 transition ${
                   isSelected
                     ? 'border-sp-green-500 bg-sp-green-500/15'
-                    : 'border-sp-ink-600 bg-sp-ink-800 hover:border-sp-ink-300/40'
+                    : missed
+                      ? 'border-amber-400/60 bg-sp-ink-800 hover:border-amber-400'
+                      : 'border-sp-ink-600 bg-sp-ink-800 hover:border-sp-ink-300/40'
                 }`}
               >
                 <span className="text-[9px] font-semibold uppercase tracking-wide text-sp-ink-300">
@@ -113,16 +124,23 @@ export default function DayStrip({
                   {date ? date.getDate() : dayNum}
                 </span>
 
-                {/* One status mark per day, in priority order — a rest day
-                    shows nothing at all rather than a hollow "not done" dot
-                    that would read as work the athlete skipped. */}
-                <span className="h-2 flex items-center justify-center">
+                {/* A dot per program type scheduled that day, filled once
+                    that type is done. The whole day being complete still gets
+                    the check — it reads faster than four filled dots, and it's
+                    the thing an athlete looks for. A rest day shows nothing at
+                    all rather than empties that would read as skipped work. */}
+                <span className="h-2 flex items-center justify-center gap-0.5">
                   {complete ? (
                     <Check size={11} className="text-sp-green-400" strokeWidth={3} />
-                  ) : missed ? (
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                   ) : rest ? null : (
-                    <span className="w-1.5 h-1.5 rounded-full bg-sp-ink-300/40" />
+                    typeStats.map(({ type, total: t, done: d }) => (
+                      <span
+                        key={type}
+                        className={`w-1.5 h-1.5 rounded-full ${programTypeInfo(type).dotClass} ${
+                          d === t ? '' : 'opacity-40'
+                        }`}
+                      />
+                    ))
                   )}
                 </span>
               </button>

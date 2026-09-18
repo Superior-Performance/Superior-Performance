@@ -169,3 +169,26 @@ export function categoryRank(label) {
   const viaAlias = EXERCISE_CATEGORIES.findIndex(c => matchesCategory(c, trimmed))
   return viaAlias === -1 ? Infinity : CATEGORY_ORDER.indexOf(EXERCISE_CATEGORIES[viaAlias].key)
 }
+
+// How an athlete's program reaches them. Stored on users/{uid}.athleteType;
+// anything unset counts as in-house, which is what every athlete was before
+// College Remote existed. These are two modes of one setting, not a flag —
+// see AdminAthleteDetail (where a coach switches between them) and
+// SchedulePage (which branches on the result).
+export const ATHLETE_TYPES = [
+  {
+    key: 'in_house',
+    label: 'In-House Scheduled',
+    blurb: 'Follows the calendar — dated weeks and days, built around set training days at the facility.',
+  },
+  {
+    key: 'remote',
+    label: 'College Remote',
+    blurb: "No fixed schedule to plan around. Picks the day type that fits their session — High Intent, Hybrid, Synergy or Recovery — and sees every program's content for it together.",
+  },
+]
+
+// Normalizes the stored value, including the empty/missing case.
+export function athleteTypeOf(user) {
+  return user?.athleteType === 'remote' ? 'remote' : 'in_house'
+}

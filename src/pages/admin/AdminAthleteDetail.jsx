@@ -17,10 +17,10 @@ import { auth } from '../../firebase/config'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 import ProgramEditorModal from '../../components/ProgramEditorModal'
-import ToggleSwitch from '../../components/ToggleSwitch'
 import Skeleton from '../../components/Skeleton'
 import ConfirmDialog from '../../components/ConfirmDialog'
-import { PROGRAM_TYPES } from '../../constants/programTypes'
+import { PROGRAM_TYPES, ATHLETE_TYPES, athleteTypeOf } from '../../constants/programTypes'
+import { compactWeeks } from '../../utils/programSize'
 import {
   OUTPUT_PULL_GROUPS, generateDraftProgram, generateAllDraftPrograms, sendAssessmentToIntakeSheet,
 } from '../../utils/sheetPrograms'
@@ -273,23 +273,29 @@ export default function AdminAthleteDetail() {
     }
   }
 
-  // College Remote Athlete Mode — flips straight from the profile page
-  // rather than through the Edit modal, since it's the kind of thing a
-  // coach needs to flip quickly (an athlete heading off to campus, or back)
-  // without clicking through a form. Athletes in this mode aren't on a
+  // Athlete type — set straight from the profile page rather than through
+  // the Edit modal, since it's the kind of thing a coach needs to change
+  // quickly (an athlete heading off to campus, or back) without clicking
+  // through a form. Two named options rather than the old on/off switch:
+  // "off" never said what the athlete then was, and the two modes are a
+  // real either/or, not a feature flag. Athletes in this mode aren't on a
   // per-week calendar at all — they pick from a fixed set of day types
   // (High Intent/Hybrid/Synergy/Recovery, tagged per day — usually auto-detected
   // from the Outputs sheet's Day column, see createDraftFromRows) that
   // apply across the whole program, not any specific week — see the
   // isRemote branch in SchedulePage.
-  async function toggleAthleteType(nextIsRemote) {
-    const nextType = nextIsRemote ? 'remote' : 'in_house'
+  const athleteType = athleteTypeOf(athlete)
+
+  async function setAthleteType(nextType) {
+    if (nextType === athleteType) return
     setTogglingType(true)
     const prevType = athlete.athleteType
     setAthlete(a => ({ ...a, athleteType: nextType })) // optimistic
     try {
       await updateUser(uid, { athleteType: nextType })
-      toast.success(nextIsRemote ? 'College Remote Athlete Mode on.' : 'College Remote Athlete Mode off.')
+      toast.success(nextType === 'remote'
+        ? 'Switched to College Remote — they now pick a day type.'
+        : 'Switched to In-House Scheduled — they now follow the calendar.')
     } catch {
       setAthlete(a => ({ ...a, athleteType: prevType }))
       toast.error('Could not update athlete type.')
@@ -612,7 +618,8 @@ export default function AdminAthleteDetail() {
   }
 
   async function saveDraftWeeks(programId, weeks, startDate) {
-    await updateProgram(programId, { weeks, totalWeeks: weeks.length, startDate })
+    const compact = compactWeeks(weeks)
+    await updateProgram(programId, { weeks: compact, totalWeeks: compact.length, startDate })
     await refreshPrograms()
   }
 
@@ -675,7 +682,8 @@ export default function AdminAthleteDetail() {
   /** Save an edit to a program the athlete is already following. Goes live immediately. */
   async function saveLiveWeeks(programId, weeks, startDate) {
     const { weeks: withIds } = ensureExerciseIds(weeks)
-    await updateLiveProgram(programId, { weeks: withIds, totalWeeks: withIds.length, startDate })
+    const compact = compactWeeks(withIds)
+    await updateLiveProgram(programId, { weeks: compact, totalWeeks: compact.length, startDate })
     await load()
   }
 
@@ -793,29 +801,51 @@ export default function AdminAthleteDetail() {
         </div>
       </div>
 
-      {/* College Remote Athlete Mode */}
-      <div className="flex items-center justify-between gap-4 bg-sp-ink-800 rounded-2xl border border-sp-ink-600 px-5 py-4 mb-6">
-        <div className="flex items-start gap-3">
+      {/* Athlete type — In-House Scheduled vs College Remote */}
+      <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 px-5 py-4 mb-6">
+        <div className="flex items-start gap-3 mb-4">
           <div className="w-9 h-9 rounded-full bg-sp-green-500/15 text-sp-green-400 flex items-center justify-center flex-shrink-0">
             <GraduationCap size={17} />
           </div>
           <div>
-            <p className="font-semibold text-white text-sm">College Remote Athlete Mode</p>
-            <p className="text-xs text-sp-ink-300 mt-0.5 max-w-md">
-              For athletes without a fixed schedule to plan around in advance. Instead of a
-              per-week calendar, they pick the day type — High Intent, Hybrid, Synergy, or Recovery —
-              that fits their session and see that day's pre-throw, throw, mobility, and lift
-              content together. Tagged automatically when the Outputs sheet's Day column names
-              the type; use the program editor's Day Type dropdown to set it by hand otherwise.
+            <p className="font-semibold text-white text-sm">Athlete Type</p>
+            <p className="text-xs text-sp-ink-300 mt-0.5 max-w-xl">
+              How this athlete's program reaches them. Switching keeps every program exactly as
+              it is — it only changes what they see on their schedule.
             </p>
           </div>
         </div>
-        <ToggleSwitch
-          checked={athlete.athleteType === 'remote'}
-          onChange={toggleAthleteType}
-          disabled={togglingType}
-          label="College Remote Athlete Mode"
-        />
+
+        <div className="grid sm:grid-cols-2 gap-3" role="radiogroup" aria-label="Athlete type">
+          {ATHLETE_TYPES.map(({ key, label, blurb }) => {
+            const active = athleteType === key
+            return (
+              <button
+                key={key}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                disabled={togglingType}
+                onClick={() => setAthleteType(key)}
+                className={`text-left rounded-xl border px-4 py-3 transition disabled:opacity-60 ${
+                  active
+                    ? 'border-sp-green-500 bg-sp-green-500/10'
+                    : 'border-sp-ink-600 bg-sp-ink-900/40 hover:border-sp-ink-300/40'
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <span className={`w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                    active ? 'border-sp-green-500' : 'border-sp-ink-300/50'
+                  }`}>
+                    {active && <span className="w-2 h-2 rounded-full bg-sp-green-500" />}
+                  </span>
+                  <span className={`text-sm font-semibold ${active ? 'text-white' : 'text-sp-ink-100'}`}>{label}</span>
+                </span>
+                <span className="block text-xs text-sp-ink-300 mt-1.5">{blurb}</span>
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* Tabs */}

@@ -11,3 +11,5 @@ Images/
 
 # emulator
 firestore-debug.log
+firebase-debug.log
+ui-debug.log

@@ -1,4 +1,4 @@
-import { DAY_TYPES, LIFTING_DAY_TYPES } from '../constants/programTypes'
+import { DAY_TYPES, LIFTING_DAY_TYPES, programTypeInfo } from '../constants/programTypes'
 import { computeTodayPosition } from '../utils/programSchedule'
 
 /**
@@ -36,6 +36,11 @@ export default function ProgramMonthView({
   onSelectWeek,
   onSelectDay,
 }) {
+  // One editor shows one program, so the grid carries that program type's
+  // colour throughout — the same colour its tab, badge and the athlete's day
+  // strip use, so a coach looking at "the blue one" and an athlete looking at
+  // a blue dot are looking at the same program.
+  const typeInfo = programTypeInfo(programType)
   const dayTypes = programType === 'lifting' ? LIFTING_DAY_TYPES : DAY_TYPES
   const labelFor = (key) => dayTypes.find(dt => dt.key === key)?.label
 
@@ -58,8 +63,9 @@ export default function ProgramMonthView({
   return (
     <div className="border border-sp-ink-600 rounded-xl overflow-hidden bg-sp-ink-900/40">
       <div className="flex items-center justify-between px-3 py-2 border-b border-sp-ink-600">
-        <p className="text-[11px] font-bold text-sp-ink-300 uppercase tracking-wider">
-          Program overview
+        <p className="text-[11px] font-bold text-sp-ink-300 uppercase tracking-wider flex items-center gap-1.5">
+          <span className={`w-2 h-2 rounded-full ${typeInfo.dotClass}`} />
+          {typeInfo.label} overview
         </p>
         <button
           type="button"
@@ -146,7 +152,7 @@ export default function ProgramMonthView({
                       </span>
 
                       {typeLabel && (
-                        <span className="text-[9px] leading-tight px-1 py-0.5 rounded bg-sp-green-500/15 text-sp-green-400 truncate">
+                        <span className={`text-[9px] leading-tight px-1 py-0.5 rounded truncate ${typeInfo.badgeClass}`}>
                           {typeLabel}
                         </span>
                       )}
@@ -154,6 +160,9 @@ export default function ProgramMonthView({
                         <span className="text-[10px] leading-tight text-sp-ink-200 line-clamp-2">
                           {focus}
                         </span>
+                      )}
+                      {count > 0 && (
+                        <span className={`h-1 rounded-full self-stretch ${typeInfo.dotClass}`} />
                       )}
                       {count > 0 && (
                         <span className="text-[9px] text-sp-ink-300/70 mt-auto">

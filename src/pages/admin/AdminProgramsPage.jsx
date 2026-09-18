@@ -10,6 +10,7 @@ import Papa from 'papaparse'
 import EmptyState from '../../components/EmptyState'
 import Skeleton from '../../components/Skeleton'
 import ProgramEditorModal from '../../components/ProgramEditorModal'
+import { compactWeeks } from '../../utils/programSize'
 import { PROGRAM_TYPES, programTypeInfo } from '../../constants/programTypes'
 import { makeExerciseId } from '../../utils/programIds'
 import Avatar from '../../components/Avatar'
@@ -180,7 +181,8 @@ export default function AdminProgramsPage() {
   }
 
   async function saveProgramWeeks(programId, weeks, startDate, athleteId) {
-    await updateProgram(programId, { weeks, totalWeeks: weeks.length, startDate })
+    const compact = compactWeeks(weeks)
+    await updateProgram(programId, { weeks: compact, totalWeeks: compact.length, startDate })
     if (athleteId) invalidateAthleteCache(athleteId)
     else await fetchGeneralOnly()
   }

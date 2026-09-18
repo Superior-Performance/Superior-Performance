@@ -8,6 +8,7 @@ import ProgramMonthView from './ProgramMonthView'
 import { computeTodayPosition } from '../utils/programSchedule'
 import { getExerciseLibrary, upsertExerciseLibraryEntries } from '../firebase/firestore'
 import { EXERCISE_CATEGORIES, exerciseCategoryInfo, categoryRank, DAY_TYPES, LIFTING_DAY_TYPES } from '../constants/programTypes'
+import { compactWeeks, estimateBytes, sizeStatus, formatBytes } from '../utils/programSize'
 
 const CATEGORY_ICONS = { Wind, Heart, Zap, Flame, CircleDot, ListChecks, Dumbbell }
 const LIFTING_BLOCK_LETTERS = ['A', 'B', 'C', 'D']
@@ -352,6 +353,12 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
     }
   }
 
+  // Size of what a save would actually write — compacted, since that's what
+  // goes to Firestore. Recomputed per render off `weeks`, which is the only
+  // thing that changes it.
+  const savedBytes = estimateBytes(compactWeeks(weeks))
+  const sizeState = sizeStatus(savedBytes)
+
   // ── Persistence ────────────────────────────────────────────────────────────
 
   async function handleSave() {
@@ -362,8 +369,8 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
       setDirty(false)
       toast.success(live ? 'Program updated — the athlete sees this now.' : isTemplate ? 'Program saved.' : 'Draft saved.')
       if (live) onClose()
-    } catch {
-      toast.error(live ? 'Could not save changes.' : isTemplate ? 'Could not save program.' : 'Could not save draft.')
+    } catch (err) {
+      toast.error(saveErrorMessage(err, { live, isTemplate }))
     } finally {
       setSaving(false)
     }
@@ -376,8 +383,8 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
       await saveToLibrary(weeks)
       await onPublish()
       onClose()
-    } catch {
-      toast.error('Could not publish.')
+    } catch (err) {
+      toast.error(saveErrorMessage(err, { live, isTemplate, verb: 'publish' }))
     } finally {
       setPublishing(false)
     }
@@ -612,6 +619,17 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
         <div className="flex items-center gap-3 px-6 py-4 border-t border-sp-ink-600 flex-shrink-0">
           <p className="text-xs text-sp-ink-300 flex-shrink-0 mr-auto">
             {weeks.length} week{weeks.length === 1 ? '' : 's'} · {totalExercises} exercise{totalExercises === 1 ? '' : 's'}
+            {/* Size only earns a mention once it's worth worrying about — a
+                program at 30% of the cap doesn't need a number on screen. */}
+            {sizeState !== 'ok' && (
+              <span
+                className={`ml-2 font-medium ${sizeState === 'over' ? 'text-red-400' : 'text-amber-400'}`}
+                title="Firestore stores a program as one document, capped at 1MB. Split the program or trim empty weeks to get under it."
+              >
+                · {formatBytes(savedBytes)} of 1MB
+                {sizeState === 'over' ? ' — too big to save' : ''}
+              </span>
+            )}
           </p>
           <button
             onClick={handleClose}
@@ -803,4 +821,26 @@ function ExerciseFields({ ex, label, isLifting, onChange, onRemove, onAddOption,
       )}
     </div>
   )
+}
+
+/**
+ * Why a save failed, in words a coach can act on.
+ *
+ * This used to be a flat "Could not save changes", which told nobody anything
+ * — including whoever had to debug it. The two failures actually seen in the
+ * wild get named outright; anything else still surfaces its real message
+ * rather than hiding it, and the full error goes to the console.
+ */
+export function saveErrorMessage(err, { live, isTemplate, verb = 'save' } = {}) {
+  console.error('Program save failed:', err)
+  const raw = String(err?.message || '')
+  if (err?.code === 'invalid-argument' && /longer than|maximum|1048487|size/i.test(raw)) {
+    return "This program is too big to save — Firestore caps one program at 1MB. Split it into two programs, or trim empty weeks."
+  }
+  if (/Unsupported field value: undefined/i.test(raw)) {
+    return 'A field on this program is blank in a way Firestore rejects. Re-save after re-picking the day type, and tell Jake which day it was.'
+  }
+  if (err?.code === 'permission-denied') return "You don't have permission to save this program."
+  const what = verb === 'publish' ? 'publish' : live ? 'save changes' : isTemplate ? 'save program' : 'save draft'
+  return raw ? `Could not ${what}: ${raw}` : `Could not ${what}.`
 }

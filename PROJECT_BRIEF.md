@@ -54,6 +54,12 @@ owned by `superiorperformance.sp@gmail.com`.
 **Admin experience** (5 screens)
 
 - Athletes roster + add athlete (creates the Auth account without logging the admin out)
+- Groups: roster cohorts (a winter camp, a travel team). `athleteGroups/{id}` holds
+  name/colour/optional block start date; membership is `users/{uid}.groupIds`, so an
+  athlete can be in several. The same chip bar filters the dashboard and the roster,
+  and on the dashboard the group applies before the attention tiles, so counts are
+  per-cohort. Generating programs while filtered to a group with a start date makes
+  the drafts start there instead of today.
 - Athlete detail: assessment scores (8 numeric fields + 5 postural dropdowns), program assignment, data log history
 - Programs: build manually or import a CSV
 - Messages: chat with any athlete
@@ -128,6 +134,24 @@ they're large.
 Firestore security rules are written and role-aware (admins read/write all; athletes scoped to their own docs).
 
 ---
+
+## Local QA without touching real data
+
+`npm run dev:emulator` runs the app against the Firebase emulators (auth +
+Firestore, ports in `firebase.json`) with `scripts/seed-emulator.mjs` data: a
+coach, an in-house athlete carrying one program of every type, and a College
+Remote athlete on day-type programs. Accounts are `coach@example.com` /
+`inhouse@example.com` / `remote@example.com`, password `test1234`. The app only
+talks to emulators when `VITE_USE_EMULATORS=1`, which that script sets and
+production builds never do (the branch compiles away — verified in the bundle).
+
+Needs a Java runtime for the emulator: `brew install openjdk@21`, then
+`export PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH"`.
+
+Two test suites, both worth running before a deploy that touches either area:
+`npm run test:unit` (date mapping, per-type day stats, document-size accounting,
+group filtering) and `npm run test:rules` (the booking/bookedCount pairing, the
+Apps Script verification logic, group access).
 
 ## Known gaps / things to discuss
 

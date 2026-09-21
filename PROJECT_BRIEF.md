@@ -61,6 +61,12 @@ owned by `superiorperformance.sp@gmail.com`.
   per-cohort. Generating programs while filtered to a group with a start date makes
   the drafts start there instead of today.
 - Athlete detail: assessment scores (8 numeric fields + 5 postural dropdowns), program assignment, data log history
+- Assessment history: every save also writes a copy to
+  `assessments/{uid}/history/{YYYY-MM-DD}`, keyed by assessment date — the same
+  date updates that entry, a new date starts a new one. The Assessment tab
+  shows past screens, what changed between consecutive ones, and a sparkline
+  per numeric field with two or more readings. `assessments/{uid}` still holds
+  the current values unchanged, so every existing reader is unaffected.
 - Programs: build manually or import a CSV
 - Messages: chat with any athlete
 - Settings: Google Apps Script URL, password change

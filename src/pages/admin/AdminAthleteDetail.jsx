@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
-  getUser, getAssessment, saveAssessment, updateUser, deleteAthleteCompletely, getProgramForAthlete, updateProgram, updateLiveProgram, migrateCompletionKeys, createProgram, deleteProgram, getSettings, getProgramsForAthlete, getGeneralPrograms, getCompletions, getAthleteGroups, addAthleteToGroup, removeAthleteFromGroup,
+  getUser, getAssessment, saveAssessment, saveAssessmentSnapshot, getAssessmentHistory, updateUser, deleteAthleteCompletely, getProgramForAthlete, updateProgram, updateLiveProgram, migrateCompletionKeys, createProgram, deleteProgram, getSettings, getProgramsForAthlete, getGeneralPrograms, getCompletions, getAthleteGroups, addAthleteToGroup, removeAthleteFromGroup,
 } from '../../firebase/firestore'
 import { getDataLogs, addDataLog, setDataLogFlag } from '../../firebase/firestore'
 import { ensureExerciseIds, completionKey, legacyCompletionKey, countProgramProgress } from '../../utils/programIds'
@@ -18,6 +18,8 @@ import ConfirmDialog from '../../components/ConfirmDialog'
 import { PROGRAM_TYPES, ATHLETE_TYPES, athleteTypeOf } from '../../constants/programTypes'
 import { compactWeeks } from '../../utils/programSize'
 import { groupColor } from '../../constants/athleteGroups'
+import AssessmentHistory from '../../components/AssessmentHistory'
+import { snapshotKeyFor } from '../../utils/assessmentHistory'
 import {
   OUTPUT_PULL_GROUPS, generateDraftProgram, generateAllDraftPrograms, sendAssessmentToIntakeSheet,
 } from '../../utils/sheetPrograms'
@@ -124,6 +126,10 @@ export default function AdminAthleteDetail() {
   const [activePrograms, setActivePrograms] = useState({}) // { correctives, throwing, lifting } -> program | undefined
   const [programs, setPrograms]     = useState([])
   const [assessment, setAssessment] = useState({})
+  // Past assessments, one per date — see saveAssessmentScores and
+  // utils/assessmentHistory. Loaded alongside the current values.
+  const [history, setHistory] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(true)
   const [logs, setLogs]             = useState([])
   const [loading, setLoading]       = useState(true)
   const [loadError, setLoadError]   = useState(null)
@@ -176,6 +182,8 @@ export default function AdminAthleteDetail() {
 
   useEffect(() => {
     load()
+    setHistoryLoading(true)
+    refreshHistory()
   }, [uid])
 
   useEffect(() => {
@@ -249,11 +257,30 @@ export default function AdminAthleteDetail() {
     setSaving(true)
     try {
       await saveAssessment(uid, assessment)
-      toast.success('Assessment saved!')
-    } catch {
-      toast.error('Save failed.')
+      // Keep a copy filed under its assessment date, so the next screen
+      // compares against this one instead of replacing it. Same date means
+      // the same entry — correcting a typo doesn't create a second record.
+      const dateKey = snapshotKeyFor(assessment)
+      await saveAssessmentSnapshot(uid, dateKey, assessment)
+      await refreshHistory()
+      const existing = history.some(h => h.id === dateKey)
+      toast.success(existing ? `Assessment for ${dateKey} updated.` : `Assessment saved to history (${dateKey}).`)
+    } catch (err) {
+      console.error('Assessment save failed:', err)
+      toast.error('Save failed: ' + (err?.message || 'unknown error'))
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function refreshHistory() {
+    try {
+      const snap = await getAssessmentHistory(uid)
+      setHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    } catch (err) {
+      console.error('Could not load assessment history:', err)
+    } finally {
+      setHistoryLoading(false)
     }
   }
 
@@ -1054,6 +1081,15 @@ export default function AdminAthleteDetail() {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Assessment history — same tab, directly under the form it records */}
+      {tab === 'assessment' && (
+        <AssessmentHistory
+          entries={history}
+          fields={FIELD_GROUPS.flatMap(g => g.fields)}
+          loading={historyLoading}
+        />
       )}
 
       {/* Program tab — one program type at a time via a sub-tab, plus an

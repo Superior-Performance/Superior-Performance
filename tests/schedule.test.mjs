@@ -9,6 +9,7 @@ const { compactWeeks, estimateBytes, sizeStatus, FIRESTORE_DOC_LIMIT } = await i
 const { matchesGroupFilter, groupsOf, suggestGroupColor, ALL_GROUPS, UNGROUPED } = await import(`${ROOT}src/constants/athleteGroups.js`)
 const { buildProgramWeeksFromRows, parseWeekOrDayRange } = await import(`${ROOT}src/utils/sheetRows.js`)
 const { assertReadable, redactDoc, collectionSegments, REDACTED } = await import(`${ROOT}scripts/lib/data-policy.mjs`)
+const { snapshotKeyFor, diffAssessments, numericSeries, trendableFields, sortByDateDesc } = await import(`${ROOT}src/utils/assessmentHistory.js`)
 
 let failures = 0
 function t(name, fn) {
@@ -288,6 +289,74 @@ t('a data log note is redacted but its numbers are not', () => {
 t("a program's coaching notes are left alone", () => {
   const doc = redactDoc('programs', { id: 'p1', name: 'Casey — Throwing', notes: 'keep the elbow up' })
   eq(doc.notes, 'keep the elbow up')
+})
+
+// ── assessment history ───────────────────────────────────────────────────────
+const aFields = [
+  { key: 'assessmentDate', label: 'Assessment Date', type: 'date' },
+  { key: 'age', label: 'Age', type: 'number' },
+  { key: 'velo', label: 'Top Velo', type: 'number' },
+  { key: 'handedness', label: 'Handedness', type: 'select' },
+  { key: 'injuryHistory', label: 'Injury History', type: 'text' },
+]
+
+t('an entry is filed under its assessment date', () => {
+  eq(snapshotKeyFor({ assessmentDate: '2026-03-14' }), '2026-03-14')
+})
+t('a missing or malformed date falls back to today rather than losing the entry', () => {
+  const today = new Date(2026, 8, 21)
+  eq(snapshotKeyFor({}, today), '2026-09-21')
+  eq(snapshotKeyFor({ assessmentDate: 'not a date' }, today), '2026-09-21')
+  eq(snapshotKeyFor({ assessmentDate: '  ' }, today), '2026-09-21')
+})
+t('history reads newest first', () => {
+  const sorted = sortByDateDesc([{ id: '2026-01-02' }, { id: '2026-06-01' }, { id: '2025-12-31' }])
+  eq(sorted.map(e => e.id), ['2026-06-01', '2026-01-02', '2025-12-31'])
+})
+t('a diff reports only what actually changed', () => {
+  const older = { velo: '80', handedness: 'Right', age: '15' }
+  const newer = { velo: '84', handedness: 'Right', age: '15' }
+  const d = diffAssessments(newer, older, aFields)
+  eq(d.map(c => c.key), ['velo'])
+  eq([d[0].from, d[0].to, d[0].delta], ['80', '84', 4])
+})
+t('a numeric drop carries a negative delta', () => {
+  const d = diffAssessments({ velo: '78' }, { velo: '84' }, aFields)
+  eq(d[0].delta, -6)
+})
+t('a non-numeric change has no delta', () => {
+  const d = diffAssessments({ handedness: 'Left' }, { handedness: 'Right' }, aFields)
+  eq([d[0].key, d[0].delta], ['handedness', null])
+})
+t('gaining or losing a value counts as a change', () => {
+  const gained = diffAssessments({ injuryHistory: 'elbow' }, {}, aFields)
+  eq([gained[0].key, gained[0].from, gained[0].to], ['injuryHistory', null, 'elbow'])
+  const lost = diffAssessments({}, { injuryHistory: 'elbow' }, aFields)
+  eq([lost[0].from, lost[0].to], ['elbow', null])
+})
+t('blank in both is not a change', () => {
+  eq(diffAssessments({ velo: '' }, { velo: '   ' }, aFields), [])
+})
+t('a field no longer on the form is ignored', () => {
+  eq(diffAssessments({ retired: 'a' }, { retired: 'b' }, aFields), [])
+})
+t('the first assessment has nothing to compare against', () => {
+  eq(diffAssessments({ velo: '80' }, null, aFields), [])
+})
+t('a numeric series runs oldest to newest and skips gaps', () => {
+  const entries = [
+    { id: '2026-01-01', assessmentDate: '2026-01-01', velo: '80' },
+    { id: '2026-03-01', assessmentDate: '2026-03-01' },            // not measured
+    { id: '2026-06-01', assessmentDate: '2026-06-01', velo: '86' },
+  ]
+  eq(numericSeries(entries, 'velo').map(p => [p.date, p.value]), [['2026-01-01', 80], ['2026-06-01', 86]])
+})
+t('only numeric fields with enough readings are trendable', () => {
+  const entries = [
+    { id: '2026-01-01', assessmentDate: '2026-01-01', velo: '80', age: '15', handedness: 'Right' },
+    { id: '2026-06-01', assessmentDate: '2026-06-01', velo: '86', handedness: 'Left' },
+  ]
+  eq(trendableFields(entries, aFields).map(t2 => t2.field.key), ['velo'], 'age has one reading, handedness is not numeric')
 })
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

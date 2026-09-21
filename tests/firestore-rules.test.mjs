@@ -158,6 +158,26 @@ await t('an admin still writes on an athlete\'s behalf', async () => {
   await assertSucceeds(setDoc(doc(db('adm'), 'completions/ath/weeks/w1'), { completed: true }))
 })
 
+// ── assessment history ──
+await t('admin writes and reads an assessment snapshot', async () => {
+  await seedGroups()
+  await assertSucceeds(setDoc(doc(db('adm'), 'assessments/ath/history/2026-09-21'), { assessmentDate: '2026-09-21', velo: '84' }))
+  await assertSucceeds(getDoc(doc(db('adm'), 'assessments/ath/history/2026-09-21')))
+})
+await t('an athlete may read their own history but not write it', async () => {
+  await seedGroups()
+  await env.withSecurityRulesDisabled(ctx =>
+    setDoc(doc(ctx.firestore(), 'assessments/ath/history/2026-09-21'), { velo: '84' }))
+  await assertSucceeds(getDoc(doc(db('ath'), 'assessments/ath/history/2026-09-21')))
+  await assertFails(setDoc(doc(db('ath'), 'assessments/ath/history/2026-09-21'), { velo: '99' }))
+})
+await t("an athlete cannot read another athlete's history", async () => {
+  await seedGroups()
+  await env.withSecurityRulesDisabled(ctx =>
+    setDoc(doc(ctx.firestore(), 'assessments/ath2/history/2026-09-21'), { velo: '84' }))
+  await assertFails(getDoc(doc(db('ath'), 'assessments/ath2/history/2026-09-21')))
+})
+
 // ── athlete groups ──
 async function seedGroups() {
   await env.clearFirestore()

@@ -8,7 +8,8 @@
  *                              body weight specifically (a lift's working weight lives on the exercise
  *                              itself, see exerciseWeights below); `exercise` is a retired field some
  *                              older entries may still carry
- *  assessments/{uid}         — { scores: {...}, programId, updatedAt }
+ *  assessments/{uid}         — { scores: {...}, programId, updatedAt } — current values
+ *  assessments/{uid}/history/{YYYY-MM-DD} — one snapshot per assessment date
  *  chats/{uid}/messages/{}   — { text, senderUid, senderName, role: 'admin'|'athlete', createdAt }
  *  chatReads/{uid}           — { lastReadAt } — admin-only "coach last opened this thread" marker
  *  teamChat/{messageId}      — { text, authorId, authorName, authorType: 'human'|'claude',
@@ -111,6 +112,12 @@ export async function deleteAthleteCompletely(uid) {
 
   // Top-level docs.
   try {
+    // Subcollections are not removed with their parent — delete the
+    // assessment history explicitly or it outlives the athlete.
+    const historySnap = await getDocs(collection(db, 'assessments', uid, 'history'))
+    await Promise.all(historySnap.docs.map(d => deleteDoc(d.ref)))
+    summary.subcollections.assessmentHistory = historySnap.size
+
     const batch = writeBatch(db)
     batch.delete(doc(db, 'assessments', uid))
     batch.delete(doc(db, 'athletePrefs', uid))
@@ -330,6 +337,26 @@ export const saveAssessment = (uid, data) =>
 // range-compares correctly as a string.
 export const getAllAssessments = () =>
   getDocs(collection(db, 'assessments'))
+
+// ── Assessment history ───────────────────────────────────────────────────────
+// assessments/{uid}/history/{YYYY-MM-DD} — a full copy of the assessment as it
+// stood on that date, so a re-screen six weeks later doesn't overwrite what it
+// should be compared against.
+//
+// The doc id is the assessment date, which is what makes this a log of
+// assessments rather than a log of saves: correcting a typo an hour later
+// updates that date's entry instead of adding a second one, and a new date is
+// a new assessment by definition. `assessments/{uid}` still holds the current
+// values unchanged, so every existing reader (the roster's date filter, the
+// sheet pull, the athlete's own read) is untouched.
+export const getAssessmentHistory = (uid) =>
+  getDocs(query(collection(db, 'assessments', uid, 'history'), orderBy('assessmentDate', 'desc')))
+
+export const saveAssessmentSnapshot = (uid, dateKey, data) =>
+  setDoc(doc(db, 'assessments', uid, 'history', dateKey), { ...data, savedAt: serverTimestamp() })
+
+export const deleteAssessmentSnapshot = (uid, dateKey) =>
+  deleteDoc(doc(db, 'assessments', uid, 'history', dateKey))
 
 // ── Athlete preferences ──────────────────────────────────────────────────────
 // athletePrefs/{uid} — { programNoticesSeen: { [programId]: millis } }

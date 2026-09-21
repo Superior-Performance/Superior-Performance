@@ -52,10 +52,18 @@ service cloud.firestore {
       allow write: if isAdmin() || (isAthlete() && request.auth.uid == uid);
     }
 
-    // Assessments: admins full access; athletes read-only their own
+    // Assessments: admins full access; athletes read-only their own.
+    // `history` holds one snapshot per assessment date so a re-screen doesn't
+    // overwrite what it should be compared against — same access as the
+    // current assessment it came from, since it is the same data.
     match /assessments/{uid} {
       allow read:  if isAdmin() || (isAuth() && request.auth.uid == uid);
       allow write: if isAdmin();
+
+      match /history/{entryId} {
+        allow read:  if isAdmin() || (isAuth() && request.auth.uid == uid);
+        allow write: if isAdmin();
+      }
     }
 
     // Completions: athletes write their own; admins read and write all.

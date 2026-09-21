@@ -196,6 +196,33 @@ service cloud.firestore {
       allow write: if isAdmin() || (isAuth() && request.auth.uid == uid);
     }
 
+    // Proof that a cancellation really happened.
+    //
+    // The booking-alert script (apps-script/booking-notify.gs) can verify a
+    // NEW booking by reading the booking doc, but a cancellation deletes the
+    // very thing that would prove it — so it used to email the coach a "late
+    // cancellation" for any slot an athlete named, including ones they never
+    // booked. This receipt closes that: it can only be created in the same
+    // write that deletes the athlete's own booking (exists before,
+    // gone after), which is exactly what cancelFacilityBooking does and is
+    // not something a caller can fake. The script reads it back as the
+    // athlete before sending anything.
+    //
+    // Never updated or deleted by an athlete — a receipt that can be edited
+    // proves nothing.
+    match /facilityCancellations/{uid}/slots/{slotId} {
+      allow read:   if isAdmin() || (isAuth() && request.auth.uid == uid);
+      // Admins too: a coach cancelling on an athlete's behalf goes through the
+      // same transaction (see deleteAthleteCompletely), and the pairing check
+      // can't apply to them since the booking being deleted isn't theirs.
+      allow create: if isAdmin() || (
+        isAthlete() && request.auth.uid == uid &&
+        exists(myBookingPath(slotId)) && !existsAfter(myBookingPath(slotId))
+      );
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
     // Recurring weekly availability patterns a coach generates concrete
     // facilitySlots from (see generateSeriesSlots in firestore.js).
     // Admin-only in every direction — athletes only ever see the slots a

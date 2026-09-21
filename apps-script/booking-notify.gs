@@ -9,7 +9,8 @@
 //
 // Checks before any email goes out:
 //   book   — the athlete's booking doc for that slot exists.
-//   cancel — it no longer exists, and the session starts within 24 hours.
+//   cancel — it no longer exists, a cancellation receipt written in the
+//            same transaction does, and the session starts within 24 hours.
 //   both   — at most one email per athlete + slot + type every 6 hours,
 //            and at most MAX_PER_ATHLETE_PER_DAY per athlete.
 //
@@ -55,6 +56,16 @@ function doPost(e) {
     }
     if (type === 'cancel') {
       if (booking.status === 200) return respond({ success: false, error: 'Booking still active.' });
+      // A deleted booking proves nothing on its own — without this check any
+      // athlete could name a slot they never booked and have the coach told
+      // they'd cancelled it late. cancelFacilityBooking writes this receipt
+      // in the same transaction that deletes the booking, and the rules only
+      // allow it to be created that way (see facilityCancellations in
+      // firestore.rules), so its existence is the proof.
+      var receipt = firestoreGet('facilityCancellations/' + uid + '/slots/' + slotId, idToken);
+      if (receipt.status !== 200) {
+        return respond({ success: false, error: 'No cancellation on record.' });
+      }
       if (hoursUntil(s.date, s.startTime) > LATE_CANCEL_HOURS) {
         return respond({ success: true, skipped: 'not a late cancel' });
       }

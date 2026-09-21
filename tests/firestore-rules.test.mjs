@@ -43,6 +43,7 @@ const cancel = (fs, uid) => runTransaction(fs, async (tx) => {
   tx.update(doc(fs, 'facilitySlots/s1'), { bookedCount: s.data().bookedCount - 1 })
   tx.delete(doc(fs, `facilitySlots/s1/bookings/${uid}`))
   tx.delete(doc(fs, `facilityBookingsByAthlete/${uid}/slots/s1`))
+  tx.set(doc(fs, `facilityCancellations/${uid}/slots/s1`), { cancelledAt: serverTimestamp() })
 })
 
 // ── legit flows ──
@@ -88,6 +89,39 @@ await t('extra fields on booking denied', async () => {
 await t('booking update denied', async () => { await seed({ count: 1, booked: ['ath'] }); await assertFails(updateDoc(doc(db('ath'), 'facilitySlots/s1/bookings/ath'), { athleteName: 'Z' })) })
 await t('role-less account cannot book', async () => { await seed(); await assertFails(book(db('rando'), 'rando')) })
 await t('role-less account can still browse slots', async () => { await seed(); await assertSucceeds(getDoc(doc(db('rando'), 'facilitySlots/s1'))) })
+
+// ── cancellation receipts ──
+// The receipt is what stops the alert script emailing "late cancellation" for
+// a slot the athlete never booked, so a receipt they can mint on demand would
+// be worthless.
+await t('a receipt can only be written while cancelling a real booking', async () => {
+  await seed({ count: 1, booked: ['ath'] })
+  await assertSucceeds(cancel(db('ath'), 'ath'))
+  await assertSucceeds(getDoc(doc(db('ath'), 'facilityCancellations/ath/slots/s1')))
+})
+await t('a bare receipt write is denied', async () => {
+  await seed({ count: 1, booked: ['ath2'] })
+  await assertFails(setDoc(doc(db('ath'), 'facilityCancellations/ath/slots/s1'), { cancelledAt: serverTimestamp() }))
+})
+await t('a receipt for a slot you never booked is denied', async () => {
+  await seed({ count: 1, booked: ['ath2'] })
+  await assertFails(cancel(db('ath'), 'ath'))
+})
+await t('a receipt cannot be written for someone else', async () => {
+  await seed({ count: 1, booked: ['ath'] })
+  await assertFails(setDoc(doc(db('ath'), 'facilityCancellations/ath2/slots/s1'), { cancelledAt: serverTimestamp() }))
+})
+await t('an athlete cannot read another athlete\'s receipts', async () => {
+  await seed({ count: 1, booked: ['ath'] })
+  await assertSucceeds(cancel(db('ath'), 'ath'))
+  await assertFails(getDoc(doc(db('ath2'), 'facilityCancellations/ath/slots/s1')))
+})
+await t('a receipt cannot be edited or deleted by the athlete', async () => {
+  await seed({ count: 1, booked: ['ath'] })
+  await assertSucceeds(cancel(db('ath'), 'ath'))
+  await assertFails(setDoc(doc(db('ath'), 'facilityCancellations/ath/slots/s1'), { cancelledAt: 'faked' }))
+  await assertFails(deleteDoc(doc(db('ath'), 'facilityCancellations/ath/slots/s1')))
+})
 
 // ── athlete groups ──
 async function seedGroups() {

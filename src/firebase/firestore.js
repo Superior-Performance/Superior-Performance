@@ -101,6 +101,10 @@ export async function deleteAthleteCompletely(uid) {
     const slotIds = bookingsSnap.docs.map(d => d.id)
     await Promise.all(slotIds.map(slotId => cancelFacilityBooking(slotId, uid)))
     summary.facilityBookings = slotIds.length
+    // Cancellation receipts are this athlete's data too — including the ones
+    // just written by the cancellations above.
+    const receiptsSnap = await getDocs(collection(db, 'facilityCancellations', uid, 'slots'))
+    await Promise.all(receiptsSnap.docs.map(d => deleteDoc(d.ref)))
   } catch (err) {
     summary.errors.push(`facility bookings: ${err.message}`)
   }
@@ -643,10 +647,17 @@ export const cancelFacilityBooking = (slotId, uid) =>
     if (!bookingSnap.exists()) return
     const slotSnap = await tx.get(slotRef)
     const bookedCount = slotSnap.data()?.bookedCount ?? 0
+    const { date, startTime, endTime } = slotSnap.data() || {}
     const mirrorRef = doc(db, 'facilityBookingsByAthlete', uid, 'slots', slotId)
+    // The receipt the alert script checks before emailing a late
+    // cancellation — see facilityCancellations in firestore.rules. Written
+    // here, in the same transaction that deletes the booking, because that
+    // pairing is the whole proof.
+    const receiptRef = doc(db, 'facilityCancellations', uid, 'slots', slotId)
     tx.update(slotRef, { bookedCount: Math.max(0, bookedCount - 1) })
     tx.delete(bookingRef)
     tx.delete(mirrorRef)
+    tx.set(receiptRef, { cancelledAt: serverTimestamp(), date, startTime, endTime })
   })
 
 export const createRecurringSeries = (data) =>

@@ -75,6 +75,11 @@ await env.withSecurityRulesDisabled(async (c) => {
   await setDoc(doc(db, 'facilitySlots/soon'), { ...slotAt(soon), capacity: 4, bookedCount: 0 })
   await setDoc(doc(db, 'facilitySlots/far'), { ...slotAt(later), capacity: 4, bookedCount: 0 })
   for (let i = 0; i < 8; i++) await setDoc(doc(db, `facilitySlots/s${i}`), { ...slotAt(soon), capacity: 4, bookedCount: 0 })
+  // Slots the athlete genuinely cancelled: booking gone, receipt left behind.
+  await setDoc(doc(db, 'facilitySlots/soonbooked'), { ...slotAt(soon), capacity: 4, bookedCount: 0 })
+  await setDoc(doc(db, 'facilityCancellations/ath2/slots/soonbooked'), { cancelledAt: new Date() })
+  await setDoc(doc(db, 'facilityCancellations/ath2/slots/far'), { cancelledAt: new Date() })
+  for (let i = 0; i < 8; i++) await setDoc(doc(db, `facilityCancellations/ath/slots/s${i}`), { cancelledAt: new Date() })
 })
 
 let failures = 0
@@ -99,8 +104,13 @@ const post = (g, body) => g.doPost({ postData: { contents: JSON.stringify(body) 
   check('path-injection slotId refused', !r.success, JSON.stringify(r))
   r = post(g, { type: 'book', slotId: 'booked', idToken: token('rando') })
   check('role-less/unknown user refused', !r.success && g.sent.length === 1, JSON.stringify(r))
+  // Forged: ath2 never booked 'soon', so there is no cancellation receipt.
+  // This used to email the coach — the test asserted it as correct.
   r = post(g, { type: 'cancel', slotId: 'soon', idToken: token('ath2') })
-  check('late cancel emails', r.success && g.sent.length === 2 && g.sent[1].subject.startsWith('Late cancellation - Other Athlete'), JSON.stringify(r))
+  check('cancel without a receipt refused', !r.success && g.sent.length === 1, JSON.stringify(r))
+  // Real: seeded with the receipt a genuine cancellation leaves behind.
+  r = post(g, { type: 'cancel', slotId: 'soonbooked', idToken: token('ath2') })
+  check('late cancel with a receipt emails', r.success && g.sent.length === 2 && g.sent[1].subject.startsWith('Late cancellation - Other Athlete'), JSON.stringify(r))
   r = post(g, { type: 'cancel', slotId: 'far', idToken: token('ath2') })
   check('early cancel silent', r.success && r.skipped && g.sent.length === 2, JSON.stringify(r))
   r = post(g, { type: 'cancel', slotId: 'booked', idToken: token('ath') })

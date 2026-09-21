@@ -4,7 +4,7 @@
 import { fileURLToPath } from 'node:url'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
-const { computeTodayPosition, dayStatsByType, dayCountForWeek } = await import(`${ROOT}src/utils/programSchedule.js`)
+const { computeTodayPosition, dayStats, dayStatsByType, dayCountForWeek, dayIndexFor } = await import(`${ROOT}src/utils/programSchedule.js`)
 const { compactWeeks, estimateBytes, sizeStatus, FIRESTORE_DOC_LIMIT } = await import(`${ROOT}src/utils/programSize.js`)
 const { matchesGroupFilter, groupsOf, suggestGroupColor, ALL_GROUPS, UNGROUPED } = await import(`${ROOT}src/constants/athleteGroups.js`)
 
@@ -93,6 +93,49 @@ t('an empty day returns nothing to colour', () => {
 })
 t('dayCountForWeek takes the longest program', () => {
   eq(dayCountForWeek(programs, 0), 2)
+})
+
+// ── sparse day arrays (Mon/Wed/Fri and friends) ──────────────────────────────
+// The sheet parser only creates an entry per day number it actually sees, so a
+// program that doesn't train 7 days a week has days[] shorter than its highest
+// dayNum. Looking a day up by array position silently returned a different
+// day's work; every case below failed before dayIndexFor existed.
+const mwf = [prog('p-mwf', 'throwing', [
+  { dayNum: 1, exercises: [ex('mon1'), ex('mon2')] },
+  { dayNum: 3, exercises: [ex('wed1')] },
+  { dayNum: 5, exercises: [ex('fri1'), ex('fri2'), ex('fri3')] },
+])]
+
+t('a gapped week spans to its highest day number, not its array length', () => {
+  eq(dayCountForWeek(mwf, 0), 5)
+})
+t('each training day reports its own work', () => {
+  eq([1, 3, 5].map(d => dayStats(mwf, {}, 0, d - 1).total), [2, 1, 3])
+})
+t('the gaps are rest days, not another day\'s work', () => {
+  eq([2, 4].map(d => dayStats(mwf, {}, 0, d - 1).total), [0, 0])
+})
+t('per-type dots follow the same lookup', () => {
+  eq([1, 2, 3, 4, 5].map(d => dayStatsByType(mwf, {}, 0, d - 1).length), [1, 0, 1, 0, 1])
+})
+t('completions land on the day they belong to', () => {
+  // 'wed1' is at array index 1 but is day 3 — the legacy positional key is
+  // built from the index, the lookup from the number.
+  const stats = dayStats(mwf, { 'p-mwf_wed1': { completed: true } }, 0, 2)
+  eq([stats.total, stats.done], [1, 1])
+  eq(dayStats(mwf, { 'p-mwf_wed1': { completed: true } }, 0, 0).done, 0, 'Monday unaffected')
+})
+t('dayIndexFor maps number to position, and -1 when absent', () => {
+  eq([dayIndexFor(mwf[0], 0, 1), dayIndexFor(mwf[0], 0, 3), dayIndexFor(mwf[0], 0, 5), dayIndexFor(mwf[0], 0, 2)], [0, 1, 2, -1])
+})
+t('days with no dayNum still fall back to their position', () => {
+  const noNums = [prog('p-old', 'throwing', [{ exercises: [ex('a')] }, { exercises: [ex('b'), ex('c')] }])]
+  eq([dayStats(noNums, {}, 0, 0).total, dayStats(noNums, {}, 0, 1).total], [1, 2])
+})
+t('a dense 7-day week is unchanged', () => {
+  const dense = [prog('p-dense', 'throwing', Array.from({ length: 7 }, (_, i) => day(i + 1, [ex('e' + i)])))]
+  eq(dayCountForWeek(dense, 0), 7)
+  eq(Array.from({ length: 7 }, (_, i) => dayStats(dense, {}, 0, i).total), [1, 1, 1, 1, 1, 1, 1])
 })
 
 // ── document size ────────────────────────────────────────────────────────────

@@ -86,6 +86,19 @@ function dayTypeWeeks(dayTypes, categories) {
   }]
 }
 
+// A Mon/Wed/Fri block — the shape that broke the day strip: three day entries
+// carrying dayNum 1, 3 and 5, so array position and day number disagree.
+function gappedWeeks(weekCount, categories) {
+  return Array.from({ length: weekCount }, (_, w) => ({
+    weekNum: w + 1,
+    days: [1, 3, 5].map(dayNum => ({
+      dayNum,
+      category: dayNum === 1 ? 'Long Toss' : dayNum === 3 ? 'Bullpen' : 'Recovery',
+      exercises: categories.map(c => ex(`${c} day ${dayNum}`, c)),
+    })),
+  }))
+}
+
 const monday = () => {
   const d = new Date()
   d.setDate(d.getDate() - ((d.getDay() + 6) % 7)) // back to this week's Monday
@@ -113,7 +126,6 @@ const run = async () => {
   const byType = {
     correctives: ['Mobilization', 'Correctives'],
     throwing: ['Catch Play', 'High-Intent Day Plyos'],
-    mobility: ['Mobilization'],
     lifting: ['Movement Activation'],
   }
 
@@ -128,6 +140,15 @@ const run = async () => {
     })
   }
 
+  // Mobility runs Mon/Wed/Fri rather than daily — so the seeded athlete has
+  // both shapes at once, which is also how the colour dots get a day with
+  // some types scheduled and others not.
+  await put('programs/seed-inhouse-gapped', {
+    name: 'Mon/Wed/Fri mobility block', athleteId: inhouse, programType: 'mobility',
+    totalWeeks: 4, startDate: start, active: true, createdAt: new Date(),
+    weeks: gappedWeeks(4, ['Mobilization']),
+  })
+
   await put('programs/seed-remote-throwing', {
     name: 'Remote throwing block', athleteId: remote, programType: 'throwing',
     totalWeeks: 1, active: true, createdAt: new Date(),
@@ -141,7 +162,7 @@ const run = async () => {
 
   console.log(`Seeded emulator.
   coach@example.com   / ${PASSWORD}  (admin)
-  inhouse@example.com / ${PASSWORD}  (in-house, 4 dated programs from ${start})
+  inhouse@example.com / ${PASSWORD}  (in-house, dated programs from ${start}, incl. a Mon/Wed/Fri one)
   remote@example.com  / ${PASSWORD}  (college remote, day-type programs)`)
 }
 

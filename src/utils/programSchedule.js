@@ -39,6 +39,27 @@ export function computeTodayPosition(programs, totalWeeks) {
 }
 
 /**
+ * Where the day numbered `dayNum` actually sits in a week's days array, or -1.
+ *
+ * These two are NOT the same thing, and assuming they were was a real bug:
+ * buildProgramWeeksFromRows (utils/sheetPrograms) only creates an entry for
+ * each day number the coach's sheet actually mentions, with no padding. A
+ * Mon/Wed/Fri program is therefore three entries at positions 0, 1, 2 holding
+ * dayNum 1, 3, 5 — so days[dayNum - 1] silently returns the wrong day, and the
+ * athlete sees Wednesday's workout counted against Tuesday.
+ *
+ * The array position is still what legacy positional completion keys are built
+ * from (see utils/programIds), so callers get the index back rather than the
+ * day object: look the day up by its number, then key completions by where it
+ * really sits.
+ */
+export function dayIndexFor(program, wi, dayNum) {
+  const days = program?.weeks?.[wi]?.days
+  if (!Array.isArray(days)) return -1
+  return days.findIndex((d, i) => (d?.dayNum ?? i + 1) === dayNum)
+}
+
+/**
  * Current streak of fully-completed days, counting backward from yesterday
  * (today doesn't break a streak while it's still in progress), plus whether
  * today itself is already fully done. Days with nothing scheduled (rest
@@ -57,9 +78,11 @@ export function computeTodayPosition(programs, totalWeeks) {
 export function dayStats(programs, completions, wi, di) {
   let total = 0, done = 0
   programs.forEach(p => {
-    const slots = buildSlots(p.weeks?.[wi]?.days?.[di]?.exercises)
+    const idx = dayIndexFor(p, wi, di + 1)
+    if (idx === -1) return
+    const slots = buildSlots(p.weeks[wi].days[idx].exercises)
     total += slots.length
-    done += slots.filter(s => isSlotComplete(completions, p.id, s, wi, di)).length
+    done += slots.filter(s => isSlotComplete(completions, p.id, s, wi, idx)).length
   })
   return { total, done }
 }
@@ -82,19 +105,29 @@ export function dayStatsByType(programs, completions, wi, di) {
   programs.forEach(p => {
     const type = p.programType || 'correctives'
     if (type === 'lifting') return
-    const slots = buildSlots(p.weeks?.[wi]?.days?.[di]?.exercises)
+    const idx = dayIndexFor(p, wi, di + 1)
+    if (idx === -1) return
+    const slots = buildSlots(p.weeks[wi].days[idx].exercises)
     if (slots.length === 0) return
     const entry = byType.get(type) || { type, total: 0, done: 0 }
     entry.total += slots.length
-    entry.done += slots.filter(s => isSlotComplete(completions, p.id, s, wi, di)).length
+    entry.done += slots.filter(s => isSlotComplete(completions, p.id, s, wi, idx)).length
     byType.set(type, entry)
   })
   return PROGRAM_TYPE_ORDER.filter(t => byType.has(t)).map(t => byType.get(t))
 }
 
-/** Days in a given week — the longest, since programs can differ in length. */
+/**
+ * How many day slots a week spans — the highest day NUMBER present, not the
+ * length of the days array. A Mon/Wed/Fri program stores three days carrying
+ * dayNum 1, 3 and 5; asking for its length says "3" and the calendar then
+ * stops at Wednesday, leaving Friday unreachable. Tuesday and Thursday come
+ * back from dayStats as rest days, which is what they are.
+ */
 export function dayCountForWeek(programs, wi) {
-  return Math.max(0, ...programs.map(p => p.weeks?.[wi]?.days?.length || 0))
+  return Math.max(0, ...programs.map(p =>
+    (p.weeks?.[wi]?.days || []).reduce((max, d, i) => Math.max(max, d?.dayNum ?? i + 1), 0)
+  ))
 }
 
 export function computeStreak(programs, completions, totalWeeks) {

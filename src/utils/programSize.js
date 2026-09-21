@@ -46,9 +46,9 @@ function compactValue(obj) {
 export function compactWeeks(weeks) {
   return (weeks || []).map(week => compactValue({
     ...week,
-    days: (week.days || []).map(day => compactValue({
+    days: (week.days || []).filter(Boolean).map(day => compactValue({
       ...day,
-      exercises: (day.exercises || []).map(compactValue),
+      exercises: (day.exercises || []).filter(Boolean).map(compactValue),
     })),
   }))
 }

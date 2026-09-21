@@ -7,6 +7,7 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const { computeTodayPosition, dayStats, dayStatsByType, dayCountForWeek, dayIndexFor } = await import(`${ROOT}src/utils/programSchedule.js`)
 const { compactWeeks, estimateBytes, sizeStatus, FIRESTORE_DOC_LIMIT } = await import(`${ROOT}src/utils/programSize.js`)
 const { matchesGroupFilter, groupsOf, suggestGroupColor, ALL_GROUPS, UNGROUPED } = await import(`${ROOT}src/constants/athleteGroups.js`)
+const { buildProgramWeeksFromRows, parseWeekOrDayRange } = await import(`${ROOT}src/utils/sheetRows.js`)
 
 let failures = 0
 function t(name, fn) {
@@ -205,6 +206,52 @@ t('chips come back in group order, not membership order', () => {
 t('a new group is offered a colour nothing else uses', () => {
   const next = suggestGroupColor(groups)
   eq(groups.some(g => g.color === next), false)
+})
+
+// ── sheet rows → weeks ───────────────────────────────────────────────────────
+// This parser had no coverage at all, and a throw in it aborts a pull
+// mid-flight — which is how an athlete's draft ended up deleted with nothing
+// to replace it. Apps Script sends real JSON types, not strings.
+t('a numeric exercise cell does not throw, and is stored as text', () => {
+  const weeks = buildProgramWeeksFromRows([{ Week: '1', Day: 'Monday', Exercise: 3, Sets: 4, Reps: 12 }], 'throwing')
+  const e = weeks[0].days[0].exercises[0]
+  eq([e.name, e.sets, e.reps], ['3', '4', '12'])
+})
+t('a numeric alternate-exercise cell does not throw', () => {
+  const weeks = buildProgramWeeksFromRows([{ Week: '1', Day: 'Monday', Exercise: 'Long Toss', 'Alternate Exercise': 7 }], 'throwing')
+  eq(weeks[0].days[0].exercises.map(e => e.name), ['Long Toss', '7'])
+})
+t('a boolean cell does not throw either', () => {
+  const weeks = buildProgramWeeksFromRows([{ Week: '1', Day: 'Monday', Exercise: true }], 'throwing')
+  eq(weeks[0].days[0].exercises[0].name, 'true')
+})
+t('an empty alternate is not turned into a second exercise', () => {
+  const weeks = buildProgramWeeksFromRows([{ Week: '1', Day: 'Monday', Exercise: 'Long Toss', 'Alternate Exercise': '' }], 'throwing')
+  eq(weeks[0].days[0].exercises.length, 1)
+})
+t('weekday names become the day numbers the calendar reads', () => {
+  const rows = [
+    { Week: '1', Day: 'Monday', Exercise: 'A' },
+    { Week: '1', Day: 'Wednesday', Exercise: 'B' },
+    { Week: '1', Day: 'Friday', Exercise: 'C' },
+  ]
+  eq(buildProgramWeeksFromRows(rows, 'throwing')[0].days.map(d => d.dayNum), [1, 3, 5])
+})
+t('a week range expands to every week in it', () => {
+  const weeks = buildProgramWeeksFromRows([{ Week: '1-3', Day: 'Monday', Exercise: 'A' }], 'throwing')
+  eq(weeks.map(w => w.weekNum), [1, 2, 3])
+})
+t('a day-type label buckets instead of becoming a weekday', () => {
+  const weeks = buildProgramWeeksFromRows([{ Week: '1', Day: 'Recovery Day', Exercise: 'A' }], 'throwing')
+  eq([weeks[0].days[0].dayType, weeks[0].days[0].dayNum], ['recovery', 4])
+})
+t('parseWeekOrDayRange handles the shapes a sheet actually contains', () => {
+  eq(parseWeekOrDayRange('2'), [2])
+  eq(parseWeekOrDayRange('Day 2'), [2])
+  eq(parseWeekOrDayRange('1-3'), [1, 2, 3])
+  eq(parseWeekOrDayRange('Friday'), [5])
+  eq(parseWeekOrDayRange(''), [1])
+  eq(parseWeekOrDayRange('nonsense'), [1])
 })
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

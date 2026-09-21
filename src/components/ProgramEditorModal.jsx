@@ -840,6 +840,9 @@ export function saveErrorMessage(err, { live, isTemplate, verb = 'save' } = {}) 
   if (/Unsupported field value: undefined/i.test(raw)) {
     return 'A field on this program is blank in a way Firestore rejects. Re-save after re-picking the day type, and tell Jake which day it was.'
   }
+  if (err?.code === 'not-found' || /no entity to update/i.test(raw)) {
+    return 'This program no longer exists — a re-pull from the sheet replaced it. Close this editor and open the new draft.'
+  }
   if (err?.code === 'permission-denied') return "You don't have permission to save this program."
   const what = verb === 'publish' ? 'publish' : live ? 'save changes' : isTemplate ? 'save program' : 'save draft'
   return raw ? `Could not ${what}: ${raw}` : `Could not ${what}.`

@@ -391,6 +391,10 @@ export default function AdminAthleteDetail() {
       console.error(err)
       toast.error('Could not reach the sheet: ' + (err.message || 'Unknown error'))
     } finally {
+      // Always resync, including after a failure: a pull that threw part-way
+      // can still have written or removed documents, and holding on to ids
+      // that no longer exist is what made the next save fail permanently.
+      await refreshPrograms().catch(() => {})
       setPulling(false)
     }
   }
@@ -431,6 +435,7 @@ export default function AdminAthleteDetail() {
       console.error(err)
       toast.error('Could not reach the sheet: ' + (err.message || 'Unknown error'))
     } finally {
+      await refreshPrograms().catch(() => {})
       setPullingAllOutputs(false)
     }
   }
@@ -610,7 +615,11 @@ export default function AdminAthleteDetail() {
       // — correctives/throwing/lifting are independent, assigning one doesn't
       // touch the others.
       const current = activePrograms[type]
-      if (current) await updateProgram(current.id, { active: false })
+      // archived, not just inactive: "inactive and not archived" is exactly
+      // what the draft list and the sheet pull both treat as a discardable
+      // draft, so a superseded program left merely inactive would show up
+      // under Drafts Awaiting Review and be deleted by the next pull.
+      if (current) await updateProgram(current.id, { active: false, archived: true })
       // Clone rather than mutate the source program — a reusable template
       // (or a program built for a different athlete) stays exactly as it
       // was, still assignable to the next athlete. This athlete gets their

@@ -123,6 +123,41 @@ await t('a receipt cannot be edited or deleted by the athlete', async () => {
   await assertFails(deleteDoc(doc(db('ath'), 'facilityCancellations/ath/slots/s1')))
 })
 
+// ── role-less accounts ──
+// Anyone can self-register over the public web API key. Such an account must
+// not be able to write anything: under the old isAuth() rules it could pile
+// documents under its own uid until the day's Spark write quota was gone,
+// taking the app down for everyone.
+await t('a role-less account cannot write its own data', async () => {
+  await seedGroups()
+  const fs = db('nobody')
+  await assertFails(setDoc(doc(fs, 'dataLogs/nobody/entries/e1'), { value: 1 }))
+  await assertFails(setDoc(doc(fs, 'completions/nobody/weeks/w1'), { completed: true }))
+  await assertFails(setDoc(doc(fs, 'athletePrefs/nobody'), { x: 1 }))
+  await assertFails(setDoc(doc(fs, 'exerciseWeights/nobody/entries/k1'), { value: 1 }))
+  await assertFails(setDoc(doc(fs, 'chats/nobody/messages/m1'), { text: 'hi' }))
+  await assertFails(setDoc(doc(fs, 'facilityBookingsByAthlete/nobody/slots/s1'), { bookedAt: 1 }))
+})
+await t('a real athlete still writes all of their own data', async () => {
+  await seedGroups()
+  const fs = db('ath')
+  await assertSucceeds(setDoc(doc(fs, 'dataLogs/ath/entries/e1'), { value: 1 }))
+  await assertSucceeds(setDoc(doc(fs, 'completions/ath/weeks/w1'), { completed: true }))
+  await assertSucceeds(setDoc(doc(fs, 'athletePrefs/ath'), { x: 1 }))
+  await assertSucceeds(setDoc(doc(fs, 'exerciseWeights/ath/entries/k1'), { value: 1 }))
+  await assertSucceeds(setDoc(doc(fs, 'chats/ath/messages/m1'), { text: 'hi' }))
+  await assertSucceeds(setDoc(doc(fs, 'facilityBookingsByAthlete/ath/slots/s1'), { bookedAt: 1 }))
+})
+await t('an athlete still cannot write another athlete\'s data', async () => {
+  await seedGroups()
+  await assertFails(setDoc(doc(db('ath'), 'dataLogs/ath2/entries/e1'), { value: 1 }))
+  await assertFails(setDoc(doc(db('ath'), 'chats/ath2/messages/m1'), { text: 'hi' }))
+})
+await t('an admin still writes on an athlete\'s behalf', async () => {
+  await seedGroups()
+  await assertSucceeds(setDoc(doc(db('adm'), 'completions/ath/weeks/w1'), { completed: true }))
+})
+
 // ── athlete groups ──
 async function seedGroups() {
   await env.clearFirestore()

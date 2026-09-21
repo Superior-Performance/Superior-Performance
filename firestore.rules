@@ -12,6 +12,17 @@ service cloud.firestore {
     function isAdmin() { return isAuth() && role() == 'admin'; }
     function isAthlete() { return isAuth() && role() == 'athlete'; }
 
+    // Writes below are gated on isAthlete(), not isAuth(), everywhere an
+    // athlete writes their own data. The web API key ships in the bundle and
+    // Email/Password signup is enabled (admins create accounts through it),
+    // so anyone can mint a signed-in account over the public REST endpoint.
+    // Such an account holds no role, owns no data, and is invisible in the
+    // admin UI — but under isAuth() it could still write unbounded documents
+    // under its own uid and burn the Spark plan's daily write quota, which
+    // takes the app down for every real athlete until midnight. Reads stay
+    // on isAuth(): they are already scoped to the caller's own uid, and a
+    // role-less account has nothing there to read.
+
     // Users: admins can read/write all; athletes can read only their own doc.
     // Writes are otherwise admin-only — role/programTypes living on this doc
     // make a general self-write a privilege escalation risk — except an
@@ -38,7 +49,7 @@ service cloud.firestore {
     // Data logs: admins read all; athletes read/write their own
     match /dataLogs/{uid}/entries/{entryId} {
       allow read:  if isAdmin() || (isAuth() && request.auth.uid == uid);
-      allow write: if isAdmin() || (isAuth() && request.auth.uid == uid);
+      allow write: if isAdmin() || (isAthlete() && request.auth.uid == uid);
     }
 
     // Assessments: admins full access; athletes read-only their own
@@ -53,7 +64,7 @@ service cloud.firestore {
     // and so a coach can correct a mis-tapped checkmark.
     match /completions/{uid}/weeks/{key} {
       allow read:  if isAdmin() || (isAuth() && request.auth.uid == uid);
-      allow write: if isAdmin() || (isAuth() && request.auth.uid == uid);
+      allow write: if isAdmin() || (isAthlete() && request.auth.uid == uid);
     }
 
     // Athlete-owned UI preferences — dismissed banners and the like. Kept out
@@ -61,7 +72,7 @@ service cloud.firestore {
     // and nothing here is security-relevant.
     match /athletePrefs/{uid} {
       allow read:  if isAdmin() || (isAuth() && request.auth.uid == uid);
-      allow write: if isAdmin() || (isAuth() && request.auth.uid == uid);
+      allow write: if isAdmin() || (isAthlete() && request.auth.uid == uid);
     }
 
     // Exercise weight tracking — one editable "this week's weight" value per
@@ -70,14 +81,14 @@ service cloud.firestore {
     // that) — same read/write shape as completions.
     match /exerciseWeights/{uid}/entries/{key} {
       allow read:  if isAdmin() || (isAuth() && request.auth.uid == uid);
-      allow write: if isAdmin() || (isAuth() && request.auth.uid == uid);
+      allow write: if isAdmin() || (isAthlete() && request.auth.uid == uid);
     }
 
     // Chat — one thread per athlete, shared with their coach. Admins can
     // read/write every thread; an athlete can only read/write their own.
     match /chats/{athleteUid}/messages/{messageId} {
       allow read:  if isAdmin() || (isAuth() && request.auth.uid == athleteUid);
-      allow write: if isAdmin() || (isAuth() && request.auth.uid == athleteUid);
+      allow write: if isAdmin() || (isAthlete() && request.auth.uid == athleteUid);
     }
 
     // Admin-only "coach last opened this thread" marker — the athlete side
@@ -193,7 +204,7 @@ service cloud.firestore {
     // same shape as dataLogs/completions/exerciseWeights.
     match /facilityBookingsByAthlete/{uid}/slots/{slotId} {
       allow read:  if isAdmin() || (isAuth() && request.auth.uid == uid);
-      allow write: if isAdmin() || (isAuth() && request.auth.uid == uid);
+      allow write: if isAdmin() || (isAthlete() && request.auth.uid == uid);
     }
 
     // Proof that a cancellation really happened.

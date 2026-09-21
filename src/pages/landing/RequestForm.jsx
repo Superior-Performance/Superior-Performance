@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { getPublicSettings } from '../../firebase/firestore'
 import { Reveal } from './motion'
@@ -109,12 +108,12 @@ export default function RequestForm() {
               <FormField id="req-grad" label="Grad year / level" placeholder="Grad year / level" value={gradYear} onChange={setGradYear} error={errors.gradYear} className="lp-input" style={fieldStyle} />
               <FormField id="req-velo" label="Current top velo (mph)" placeholder="Current top velo (mph)" value={velo} onChange={setVelo} error={errors.velo} className="lp-input" style={fieldStyle} />
               <div style={{ background: C.ink }}>
-                <label htmlFor="req-notes" style={SR_ONLY}>Goals, injury history, anything we should know</label>
+                <label htmlFor="req-notes" style={SR_ONLY}>Goals, availability, anything we should know</label>
                 <textarea
                   id="req-notes"
                   className="lp-input"
                   rows={4}
-                  placeholder="Goals, injury history, anything we should know"
+                  placeholder="Goals, availability, anything we should know"
                   value={notes}
                   onChange={e => setNotes(e.target.value)}
                   style={{ ...fieldStyle, resize: 'vertical', display: 'block' }}
@@ -132,11 +131,17 @@ export default function RequestForm() {
                 aria-describedby={errors.consent ? 'req-consent-error' : undefined}
                 style={{ width: 18, height: 18, marginTop: 2, flexShrink: 0, accentColor: C.green, cursor: 'pointer' }}
               />
+              {/* Says only what is actually true today. It used to assert the
+                  visitor had read a Privacy Policy and Terms — pages that are
+                  still placeholders and are stripped from every deploy, so
+                  the links went nowhere and the claim was a consent record
+                  for a document nobody could read. Worse, the deploy
+                  carve-out removed this whole block along with the links,
+                  which left the form collecting a minor's details with no
+                  consent language at all. No links now, so nothing to strip.
+                  Restore the policy references once the real pages ship. */}
               <label htmlFor="req-consent" style={{ fontFamily: BODY, fontSize: 14, lineHeight: 1.55, color: 'rgba(242,244,243,.72)', cursor: 'pointer' }}>
-                I agree to be contacted about this request and have read the{' '}
-                <Link to="/privacy" className="lp-link lp-focus" style={{ color: C.greenBright, textDecoration: 'underline' }}>Privacy Policy</Link>
-                {' '}and{' '}
-                <Link to="/terms" className="lp-link lp-focus" style={{ color: C.greenBright, textDecoration: 'underline' }}>Terms &amp; Conditions</Link>.
+                I agree to be contacted about this request. What you send is used only to reply to you.
               </label>
             </div>
             {errors.consent && <p id="req-consent-error" style={{ fontFamily: MONO, fontSize: 11, color: '#ff8a7a', marginTop: 8 }}>{errors.consent}</p>}

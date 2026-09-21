@@ -35,9 +35,11 @@ node scripts/fs-read.mjs get <collection> <docId>
 
 **Always pass `--fields` when listing `programs`.** Each program doc carries its whole weeks/days/exercises tree — an unprojected list of them is megabytes and will bury your own context for no benefit.
 
-Useful shapes: `users` (role, name, email), `programs` (name, athleteId, programType, active, archived — `athleteId: null` means it's a template), `facilitySlots` (date, startTime, endTime, capacity, bookedCount), `assessments`, `dataLogs/{uid}/entries`, `exerciseWeights/{uid}/entries`.
+Useful shapes: `users` (role, name, athleteType, groupIds), `programs` (name, athleteId, programType, active, archived — `athleteId: null` means it's a template), `facilitySlots` (date, startTime, endTime, capacity, bookedCount), `dataLogs/{uid}/entries` (date, type, value), `exerciseWeights/{uid}/entries`, `athleteGroups`.
 
-Real athlete data is in here. Answer the question asked; don't dump personal details into the room that nobody needed.
+**Some of this is deliberately out of reach.** Assessments (injury history, screening notes) and athlete chat threads are refused by the tool itself, and contact fields like email are stripped from what it returns — these are minors' health details and private conversations, and this session runs unattended. If a question genuinely needs them, say so and let a human look it up; don't try to reach the same data another way.
+
+Real athlete data is still in what you can read. Answer the question asked; don't dump personal details into the room that nobody needed. Remember the room is permanent — `teamChat` messages can't be deleted by anyone, so anything you write about an athlete stays there for good.
 
 If a question needs something you genuinely cannot reach — a decision only a human can make, a business detail nobody wrote down — say so plainly and ask for what you need. Don't guess and don't pad.
 

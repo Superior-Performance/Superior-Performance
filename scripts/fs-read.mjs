@@ -12,6 +12,12 @@
  * IAM, so it bypasses security rules the way the Admin SDK would). Whoever runs
  * this must already have owner/editor on the Firebase project.
  *
+ * Because those rules don't apply here, what this tool may read is decided by
+ * lib/data-policy.mjs instead: assessments and athlete chat threads are
+ * refused outright, and contact fields are stripped from what does come back.
+ * That's a capability the agent lacks rather than an instruction it might be
+ * argued out of — see the header of that file for the reasoning.
+ *
  * Commands:
  *   node scripts/fs-read.mjs collections
  *       Root collection ids.
@@ -35,6 +41,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { assertReadable, redactDoc } from './lib/data-policy.mjs'
 
 const PROJECT = 'superior-performance-ba102'
 const BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`
@@ -119,6 +126,9 @@ async function listDocs(token, collection, { count, fields }) {
 }
 
 try {
+  // Checked before authenticating: a refused read shouldn't mint a token.
+  if (['count', 'list', 'get'].includes(command) && positional[0]) assertReadable(positional[0])
+
   const token = await accessToken()
 
   if (command === 'collections') {
@@ -127,28 +137,34 @@ try {
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: '{}',
     })
-    console.log(JSON.stringify((await res.json()).collectionIds || [], null, 2))
+    const ids = ((await res.json()).collectionIds || []).filter(id => {
+      try { assertReadable(id); return true } catch { return false }
+    })
+    console.log(JSON.stringify(ids, null, 2))
 
   } else if (command === 'count') {
     if (!positional[0]) throw new Error('count requires a collection')
+    assertReadable(positional[0])
     // Project down to __name__ only: counting shouldn't pull document bodies.
     const docs = await listDocs(token, positional[0], { count: 100_000, fields: ['__name__'] })
     console.log(JSON.stringify({ collection: positional[0], count: docs.length }, null, 2))
 
   } else if (command === 'list') {
     if (!positional[0]) throw new Error('list requires a collection')
-    console.log(JSON.stringify(
-      await listDocs(token, positional[0], { count: COUNT, fields: FIELDS }), null, 2))
+    assertReadable(positional[0])
+    const docs = await listDocs(token, positional[0], { count: COUNT, fields: FIELDS })
+    console.log(JSON.stringify(docs.map(d => redactDoc(positional[0], d)), null, 2))
 
   } else if (command === 'get') {
     const [collection, docId] = positional
     if (!collection || !docId) throw new Error('get requires <collection> <docId>')
+    assertReadable(collection)
     const params = maskQuery(FIELDS)
     const res = await fetch(`${BASE}/${collection}/${docId}${params ? `?${params}` : ''}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
     if (!res.ok) throw new Error(`GET ${collection}/${docId} → ${res.status}`)
-    console.log(JSON.stringify(docToObj(await res.json()), null, 2))
+    console.log(JSON.stringify(redactDoc(collection, docToObj(await res.json())), null, 2))
 
   } else {
     console.error('Usage: fs-read.mjs <collections|count|list|get> … — see header comment.')

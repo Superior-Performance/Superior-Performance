@@ -102,8 +102,17 @@ function runAgent() {
       resolve()
     })
     child.on('close', (code) => {
-      const tail = out.trim().split('\n').slice(-6).join('\n')
-      log(`agent exited ${code}${tail ? `\n${tail}` : ''}`)
+      // The agent's output can quote production data — an athlete's name, what
+      // they logged, what the coach asked about them. This log is an unrotated
+      // plaintext file on a personal laptop, so a successful run records only
+      // that it happened. A failure still gets its tail, because diagnosing a
+      // crash needs it and a crashed run rarely got as far as reading data.
+      if (code === 0) {
+        log('agent exited 0')
+      } else {
+        const tail = out.trim().split('\n').slice(-6).join('\n')
+        log(`agent exited ${code}${tail ? `\n${tail}` : ''}`)
+      }
       resolve()
     })
   })

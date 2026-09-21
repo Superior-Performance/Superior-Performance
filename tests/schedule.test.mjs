@@ -8,6 +8,7 @@ const { computeTodayPosition, dayStats, dayStatsByType, dayCountForWeek, dayInde
 const { compactWeeks, estimateBytes, sizeStatus, FIRESTORE_DOC_LIMIT } = await import(`${ROOT}src/utils/programSize.js`)
 const { matchesGroupFilter, groupsOf, suggestGroupColor, ALL_GROUPS, UNGROUPED } = await import(`${ROOT}src/constants/athleteGroups.js`)
 const { buildProgramWeeksFromRows, parseWeekOrDayRange } = await import(`${ROOT}src/utils/sheetRows.js`)
+const { assertReadable, redactDoc, collectionSegments, REDACTED } = await import(`${ROOT}scripts/lib/data-policy.mjs`)
 
 let failures = 0
 function t(name, fn) {
@@ -252,6 +253,41 @@ t('parseWeekOrDayRange handles the shapes a sheet actually contains', () => {
   eq(parseWeekOrDayRange('Friday'), [5])
   eq(parseWeekOrDayRange(''), [1])
   eq(parseWeekOrDayRange('nonsense'), [1])
+})
+
+// ── what the unattended agent may read ───────────────────────────────────────
+// fs-read.mjs runs with a project-owner token, so Firestore rules don't apply
+// to it. This policy is the only thing keeping minors' health data out of an
+// AI transcript, a laptop log and a permanently undeletable staff-room post.
+const refuses = (path) => {
+  try { assertReadable(path); return false } catch { return true }
+}
+t('assessments and athlete chats are refused', () => {
+  eq([refuses('assessments'), refuses('chats')], [true, true])
+})
+t('refusal follows the path, not just its first segment', () => {
+  eq([refuses('chats/uid123/messages'), refuses('teamChat'), refuses('chatReads')], [true, true, true])
+})
+t('the collections the agent actually needs are allowed', () => {
+  eq(['users', 'programs', 'facilitySlots', 'athleteGroups', 'dataLogs/uid/entries'].map(refuses), [false, false, false, false, false])
+})
+t('document ids in a path are not mistaken for collections', () => {
+  eq(collectionSegments('dataLogs/uid123/entries'), ['dataLogs', 'entries'])
+  // An athlete whose uid happened to be "chats" must not block their own logs.
+  eq(refuses('dataLogs/chats/entries'), false)
+})
+t('contact fields are redacted everywhere, not dropped', () => {
+  const doc = redactDoc('users', { id: 'u1', name: 'Casey', email: 'casey@example.com', photoURL: 'https://x/y', role: 'athlete' })
+  eq([doc.email, doc.photoURL], [REDACTED, REDACTED])
+  eq([doc.name, doc.role], ['Casey', 'athlete'], 'structural fields survive')
+})
+t('a data log note is redacted but its numbers are not', () => {
+  const doc = redactDoc('dataLogs/uid/entries', { id: 'e1', date: '2026-09-21', type: 'velo', value: 82, notes: 'elbow sore after' })
+  eq([doc.notes, doc.value, doc.type], [REDACTED, 82, 'velo'])
+})
+t("a program's coaching notes are left alone", () => {
+  const doc = redactDoc('programs', { id: 'p1', name: 'Casey — Throwing', notes: 'keep the elbow up' })
+  eq(doc.notes, 'keep the elbow up')
 })
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

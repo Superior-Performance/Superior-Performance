@@ -139,7 +139,8 @@ Firestore security rules are written and role-aware (admins read/write all; athl
 
 `npm run dev:emulator` runs the app against the Firebase emulators (auth +
 Firestore, ports in `firebase.json`) with `scripts/seed-emulator.mjs` data: a
-coach, an in-house athlete carrying one program of every type, and a College
+coach, an in-house athlete carrying a program of every type (including a
+Mon/Wed/Fri one, so the gapped-day shape is always exercised), and a College
 Remote athlete on day-type programs. Accounts are `coach@example.com` /
 `inhouse@example.com` / `remote@example.com`, password `test1234`. The app only
 talks to emulators when `VITE_USE_EMULATORS=1`, which that script sets and
@@ -148,10 +149,18 @@ production builds never do (the branch compiles away — verified in the bundle)
 Needs a Java runtime for the emulator: `brew install openjdk@21`, then
 `export PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH"`.
 
-Two test suites, both worth running before a deploy that touches either area:
-`npm run test:unit` (date mapping, per-type day stats, document-size accounting,
-group filtering) and `npm run test:rules` (the booking/bookedCount pairing, the
-Apps Script verification logic, group access).
+Two test suites, both worth running before any deploy:
+
+- `npm run test:unit` — no emulator needed. Date mapping, per-type day stats,
+  gapped day arrays, document-size accounting, group filtering, sheet-row
+  parsing (the cell types Apps Script actually sends), and the agent data
+  policy.
+- `npm run test:rules` — needs the emulator and the JDK on PATH. Firestore
+  rules (booking/`bookedCount` pairing, cancellation receipts, group access,
+  role-gated writes) plus both Apps Scripts run against shimmed services.
+
+Neither covers React components — there are no component tests, so anything
+that moves JSX still needs a click-through in `dev:emulator`.
 
 ## Known gaps / things to discuss
 
@@ -188,20 +197,24 @@ Apps Script verification logic, group access).
 
 ## Open work, roughly in priority order
 
-**Fixed and deployed 2026-09-16** — rules, app, and both Apps Scripts (booking "Superior Notifications" v5, inquiry "Website Request Form" v2), same URLs.
+**Needs a human, not code — do these first**
 
-1. ~~Athletes could change a slot's `bookedCount` without holding a booking.~~
-   `firestore.rules` now only allows ±1 in the same write as creating/deleting
-   the athlete's own booking doc, and requires the athlete role. Covered by
-   `npm run test:rules`.
-2. ~~Apps Script webhooks unauthenticated.~~ Script source now lives in
-   `apps-script/` (the Settings page shows it from there). The booking script
-   only emails for a verified athlete's real booking, reading every detail from
-   Firestore with the athlete's ID token. The inquiry script (which has to stay
-   anonymous) caps volume, dedupes senders, and never uses the last 40 of the
-   account's daily mail quota, so booking alerts keep working.
-3. ~~Late-cancellation timezone bug.~~ The 24h check moved into the booking
-   script, which parses the slot time in America/Chicago.
+1. **Paste both Apps Scripts** (superiorperformance.sp account, Deploy → Manage
+   deployments → Edit → New version, same URL). The repo copies in
+   `apps-script/` are ahead of what's deployed as of 2026-09-21:
+   - *Superior Notifications* — refuses a cancellation alert without a
+     receipt. Until it's pasted, any athlete can have the coach emailed
+     "Late cancellation — <their name>" for a slot they never booked.
+   - *Website Request Form* — escapes spreadsheet formulas and caps sheet
+     rows. Only matters if `OVERFLOW_SHEET_ID` is set; unclear whether it is.
+2. **Two Claude accounts ship to this one Firebase project.** Production holds
+   `assessmentSlots`, `assessmentBookings`, `assessmentBookingLocks` and
+   `filmingExercises` from the other account, with no code in this repo and no
+   rules covering them (so its own reads are denied). A rules or hosting deploy
+   replaces the whole file/bundle, so whoever deploys next can silently revert
+   the other's work. Agree on a protocol before either side deploys again.
+3. **Confirm the save fix on real data** — switch an athlete College Remote →
+   In-House, re-pull, open a draft, save. That path was broken for weeks.
 
 **Known bugs**
 
@@ -209,44 +222,128 @@ Apps Script verification logic, group access).
    a just-saved value. Nothing is lost, but it reads as data loss.
 5. Deleting a facility slot with active bookings orphans the `bookings` subcollection
    and the athlete-side mirrors.
+6. Publishing a draft clones the weeks as they were *before* the edit that
+   immediately preceded it (`assignProgram` reads `programs` from a stale
+   render closure). The draft keeps the new content; the athlete's published
+   copy doesn't. Reads as "my save didn't take".
+7. `migrateCompletionKeys` builds one unchunked `writeBatch` — a legacy
+   program with >250 completed exercises exceeds Firestore's 500-op limit and
+   fails to open for editing. Every other batch in `firestore.js` chunks at 450.
+
+**Athlete privacy — found by the data review 2026-09-21, not yet addressed**
+
+8. Assessment intake sends a minor's injury history **in a URL query string**
+   to Apps Script (`sendAssessmentToIntakeSheet`). URLs get logged where
+   request bodies don't. A POST carries the same data with far less log
+   surface.
+9. Profile photo URLs carry a permanent `?token=` that bypasses
+   `storage.rules` entirely, and photo deletion is best-effort behind a 5s
+   timeout — so "delete my child's data" can report success while the image
+   stays publicly reachable.
+10. **"Delete my child's data" is not achievable today.** `deleteAthleteCompletely`
+    is thorough inside Firestore, but the Auth record, the Assessment Intake
+    Sheet, the inquiry overflow Sheet, every booking/inquiry email in Gmail,
+    and `teamChat` (undeletable by rule) all survive it.
+11. Both Google Sheets' sharing settings are unknown. A link-shared sheet of
+    minors' injury histories would be serious; worth 60 seconds in the sharing
+    dialog.
 
 **Blocked on the business, not on code**
 
-6. Legal pages need a real entity name, mailing address, state, and refund terms. Until
-   then every deploy has to carve them out.
-7. Results-section velocity numbers are placeholders pending real figures.
+12. Legal pages need a real entity name, mailing address, state, and refund terms.
+    Until then every deploy carves them out — see the routine in the memory note,
+    and mind that the carve-out must no longer touch `RequestForm.jsx`.
+13. Results-section velocity numbers are placeholders pending real figures.
 
 **Data hygiene**
 
-8. Test accounts still in production — several `zzz-test-*` Auth users, a "big hitter"
-   athlete, and a couple of orphan `ZZZ TEST` programs. Deleting these needs a human.
+14. Test accounts still in production — several `zzz-test-*` Auth users, a "big hitter"
+    athlete, and a couple of orphan `ZZZ TEST` programs. Deleting these needs a human.
 
-**Structural, non-urgent**
+**Structural, non-urgent** (a full ranked plan exists from the refactor review)
 
-9. `AdminAthleteDetail.jsx` is ~1,500 lines doing three unrelated jobs behind one tab
-   switch. `SchedulePage.jsx` duplicates an accordion toggle three times. A
-   "get script URL or bail" helper exists in `AdminAthletesPage.jsx` and is re-inlined
-   three times in `AdminAthleteDetail.jsx`.
-10. No custom domain — everything canonical points at `*.web.app`, which caps local SEO.
+15. `AdminAthleteDetail.jsx` is ~1,600 lines doing three unrelated jobs behind one tab
+    switch, and its `saving` flag is one boolean shared by six unrelated actions.
+    `SchedulePage.jsx` duplicates an accordion toggle three times. A
+    "get script URL or bail" helper exists in `AdminAthletesPage.jsx` and is re-inlined
+    three times in `AdminAthleteDetail.jsx`. `cellDate` is implemented three times
+    (`ProgramMonthView`, `DayStrip`, `SchedulePage`) — start there: it's the
+    smallest, and it lands in a module the tests already cover.
+16. No custom domain — everything canonical points at `*.web.app`, which caps local SEO.
     The origin is hardcoded in four files with no single source of truth.
 
 ---
 
-## Deploying the booking/webhook fix
+## Deploying
 
-The rules, the app, and the two Apps Scripts have to go out together. The new
-app sends booking alerts as a signed-in POST, which the old script ignores.
-The new script refuses the old app's GET. Either mismatch just drops alert
-emails (bookings themselves still work), so do all three in one sitting:
+Rules and hosting are separate deploys, and **each replaces the whole thing** —
+there is no merge. Always:
 
-1. `firebase deploy --only firestore:rules`. This is safe on its own because
-   the current app already writes bookings the way the new rules require.
-2. Build and deploy hosting, with the legal-pages carve-out.
-3. In the superiorperformance.sp account, open each Apps Script, paste the new
-   code from Admin → Settings (or `apps-script/*.gs`), then use Deploy →
-   Manage deployments → Edit → New version so the URL stays the same. For the
-   booking script, run `authorize` once first; it now needs permission to
-   make external requests. Optionally set `OVERFLOW_SHEET_ID` on the inquiry
-   script.
-4. Book and cancel a slot inside 24h from a test athlete account. That should
-   send two emails. Opening the booking URL in a browser should show an error.
+1. `npx firebase deploy --only firestore:rules` (firebase-tools is a
+   devDependency, so `npx`, not a global `firebase`).
+2. Build and deploy hosting **with the legal-pages carve-out** — see the memory
+   note for the exact steps. It strips `App.jsx`'s legal routes and the footer
+   links only; it must **not** touch `RequestForm.jsx` any more (doing so used
+   to remove the consent checkbox along with its links).
+3. Verify the **served** bundle, never the route — an SPA returns the same shell
+   for every path:
+   ```
+   JS=$(curl -s https://superior-performance-ba102.web.app/ | grep -o '/assets/index-[^"]*\.js' | head -1)
+   curl -s "https://superior-performance-ba102.web.app$JS" | grep -c 'PrivacyPolicyPage\|refund-policy'
+   ```
+4. An Apps Script change is a separate manual step (item 1 above).
+
+## Fixed and deployed 2026-09-16
+
+- Athletes could change a facility slot's `bookedCount` without holding a
+  booking. The rules now allow ±1 only in the same write that creates or
+  deletes the athlete's own booking doc.
+- Both Apps Script webhooks were unauthenticated and their URLs world-readable.
+  Script source moved into `apps-script/`; the booking script only emails for a
+  verified athlete's real booking, reading every detail from Firestore with
+  their ID token. The inquiry script stays anonymous but caps volume, dedupes
+  senders, and reserves the last 40 of the account's daily mail quota so
+  booking alerts keep working.
+- Late-cancellation timezone bug — the 24h check moved into the booking script,
+  which parses the slot time in America/Chicago.
+
+## Fixed and deployed 2026-09-21
+
+All verified in the served bundle or against production, with tests.
+
+- **The long-standing "can't save this program" bug.** The sheet pull deleted
+  existing drafts *before* creating replacements, so anything that threw in
+  between left the coach editing a document that no longer existed — every save
+  then failed with "no entity to update", permanently. Now creates first,
+  deletes after; coerces sheet cells with `String()` (Apps Script sends a JSON
+  number for a numeric cell, so an exercise named "3" threw mid-pull); refreshes
+  the program list in a `finally`; and uses `allSettled` so one bad tab can't
+  abort the other three.
+- **Publishing now archives the program it supersedes.** "Inactive and not
+  archived" is exactly what the draft list and the sheet pull treat as
+  discardable, so an athlete's previous program was showing up as a draft and
+  being deleted by the next pull.
+- **Calendar days resolve by day number, not array position.** A Mon/Wed/Fri
+  program stores three days carrying `dayNum` 1, 3, 5 — indexing by position
+  showed Wednesday's work on Tuesday and made Friday unreachable. `dayIndexFor`
+  in `programSchedule.js`; completions still key off the real array position.
+- **Forged cancellation alerts.** A cancellation now writes a receipt in the
+  same transaction that deletes the booking, and the rules only permit creating
+  one with that pairing. The script checks it before emailing.
+- **Quota exhaustion.** Six collections accepted writes from any signed-in
+  account, and anyone can self-register through the public web API key — enough
+  to exhaust the Spark daily write quota and take the app down for everyone.
+  Writes now require the athlete role.
+- **Consent on the public form.** The checkbox asserted the visitor had read a
+  Privacy Policy that doesn't exist, and the deploy carve-out stripped the whole
+  block along with its links — so the live form collected a minor's details with
+  no consent language at all. The label is now link-free and true, and the form
+  no longer asks for injury history.
+- **Spreadsheet formula injection.** Inquiry rows written to the overflow sheet
+  escape a leading `=`/`+`/`-`/`@`, and sheet rows are capped per day.
+- **The team-chat agents can no longer read athletes' health data.**
+  `scripts/fs-read.mjs` uses a project-owner token that bypasses security rules,
+  so `scripts/lib/data-policy.mjs` decides what it may read: `assessments`,
+  `chats` and `teamChat` refused at any depth; `email`, `photoURL` and a data
+  log's `notes` redacted. Capability, not prompt instruction. The watcher also
+  stopped writing agent output to its laptop log on success.

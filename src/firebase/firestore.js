@@ -42,9 +42,6 @@ export const createUser = (uid, data) =>
 export const updateUser = (uid, data) =>
   updateDoc(doc(db, 'users', uid), data)
 
-export const deleteUser = (uid) =>
-  deleteDoc(doc(db, 'users', uid))
-
 export const getAllAthletes = () =>
   getDocs(query(collection(db, 'users'), where('role', '==', 'athlete')))
 
@@ -160,10 +157,6 @@ export async function deleteAthleteCompletely(uid) {
 
   return summary
 }
-
-// ── Programs ────────────────────────────────────────────────────────────────
-export const getProgram = (programId) =>
-  getDoc(doc(db, 'programs', programId))
 
 // Returns every active program for this athlete — up to one per programType
 // (correctives/throwing/lifting), since all three can run concurrently.
@@ -354,9 +347,6 @@ export const getAssessmentHistory = (uid) =>
 
 export const saveAssessmentSnapshot = (uid, dateKey, data) =>
   setDoc(doc(db, 'assessments', uid, 'history', dateKey), { ...data, savedAt: serverTimestamp() })
-
-export const deleteAssessmentSnapshot = (uid, dateKey) =>
-  deleteDoc(doc(db, 'assessments', uid, 'history', dateKey))
 
 // ── Athlete preferences ──────────────────────────────────────────────────────
 // athletePrefs/{uid} — { programNoticesSeen: { [programId]: millis } }
@@ -551,25 +541,6 @@ export const subscribeTeamChat = (callback) =>
     (snap) => callback(snap.docs.map(d => ({ id: d.id, ...d.data() })).reverse()),
   )
 
-// One-shot read for the scheduled agent, which has no React lifecycle to hang
-// a subscription off. Deliberately a plain recency window filtered in memory
-// rather than a where('mentions','array-contains-any',...) + where('answeredBy',
-// '==', null) query: that combination needs a composite index, and a staff room
-// is small enough that scanning the last N messages costs nothing.
-export const getRecentTeamChat = (count = 50) =>
-  getDocs(query(collection(db, 'teamChat'), orderBy('createdAt', 'desc'), limit(count)))
-
-// Claim-and-record in one write. Called by an agent immediately after it posts
-// its reply, so the message it answered won't come back as outstanding work.
-export const markTeamChatAnswered = (messageId, agentHandle) =>
-  updateDoc(doc(db, 'teamChat', messageId), { answeredBy: agentHandle })
-
-// teamChatReads/{uid} — { lastReadAt }. Per-admin, unlike chatReads/{athleteUid}
-// which is keyed by the thread: here every admin is a participant, so each one
-// needs their own "last opened" marker to drive their own unread badge.
-export const getTeamChatRead = (uid) =>
-  getDoc(doc(db, 'teamChatReads', uid))
-
 // Live variant — the unread badge needs this rather than a one-time read, or
 // it would keep counting messages the reader is looking at right now (the
 // chat page updates this marker as they sit there, and a stale local copy
@@ -630,12 +601,6 @@ export const deleteFacilitySlot = (slotId) =>
 
 export const getFacilitySlots = (fromDate) =>
   getDocs(query(collection(db, 'facilitySlots'), where('date', '>=', fromDate), orderBy('date'), orderBy('startTime')))
-
-export const subscribeFacilitySlots = (fromDate, callback) =>
-  onSnapshot(
-    query(collection(db, 'facilitySlots'), where('date', '>=', fromDate), orderBy('date'), orderBy('startTime')),
-    callback,
-  )
 
 export const getSlotBookings = (slotId) =>
   getDocs(collection(db, 'facilitySlots', slotId, 'bookings'))

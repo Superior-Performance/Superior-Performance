@@ -52,8 +52,10 @@ const COLUMNS = [
   'mode', 'trainingPhase', 'programLengthWeeks',
 ]
 
-// Rows that are examples or test data, not athletes.
-const SKIP_NAMES = [/^example/i, /^test\b/i, /^zzz/i, /^big hitter$/i]
+// Rows that are examples or test data, not athletes. "Tre Morris" looks like
+// a real name but is a tester account — confirmed 2026-09-22 after its two
+// backfilled screens disagreed on age and training age.
+const SKIP_NAMES = [/^example/i, /^test\b/i, /^zzz/i, /^big hitter$/i, /^tre morris$/i]
 
 const APPLY = process.argv.includes('--apply')
 const rowsFile = process.argv.slice(2).find(a => !a.startsWith('--'))

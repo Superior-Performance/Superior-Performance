@@ -269,7 +269,10 @@ that moves JSX still needs a click-through in `dev:emulator`.
 **Data hygiene**
 
 14. Test accounts still in production — several `zzz-test-*` Auth users, a "big hitter"
-    athlete, and a couple of orphan `ZZZ TEST` programs. Deleting these needs a human.
+    athlete, **"Tre Morris"** (confirmed a tester account 2026-09-22, which is why his
+    two backfilled assessments disagree on age and training age), and a couple of
+    orphan `ZZZ TEST` programs. Deleting these needs a human. Note they inflate
+    roster counts: 32 "athletes", 22 with assessment history, include these.
 
 **Structural, non-urgent** (a full ranked plan exists from the refactor review)
 

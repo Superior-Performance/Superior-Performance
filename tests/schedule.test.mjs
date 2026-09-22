@@ -10,6 +10,7 @@ const { matchesGroupFilter, groupsOf, suggestGroupColor, ALL_GROUPS, UNGROUPED }
 const { buildProgramWeeksFromRows, parseWeekOrDayRange } = await import(`${ROOT}src/utils/sheetRows.js`)
 const { assertReadable, redactDoc, collectionSegments, REDACTED } = await import(`${ROOT}scripts/lib/data-policy.mjs`)
 const { snapshotKeyFor, diffAssessments, numericSeries, trendableFields, sortByDateDesc } = await import(`${ROOT}src/utils/assessmentHistory.js`)
+const { ALL_FIELDS, RETIRED_FIELDS, SHEET_COLUMNS, isFlaggedValue, flaggedFindings, computeTotalArcs, TOTAL_ARCS } = await import(`${ROOT}src/constants/assessmentFields.js`)
 
 let failures = 0
 function t(name, fn) {
@@ -357,6 +358,90 @@ t('only numeric fields with enough readings are trendable', () => {
     { id: '2026-06-01', assessmentDate: '2026-06-01', velo: '86', handedness: 'Left' },
   ]
   eq(trendableFields(entries, aFields).map(t2 => t2.field.key), ['velo'], 'age has one reading, handedness is not numeric')
+})
+
+// ── assessment schema: degree fields, flags, arcs ────────────────────────────
+const fieldByKey = Object.fromEntries([...ALL_FIELDS, ...RETIRED_FIELDS].map(f => [f.key, f]))
+
+t('the converted fields are degree numbers now', () => {
+  eq(['activeShoulderERLeft', 'shoulderIRRight', 'tSpineRotationLeft', 'seatedHipERLeft', 'proneHipIRRight']
+    .map(k => fieldByKey[k]?.type), ['number', 'number', 'number', 'number', 'number'])
+})
+t('passive shoulder ER is untouched and still separate from active', () => {
+  eq([fieldByKey.shoulderERLeft.type, /Passive/.test(fieldByKey.shoulderERLeft.label)], ['number', true])
+  eq(fieldByKey.activeShoulderERLeft.key !== fieldByKey.shoulderERLeft.key, true)
+})
+t('hipExtension is unchanged', () => {
+  eq(fieldByKey.hipExtension.type, 'select')
+})
+t('the eight new hip degree fields exist', () => {
+  const hips = ['seatedHipERLeft','seatedHipERRight','seatedHipIRLeft','seatedHipIRRight','proneHipERLeft','proneHipERRight','proneHipIRLeft','proneHipIRRight']
+  eq(hips.every(k => fieldByKey[k]?.type === 'number'), true)
+})
+t('replaced fields are retired, not deleted, so old history still reads', () => {
+  const retired = RETIRED_FIELDS.map(f => f.key)
+  eq(['hipERLimitedLeft', 'hipIRLimitedRight', 'shoulderIRLimitedLeft', 'activeShoulderERTestLeft', 'tSpineRotation']
+    .every(k => retired.includes(k)), true)
+  eq(ALL_FIELDS.some(f => f.key === 'hipERLimitedLeft'), false, 'and off the form')
+})
+
+t('sheet columns only ever append — the original 41 keep their positions', () => {
+  const original = ['athleteName','assessmentDate','age','ageBracket','trainingAge','sportPosition','handedness','injuryHistory','isaReading','compressionSigns','shoulderERLeft','shoulderERRight','activeShoulderERTestLeft','activeShoulderERTestRight','shoulderIRLimitedLeft','shoulderIRLimitedRight','hipIRLimitedLeft','hipIRLimitedRight','hipERLimitedLeft','hipERLimitedRight','hipExtension','hamstringTest','splitsTest','ankleDorsiflexionLeft','ankleDorsiflexionRight','shoulderFlexion','tSpineRotation','tSpineExtension','tSpineFlexion','pecTest','elbowPainType','flexorForearmTightness','ribFlare','scapControl','postureFeet','posturePelvis','postureUpperBody','otherNotes','mode','trainingPhase','programLengthWeeks']
+  eq(SHEET_COLUMNS.slice(0, 41), original)
+})
+t('every field the form collects has a sheet column', () => {
+  const missing = ALL_FIELDS.map(f => f.key).filter(k => !SHEET_COLUMNS.includes(k))
+  eq(missing, [])
+})
+t('the computed arcs and the ranking have columns too', () => {
+  eq(TOTAL_ARCS.map(a => a.key).filter(k => !SHEET_COLUMNS.includes(k)), [])
+  eq(['priorityRanking', 'priorityNote'].filter(k => !SHEET_COLUMNS.includes(k)), [])
+})
+
+t('flagged values are the ones a coach would act on', () => {
+  eq(isFlaggedValue(fieldByKey.hamstringTest, 'Fail'), true)
+  eq(isFlaggedValue(fieldByKey.hamstringTest, 'Pass'), false)
+  eq(isFlaggedValue(fieldByKey.ribFlare, 'Yes'), true)
+  eq(isFlaggedValue(fieldByKey.ribFlare, 'No'), false)
+  eq(isFlaggedValue(fieldByKey.shoulderFlexion, 'Limited (bilateral)'), true)
+  eq(isFlaggedValue(fieldByKey.shoulderFlexion, 'Full'), false)
+})
+t('"Not compressed" does not flag just because it contains "compressed"', () => {
+  eq(isFlaggedValue(fieldByKey.compressionSigns, 'Not compressed'), false)
+  eq(isFlaggedValue(fieldByKey.compressionSigns, 'Compressed'), true)
+})
+t('a blank value never flags', () => {
+  eq([undefined, null, '', '   '].some(v => isFlaggedValue(fieldByKey.ribFlare, v)), false)
+})
+t('degree fields do not flag until thresholds are agreed', () => {
+  eq(isFlaggedValue(fieldByKey.shoulderIRLeft, '12'), false)
+})
+t('findings come back in form order with their values', () => {
+  const found = flaggedFindings({ hamstringTest: 'Fail', ribFlare: 'Yes', splitsTest: 'Pass' })
+  eq(found.map(f => f.key), ['hamstringTest', 'ribFlare'])
+  eq(found[0].value, 'Fail')
+})
+
+t('total arc is ER + IR, per joint and side', () => {
+  const arcs = computeTotalArcs({
+    activeShoulderERLeft: '120', shoulderIRLeft: '40',
+    seatedHipERLeft: '35', seatedHipIRLeft: '30',
+    proneHipERRight: '40', proneHipIRRight: '45',
+  })
+  eq(arcs.totalArcShoulderLeft, 160)
+  eq(arcs.totalArcSeatedHipLeft, 65)
+  eq(arcs.totalArcProneHipRight, 85)
+})
+t('seated and prone arcs stay separate', () => {
+  const arcs = computeTotalArcs({ seatedHipERLeft: '35', seatedHipIRLeft: '30', proneHipERLeft: '10', proneHipIRLeft: '10' })
+  eq([arcs.totalArcSeatedHipLeft, arcs.totalArcProneHipLeft], [65, 20])
+})
+t('half a measurement yields no arc rather than a misleading one', () => {
+  eq(computeTotalArcs({ activeShoulderERLeft: '120' }).totalArcShoulderLeft, undefined)
+  eq(computeTotalArcs({ activeShoulderERLeft: '120', shoulderIRLeft: '' }).totalArcShoulderLeft, undefined)
+})
+t('arcs are not form fields — they are computed on save', () => {
+  eq(ALL_FIELDS.some(f => TOTAL_ARCS.some(a => a.key === f.key)), false)
 })
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

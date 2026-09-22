@@ -120,7 +120,11 @@ export async function generateAllDraftPrograms(scriptUrl, uid, athleteName, exis
 // report it (a single toast, or a rolled-up bulk summary).
 export async function sendAssessmentToIntakeSheet(scriptUrl, athleteName, assessmentData) {
   const params = new URLSearchParams()
-  Object.entries(assessmentData).forEach(([k, v]) => { if (v) params.set(k, v) })
+  Object.entries(assessmentData).forEach(([k, v]) => {
+    if (!v) return
+    // priorityRanking is an ordered array of field keys; a sheet cell is text.
+    params.set(k, Array.isArray(v) ? v.join(', ') : v)
+  })
   params.set('athleteName', athleteName)
   const res = await fetch(`${scriptUrl}?${params.toString()}`)
   return res.json()

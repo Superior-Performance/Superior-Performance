@@ -689,7 +689,19 @@ function appendAssessment(e) {
       'ankleDorsiflexionLeft', 'ankleDorsiflexionRight', 'shoulderFlexion', 'tSpineRotation',
       'tSpineExtension', 'tSpineFlexion', 'pecTest', 'elbowPainType', 'flexorForearmTightness',
       'ribFlare', 'scapControl', 'postureFeet', 'posturePelvis', 'postureUpperBody', 'otherNotes',
-      'mode', 'trainingPhase', 'programLengthWeeks'
+      'mode', 'trainingPhase', 'programLengthWeeks',
+      // Added 2026-09-22. Columns 42-63, appended on purpose: the app no
+      // longer collects the nine retired fields above (columns 13-20 and 27),
+      // but their columns stay so nothing to their right shifts. Add the
+      // matching headers to the Assessment Intake tab in this same order.
+      'activeShoulderERLeft', 'activeShoulderERRight', 'shoulderIRLeft', 'shoulderIRRight',
+      'tSpineRotationLeft', 'tSpineRotationRight',
+      'seatedHipERLeft', 'seatedHipERRight', 'seatedHipIRLeft', 'seatedHipIRRight',
+      'proneHipERLeft', 'proneHipERRight', 'proneHipIRLeft', 'proneHipIRRight',
+      'totalArcShoulderLeft', 'totalArcShoulderRight',
+      'totalArcSeatedHipLeft', 'totalArcSeatedHipRight',
+      'totalArcProneHipLeft', 'totalArcProneHipRight',
+      'priorityRanking', 'priorityNote'
     ];
 
     const row = columns.map(key => e.parameter[key] || '');

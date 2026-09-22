@@ -19,6 +19,10 @@ import { PROGRAM_TYPES, ATHLETE_TYPES, athleteTypeOf } from '../../constants/pro
 import { compactWeeks } from '../../utils/programSize'
 import { groupColor } from '../../constants/athleteGroups'
 import AssessmentHistory from '../../components/AssessmentHistory'
+import PriorityRanking from '../../components/PriorityRanking'
+import {
+  FIELD_GROUPS, ALL_FIELDS, RETIRED_FIELDS, computeTotalArcs,
+} from '../../constants/assessmentFields'
 import { snapshotKeyFor } from '../../utils/assessmentHistory'
 import {
   OUTPUT_PULL_GROUPS, generateDraftProgram, generateAllDraftPrograms, sendAssessmentToIntakeSheet,
@@ -27,97 +31,6 @@ import {
 // Mirrors the "Assessment Intake" Google Sheet column-for-column (minus
 // Athlete Name, which the app already tracks) so the saved doc can be handed
 // straight to that sheet once the two are wired together.
-const PASS_FAIL = ['Pass', 'Fail']
-const YES_NO = ['Yes', 'No']
-const FULL_LIMITED_SIDES = ['Full', 'Limited (bilateral)', 'Limited (left)', 'Limited (right)']
-
-const FIELD_GROUPS = [
-  {
-    title: 'General',
-    fields: [
-      { key: 'assessmentDate', label: 'Assessment Date', type: 'date' },
-      { key: 'age',            label: 'Age',             type: 'number' },
-      { key: 'ageBracket',     label: 'Age Bracket',      type: 'select', options: ['14u', '15u', '16u', '17u', '18u', 'College'] },
-      { key: 'trainingAge',    label: 'Training Age (yrs lifting)', type: 'number' },
-      { key: 'sportPosition',  label: 'Sport / Position', type: 'text' },
-      { key: 'handedness',     label: 'Handedness',       type: 'select', options: ['Left', 'Right'] },
-      { key: 'injuryHistory',  label: 'Injury History / Pain (red flags)', type: 'text', wide: true },
-    ],
-  },
-  {
-    title: 'Program Planning',
-    fields: [
-      { key: 'mode',                label: 'Mode',            type: 'select', options: ['In-House', 'Remote'] },
-      { key: 'programLengthWeeks',  label: 'Program Length',  type: 'select', options: ['4 weeks', '8 weeks', '12 weeks'] },
-      { key: 'trainingPhase',       label: 'Training Phase',  type: 'select', options: ['On-Ramp', 'In-Season', 'Off-Season'] },
-    ],
-  },
-  {
-    title: 'ISA',
-    fields: [
-      { key: 'isaReading',       label: 'ISA Reading',                type: 'select', options: ['Neutral', 'Narrow', 'Wide'] },
-      { key: 'compressionSigns', label: 'Compression Signs (ISA test)', type: 'select', options: ['Not compressed', 'Slightly compressed', 'Compressed'] },
-    ],
-  },
-  {
-    title: 'Shoulder',
-    fields: [
-      { key: 'shoulderERLeft',            label: 'Shoulder ER - Left (deg)',  type: 'number' },
-      { key: 'shoulderERRight',           label: 'Shoulder ER - Right (deg)', type: 'number' },
-      { key: 'activeShoulderERTestLeft',  label: 'Active Shoulder ER Test - Left',  type: 'select', options: PASS_FAIL },
-      { key: 'activeShoulderERTestRight', label: 'Active Shoulder ER Test - Right', type: 'select', options: PASS_FAIL },
-      { key: 'shoulderIRLimitedLeft',     label: 'Shoulder IR Limited - Left',  type: 'select', options: YES_NO },
-      { key: 'shoulderIRLimitedRight',    label: 'Shoulder IR Limited - Right', type: 'select', options: YES_NO },
-      { key: 'shoulderFlexion',           label: 'Shoulder Flexion', type: 'select', options: FULL_LIMITED_SIDES },
-    ],
-  },
-  {
-    title: 'Hip',
-    fields: [
-      { key: 'hipIRLimitedLeft',  label: 'Hip IR Limited - Left',  type: 'select', options: YES_NO },
-      { key: 'hipIRLimitedRight', label: 'Hip IR Limited - Right', type: 'select', options: YES_NO },
-      { key: 'hipERLimitedLeft',  label: 'Hip ER Limited - Left',  type: 'select', options: YES_NO },
-      { key: 'hipERLimitedRight', label: 'Hip ER Limited - Right', type: 'select', options: YES_NO },
-      { key: 'hipExtension',      label: 'Hip Extension (table test)', type: 'select', options: FULL_LIMITED_SIDES },
-    ],
-  },
-  {
-    title: 'Lower Body',
-    fields: [
-      { key: 'hamstringTest',          label: 'Hamstring Test',            type: 'select', options: PASS_FAIL },
-      { key: 'splitsTest',             label: 'Splits Test',               type: 'select', options: PASS_FAIL },
-      { key: 'ankleDorsiflexionLeft',  label: 'Ankle Dorsiflexion - Left',  type: 'select', options: PASS_FAIL },
-      { key: 'ankleDorsiflexionRight', label: 'Ankle Dorsiflexion - Right', type: 'select', options: PASS_FAIL },
-    ],
-  },
-  {
-    title: 'T-Spine',
-    fields: [
-      { key: 'tSpineRotation',  label: 'T-Spine Rotation',  type: 'select', options: [...FULL_LIMITED_SIDES, 'Limited (glove side)'] },
-      { key: 'tSpineExtension', label: 'T-Spine Extension', type: 'select', options: ['Full', 'Limited'] },
-      { key: 'tSpineFlexion',   label: 'T-Spine Flexion',   type: 'select', options: ['Full', 'Limited'] },
-    ],
-  },
-  {
-    title: 'Elbow / Forearm',
-    fields: [
-      { key: 'pecTest',                 label: 'Pec Test',                 type: 'select', options: PASS_FAIL },
-      { key: 'elbowPainType',           label: 'Elbow Pain Type',          type: 'select', options: ['None', 'Olecranon', 'Tennis elbow', 'Both'] },
-      { key: 'flexorForearmTightness',  label: 'Flexor Forearm Tightness', type: 'select', options: PASS_FAIL },
-    ],
-  },
-  {
-    title: 'Posture & Notes',
-    fields: [
-      { key: 'ribFlare',          label: 'Rib Flare',              type: 'select', options: YES_NO },
-      { key: 'scapControl',       label: 'Scap Control / Winging', type: 'text' },
-      { key: 'postureFeet',       label: 'Posture - Feet',         type: 'text' },
-      { key: 'posturePelvis',     label: 'Posture - Pelvis',       type: 'text' },
-      { key: 'postureUpperBody',  label: 'Posture - Upper Body',   type: 'text' },
-      { key: 'otherNotes',        label: 'Other Notes',            type: 'text', wide: true },
-    ],
-  },
-]
 
 export default function AdminAthleteDetail() {
   const { uid } = useParams()
@@ -256,12 +169,16 @@ export default function AdminAthleteDetail() {
   async function saveAssessmentScores() {
     setSaving(true)
     try {
-      await saveAssessment(uid, assessment)
+      // Total arc of motion is derived from the degree readings, so it's
+      // computed here rather than held in form state where it could drift
+      // from the numbers it comes from. Firestore-only — never on the form.
+      const withArcs = { ...assessment, ...computeTotalArcs(assessment) }
+      await saveAssessment(uid, withArcs)
       // Keep a copy filed under its assessment date, so the next screen
       // compares against this one instead of replacing it. Same date means
       // the same entry — correcting a typo doesn't create a second record.
-      const dateKey = snapshotKeyFor(assessment)
-      await saveAssessmentSnapshot(uid, dateKey, assessment)
+      const dateKey = snapshotKeyFor(withArcs)
+      await saveAssessmentSnapshot(uid, dateKey, withArcs)
       await refreshHistory()
       const existing = history.some(h => h.id === dateKey)
       toast.success(existing ? `Assessment for ${dateKey} updated.` : `Assessment saved to history (${dateKey}).`)
@@ -1083,11 +1000,21 @@ export default function AdminAthleteDetail() {
         </div>
       )}
 
+      {tab === 'assessment' && (
+        <PriorityRanking
+          assessment={assessment}
+          ranking={Array.isArray(assessment.priorityRanking) ? assessment.priorityRanking : []}
+          note={assessment.priorityNote || ''}
+          onChange={({ ranking, note }) =>
+            setAssessment(p => ({ ...p, priorityRanking: ranking, priorityNote: note }))}
+        />
+      )}
+
       {/* Assessment history — same tab, directly under the form it records */}
       {tab === 'assessment' && (
         <AssessmentHistory
           entries={history}
-          fields={FIELD_GROUPS.flatMap(g => g.fields)}
+          fields={[...ALL_FIELDS, ...RETIRED_FIELDS]}
           loading={historyLoading}
         />
       )}

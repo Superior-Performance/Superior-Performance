@@ -213,6 +213,11 @@ that moves JSX still needs a click-through in `dev:emulator`.
      "Late cancellation — <their name>" for a slot they never booked.
    - *Website Request Form* — escapes spreadsheet formulas and caps sheet
      rows. Only matters if `OVERFLOW_SHEET_ID` is set; unclear whether it is.
+   - *Assessment Intake* — 22 new columns for the degree fields, total arcs
+     and priority ranking (shipped 2026-09-22). **Ian adds the sheet headers
+     first**, then the script is pasted, or the script writes 63 values into a
+     41-header sheet. The exact headers, positions and letters are in
+     `apps-script/assessment-intake-sheet-columns.md`.
 2. **Two Claude accounts ship to this one Firebase project.** Production holds
    `assessmentSlots`, `assessmentBookings`, `assessmentBookingLocks` and
    `filmingExercises` from the other account, with no code in this repo and no

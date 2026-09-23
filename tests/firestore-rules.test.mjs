@@ -158,6 +158,21 @@ await t('an admin still writes on an athlete\'s behalf', async () => {
   await assertSucceeds(setDoc(doc(db('adm'), 'completions/ath/weeks/w1'), { completed: true }))
 })
 
+// Deleting a facility slot has to clear the bookings under it and each
+// athlete's mirror of them (deleteFacilitySlot) — otherwise the session stays
+// on the athlete's "My Bookings" after the coach removes it. That is an admin
+// writing under another athlete's uid, so the rules have to allow it.
+await t('an admin can clear a booking and its athlete-side mirror', async () => {
+  await seed({ count: 1, booked: ['ath'] })
+  await assertSucceeds(deleteDoc(doc(db('adm'), 'facilitySlots/s1/bookings/ath')))
+  await assertSucceeds(deleteDoc(doc(db('adm'), 'facilityBookingsByAthlete/ath/slots/s1')))
+  await assertSucceeds(deleteDoc(doc(db('adm'), 'facilitySlots/s1')))
+})
+await t('an athlete cannot delete another athlete\'s booking mirror', async () => {
+  await seed({ count: 1, booked: ['ath'] })
+  await assertFails(deleteDoc(doc(db('ath2'), 'facilityBookingsByAthlete/ath/slots/s1')))
+})
+
 // ── assessment history ──
 await t('admin writes and reads an assessment snapshot', async () => {
   await seedGroups()

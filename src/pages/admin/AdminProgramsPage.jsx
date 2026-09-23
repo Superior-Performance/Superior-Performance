@@ -562,6 +562,12 @@ export default function AdminProgramsPage() {
 // toggleAthlete) and only cover viewing/status; actual editing happens on
 // the athlete's own profile, where the live-program safety logic lives.
 function AthleteProgramsRow({ athlete, expanded, onToggle, cacheEntry }) {
+  const loaded = cacheEntry && !cacheEntry.loading ? cacheEntry.programs : null
+  const summaryTypes = loaded
+    ? [...new Set(loaded.filter(p => p.active).map(p => p.programType || 'correctives'))]
+        .sort((a, b) => PROGRAM_TYPES.findIndex(t => t.key === a) - PROGRAM_TYPES.findIndex(t => t.key === b))
+    : (athlete.programTypes || [])
+
   return (
     <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 overflow-hidden">
       <button
@@ -573,7 +579,13 @@ function AthleteProgramsRow({ athlete, expanded, onToggle, cacheEntry }) {
           <div className="text-left min-w-0">
             <p className="font-medium text-white text-sm truncate">{athlete.name}</p>
             <div className="flex flex-wrap gap-2 mt-0.5">
-              {athlete.programTypes?.length ? athlete.programTypes.map(t => (
+              {/* users/{uid}.programTypes is a denormalised summary, kept up
+                  to date by the flows that assign and remove programs but
+                  predating some of the data in the database — so a row could
+                  read "No active programs" for an athlete who had two.
+                  Expanding fetches that athlete's real programs; once they're
+                  in hand, believe them over the summary. */}
+              {summaryTypes.length ? summaryTypes.map(t => (
                 <span key={t} className="inline-flex items-center gap-1 text-[10px] font-medium text-sp-ink-300">
                   <span className={`w-1.5 h-1.5 rounded-full ${programTypeInfo(t).dotClass}`} />
                   {programTypeInfo(t).shortLabel}

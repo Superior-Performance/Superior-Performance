@@ -172,6 +172,13 @@ export const getProgramForAthlete = (athleteId) =>
 export const createProgram = (data) =>
   addDoc(collection(db, 'programs'), { ...data, createdAt: serverTimestamp(), active: data.active ?? true })
 
+// Reads a program straight from Firestore. Needed where a stale copy would be
+// wrong rather than merely old — publishing clones the program, and cloning
+// the version a render closure captured silently hands the athlete the
+// content from before the coach's last edit.
+export const getProgram = (programId) =>
+  getDoc(doc(db, 'programs', programId))
+
 export const updateProgram = (programId, data) =>
   updateDoc(doc(db, 'programs', programId), data)
 
@@ -437,19 +444,29 @@ export const migrateCompletionKeys = async (uid, remaps) => {
   const byId = {}
   existing.forEach((d) => { byId[d.id] = d.data() })
 
-  const batch = writeBatch(db)
-  let moved = 0
+  // Two writes per remap (set + delete) against Firestore's 500-op batch
+  // limit, so anything past ~250 completed exercises needs chunking — a
+  // legacy program with a season of ticks behind it otherwise fails to open
+  // for editing at all. Every other batch in this file chunks at 450; this
+  // one didn't.
+  const pending = []
   for (const { from, to } of remaps) {
     if (from === to) continue
     const data = byId[from]
     if (!data) continue                 // nothing was completed at that position
     if (byId[to]) continue              // already migrated — don't clobber
-    batch.set(doc(db, 'completions', uid, 'weeks', to), data, { merge: true })
-    batch.delete(doc(db, 'completions', uid, 'weeks', from))
-    moved++
+    pending.push({ from, to, data })
   }
-  if (moved > 0) await batch.commit()
-  return moved
+
+  for (let i = 0; i < pending.length; i += 225) {   // 225 remaps = 450 writes
+    const batch = writeBatch(db)
+    for (const { from, to, data } of pending.slice(i, i + 225)) {
+      batch.set(doc(db, 'completions', uid, 'weeks', to), data, { merge: true })
+      batch.delete(doc(db, 'completions', uid, 'weeks', from))
+    }
+    await batch.commit()
+  }
+  return pending.length
 }
 
 export const getCompletions = (uid) =>
@@ -596,8 +613,29 @@ export const getExerciseWeights = (uid) =>
 export const createFacilitySlot = (data) =>
   addDoc(collection(db, 'facilitySlots'), { ...data, bookedCount: 0, createdAt: serverTimestamp() })
 
-export const deleteFacilitySlot = (slotId) =>
-  deleteDoc(doc(db, 'facilitySlots', slotId))
+// Deleting a slot has to take its bookings and every athlete's copy of them
+// with it. A subcollection does not go with its parent, so the old one-line
+// delete left orphaned bookings behind and athletes still showing a session
+// that no longer exists under "My Bookings".
+export const deleteFacilitySlot = async (slotId) => {
+  const bookings = await getDocs(collection(db, 'facilitySlots', slotId, 'bookings'))
+  // Two deletes per booking, chunked like every other batch here. The
+  // booking's doc id is the athlete's uid (see bookFacilitySlot), which is
+  // what makes the mirror addressable without a second query.
+  const docs = bookings.docs
+  for (let i = 0; i < docs.length; i += 225) {
+    const batch = writeBatch(db)
+    for (const b of docs.slice(i, i + 225)) {
+      batch.delete(b.ref)
+      batch.delete(doc(db, 'facilityBookingsByAthlete', b.id, 'slots', slotId))
+    }
+    await batch.commit()
+  }
+  // Last, so a failure part-way leaves the slot itself in place rather than
+  // stranding bookings under a slot that no longer exists.
+  await deleteDoc(doc(db, 'facilitySlots', slotId))
+  return docs.length
+}
 
 export const getFacilitySlots = (fromDate) =>
   getDocs(query(collection(db, 'facilitySlots'), where('date', '>=', fromDate), orderBy('date'), orderBy('startTime')))

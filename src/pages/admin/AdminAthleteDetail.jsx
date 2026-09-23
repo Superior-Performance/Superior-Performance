@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
-  getUser, getAssessment, saveAssessment, saveAssessmentSnapshot, getAssessmentHistory, updateUser, deleteAthleteCompletely, getProgramForAthlete, updateProgram, updateLiveProgram, migrateCompletionKeys, createProgram, deleteProgram, getSettings, getProgramsForAthlete, getGeneralPrograms, getCompletions, getAthleteGroups, addAthleteToGroup, removeAthleteFromGroup,
+  getUser, getProgram, getAssessment, saveAssessment, saveAssessmentSnapshot, getAssessmentHistory, updateUser, deleteAthleteCompletely, getProgramForAthlete, updateProgram, updateLiveProgram, migrateCompletionKeys, createProgram, deleteProgram, getSettings, getProgramsForAthlete, getGeneralPrograms, getCompletions, getAthleteGroups, addAthleteToGroup, removeAthleteFromGroup,
 } from '../../firebase/firestore'
 import { getDataLogs, addDataLog, setDataLogFlag } from '../../firebase/firestore'
 import { ensureExerciseIds, completionKey, legacyCompletionKey, countProgramProgress } from '../../utils/programIds'
@@ -546,8 +546,15 @@ export default function AdminAthleteDetail() {
   async function assignProgram(programId) {
     setSaving(true)
     try {
-      const target = programs.find(p => p.id === programId)
-      if (!target) { toast.error('Program not found.'); return }
+      // Read the program fresh rather than cloning the copy in state. That
+      // list is a snapshot from page load, and a clone is permanent: if the
+      // program changed since — edited in another tab, or a refresh that
+      // hasn't landed — the athlete gets a copy of the older content while
+      // the source shows the newer, which reads exactly like a save that
+      // didn't take.
+      const sourceSnap = await getProgram(programId)
+      if (!sourceSnap.exists()) { toast.error('Program not found.'); return }
+      const target = { id: sourceSnap.id, ...sourceSnap.data() }
       const type = target.programType || 'correctives'
       // Guard against assigning away a program that's already active for a
       // different athlete — the Assign Existing list is filtered to prevent

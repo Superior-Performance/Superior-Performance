@@ -1028,6 +1028,7 @@ export default function AdminAthleteDetail() {
           programs={programs}
           completions={completions}
           athleteType={athleteType}
+          athleteId={uid}
         />
       )}
 

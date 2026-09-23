@@ -4,7 +4,7 @@
 import { fileURLToPath } from 'node:url'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
-const { computeTodayPosition, dayStats, dayStatsByType, dayCountForWeek, dayIndexFor } = await import(`${ROOT}src/utils/programSchedule.js`)
+const { computeTodayPosition, dayStats, dayStatsByType, dayCountForWeek, dayIndexFor, activeProgramsForAthlete, cellDate } = await import(`${ROOT}src/utils/programSchedule.js`)
 const { compactWeeks, estimateBytes, sizeStatus, FIRESTORE_DOC_LIMIT } = await import(`${ROOT}src/utils/programSize.js`)
 const { matchesGroupFilter, groupsOf, suggestGroupColor, ALL_GROUPS, UNGROUPED } = await import(`${ROOT}src/constants/athleteGroups.js`)
 const { buildProgramWeeksFromRows, parseWeekOrDayRange } = await import(`${ROOT}src/utils/sheetRows.js`)
@@ -442,6 +442,36 @@ t('half a measurement yields no arc rather than a misleading one', () => {
 })
 t('arcs are not form fields — they are computed on save', () => {
   eq(ALL_FIELDS.some(f => TOTAL_ARCS.some(a => a.key === f.key)), false)
+})
+
+// ── whose programs are these ─────────────────────────────────────────────────
+// The admin page's program list carries the general library alongside the
+// athlete's own, because that page also offers templates for assignment.
+// Filtering on `active` alone put every active template on every athlete's
+// schedule — one athlete showed four pre-throw programs when he had one.
+const mixed = [
+  { id: 'his-pre',   athleteId: 'knox', programType: 'correctives', active: true },
+  { id: 'his-throw', athleteId: 'knox', programType: 'throwing',    active: true },
+  { id: 'his-old',   athleteId: 'knox', programType: 'correctives', active: false },
+  { id: 'template1', athleteId: null,   programType: 'correctives', active: true },
+  { id: 'template2',                    programType: 'correctives', active: true },
+  { id: 'someone-else', athleteId: 'cale', programType: 'correctives', active: true },
+]
+t('only this athlete\'s active programs count as theirs', () => {
+  eq(activeProgramsForAthlete(mixed, 'knox').map(p => p.id), ['his-pre', 'his-throw'])
+})
+t('library templates never appear on an athlete schedule', () => {
+  const ids = activeProgramsForAthlete(mixed, 'knox').map(p => p.id)
+  eq(ids.includes('template1') || ids.includes('template2'), false)
+})
+t("another athlete's program never appears", () => {
+  eq(activeProgramsForAthlete(mixed, 'knox').some(p => p.id === 'someone-else'), false)
+})
+t('an athlete with no programs gets nothing, not the library', () => {
+  eq(activeProgramsForAthlete(mixed, 'nobody'), [])
+})
+t('a missing athleteId matches nobody, including undefined', () => {
+  eq(activeProgramsForAthlete(mixed, undefined), [])
 })
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

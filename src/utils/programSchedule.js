@@ -39,6 +39,21 @@ export function computeTodayPosition(programs, totalWeeks) {
 }
 
 /**
+ * The programs an athlete is actually following.
+ *
+ * `active` alone is NOT enough, and assuming it was put other athletes' work
+ * on someone's schedule: the admin page's program list deliberately includes
+ * the general library (templates carry `athleteId: null` and are created
+ * active), because that page also offers them for assignment. A template is
+ * not something this athlete is doing, so it has no business on their
+ * schedule — one active pre-throw template showed up as a second pre-throw
+ * program for every athlete in the gym.
+ */
+export function activeProgramsForAthlete(programs, athleteId) {
+  return (programs || []).filter(p => p?.active && p.athleteId && p.athleteId === athleteId)
+}
+
+/**
  * The calendar date of a given week/day, or null when the program has no
  * startDate (older programs, and College Remote ones, which have no dates at
  * all by design).

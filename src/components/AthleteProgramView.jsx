@@ -3,7 +3,7 @@ import { CalendarDays, Moon, Check, Dumbbell } from 'lucide-react'
 import { format } from 'date-fns'
 import { PROGRAM_TYPES, programTypeInfo, exerciseCategoryInfo, categoryRank, DAY_TYPES, LIFTING_DAY_TYPES } from '../constants/programTypes'
 import { buildSlots, isSlotComplete, isExerciseComplete } from '../utils/programIds'
-import { cellDate, computeTodayPosition, dayIndexFor, dayCountForWeek, dayStatsByType } from '../utils/programSchedule'
+import { cellDate, computeTodayPosition, dayIndexFor, dayCountForWeek, dayStatsByType, activeProgramsForAthlete } from '../utils/programSchedule'
 
 /**
  * What an athlete actually has on a given day, read-only.
@@ -25,8 +25,11 @@ import { cellDate, computeTodayPosition, dayIndexFor, dayCountForWeek, dayStatsB
  * Completion marks come from the same helpers the athlete's page and the
  * streak use, so "done" here means exactly what it means everywhere else.
  */
-export default function AthleteProgramView({ programs = [], completions = {}, athleteType = 'in_house' }) {
-  const active = programs.filter(p => p.active)
+export default function AthleteProgramView({ programs = [], completions = {}, athleteType = 'in_house', athleteId }) {
+  // Filtered here rather than by the caller: the page's program list carries
+  // the general library too, and a template rendered as this athlete's work
+  // is the bug this view shipped with.
+  const active = activeProgramsForAthlete(programs, athleteId)
   const lifting = active.filter(p => (p.programType || 'correctives') === 'lifting')
   const dated = active.filter(p => (p.programType || 'correctives') !== 'lifting')
   const isRemote = athleteType === 'remote'

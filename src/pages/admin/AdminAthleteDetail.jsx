@@ -20,6 +20,7 @@ import { compactWeeks } from '../../utils/programSize'
 import { groupColor } from '../../constants/athleteGroups'
 import AssessmentHistory from '../../components/AssessmentHistory'
 import PriorityRanking from '../../components/PriorityRanking'
+import AthleteProgramView from '../../components/AthleteProgramView'
 import {
   FIELD_GROUPS, ALL_FIELDS, RETIRED_FIELDS, computeTotalArcs,
 } from '../../constants/assessmentFields'
@@ -870,7 +871,7 @@ export default function AdminAthleteDetail() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 bg-sp-ink-800 border border-sp-ink-600 rounded-xl p-1 w-fit">
-        {[['assessment','Assessment'],['program','Program'],['logs','Data Logs']].map(([k,l]) => (
+        {[['assessment','Assessment'],['schedule','Schedule'],['program','Program'],['logs','Data Logs']].map(([k,l]) => (
           <button
             key={k}
             onClick={() => setTab(k)}
@@ -1016,6 +1017,17 @@ export default function AdminAthleteDetail() {
           entries={history}
           fields={[...ALL_FIELDS, ...RETIRED_FIELDS]}
           loading={historyLoading}
+        />
+      )}
+
+      {/* Schedule tab — read-only. Deliberately not the editor: this is for
+          looking at what an athlete actually has, without a single control
+          that could write to a live program. */}
+      {tab === 'schedule' && (
+        <AthleteProgramView
+          programs={programs}
+          completions={completions}
+          athleteType={athleteType}
         />
       )}
 

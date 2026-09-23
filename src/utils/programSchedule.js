@@ -39,6 +39,25 @@ export function computeTodayPosition(programs, totalWeeks) {
 }
 
 /**
+ * The calendar date of a given week/day, or null when the program has no
+ * startDate (older programs, and College Remote ones, which have no dates at
+ * all by design).
+ *
+ * The inverse of computeTodayPosition: startDate + (week * 7) + (dayNum - 1).
+ * Lived in three copies — the coach's month grid, the athlete's day strip and
+ * the athlete's schedule page — which is three chances for them to disagree
+ * about what date a day is.
+ */
+export function cellDate(startDate, weekIdx, dayNum) {
+  if (!startDate) return null
+  const start = new Date(`${startDate}T00:00:00`)
+  if (Number.isNaN(start.getTime())) return null
+  const d = new Date(start)
+  d.setDate(d.getDate() + weekIdx * 7 + (dayNum - 1))
+  return d
+}
+
+/**
  * Where the day numbered `dayNum` actually sits in a week's days array, or -1.
  *
  * These two are NOT the same thing, and assuming they were was a real bug:

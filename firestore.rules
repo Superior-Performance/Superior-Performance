@@ -147,6 +147,18 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Video filming punch-list (superior-filming site): coach-tooling data,
+    // no PII - exercise names, usage counts, and YouTube links. Reachable
+    // only via an unlisted hosting URL, same trust model as the booking
+    // site's other low-sensitivity collections, so anonymous sign-in
+    // (isAuth() covers it) is enough - no separate login flow needed for
+    // an internal punch-list. Deliberately isAuth(), not isAthlete(): the
+    // filming tool's users are anonymous, with no users/{uid} doc for
+    // role() to read.
+    match /filmingExercises/{exerciseId} {
+      allow read, write: if isAuth();
+    }
+
     // Facility scheduling: everyone signed in can browse slots (to see
     // availability); only admins create/delete a slot or edit its own
     // fields (date/time/capacity/notes). bookedCount is the one field an
@@ -257,6 +269,132 @@ service cloud.firestore {
     match /settings/{docId} {
       allow read:  if isAdmin() || docId == 'public';
       allow write: if isAdmin();
+    }
+
+    // ------------------------------------------------------------------
+    // Assessment booking (no-account intake for new athletes, added for
+    // the Nov/Dec onboarding wave). Bookers are anonymous Firebase Auth
+    // users (signInAnonymously — no password, no email, no real account),
+    // so isAuth() covers them but isAdmin()/isAthlete() correctly do not.
+    // Same "rules-enforced bounded counter, no Cloud Function" shape as
+    // facilitySlots above, since this project has no Cloud Functions
+    // deployed and this pattern is already the established, proven one
+    // here.
+    //
+    // Restored TWICE now after a separate rules deploy (unrelated to the
+    // booking site) replaced the whole ruleset and silently dropped this
+    // section, taking the live booking site down site-wide: first on
+    // 2026-09-19, again on 2026-09-21 (caught and re-restored 2026-09-22).
+    // If you're about to `firebase deploy --only firestore:rules` from a
+    // checkout that doesn't have this block, you will do that again —
+    // pull the live rules first, don't deploy from a stale local copy.
+    // ------------------------------------------------------------------
+
+    // Slot inventory the coach defines (date/time/capacity). No PII lives
+    // on these docs, so any signed-in caller (anonymous included) can read
+    // them to see what's open. Only an admin edits the inventory itself;
+    // bookedCount can additionally be bumped by exactly +1 by the anonymous
+    // booking flow, mirroring facilitySlots' ±1 pattern but one-directional
+    // (bookers never cancel their own row here — see assessmentBookings).
+    match /assessmentSlots/{slotId} {
+      allow read: if isAuth();
+      allow create, delete: if isAdmin();
+      // +1 (a new booking) only into a slot that's still active and has
+      // room; -1 (a cancel/reschedule releasing this slot) is allowed
+      // regardless of active, since letting a seat go is always safe and
+      // the coach may have since closed the slot out from under it.
+      allow update: if isAdmin() || (
+        isAuth() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['bookedCount']) &&
+        (
+          (request.resource.data.bookedCount == resource.data.bookedCount + 1 &&
+           request.resource.data.bookedCount <= resource.data.capacity &&
+           resource.data.active == true) ||
+          (request.resource.data.bookedCount == resource.data.bookedCount - 1 &&
+           request.resource.data.bookedCount >= 0)
+        )
+      );
+    }
+
+    // The actual booking record — athlete/parent contact info. This is
+    // real PII for people who are not yet accounts, so the collection can
+    // never be listed/enumerated by anyone but the coach. A single
+    // document CAN be fetched by anyone signed in (anonymous included) —
+    // but only if they already know its exact id, which is what makes the
+    // "manage your booking" link work from any device without an account.
+    // A Firestore auto-id has ~119 bits of entropy and is never surfaced
+    // anywhere but that one link, so this is the same trust model as any
+    // other unlisted/private link (a Stripe payment link, an unlisted
+    // video) — safe specifically because list stays admin-only below, so
+    // there's no way to discover an id you weren't given.
+    //
+    // create is intentionally strict and allowlisted field-by-field so a
+    // crafted request can't smuggle in extra fields, flip its own status,
+    // or backdate itself:
+    //  - hp (honeypot) must be sent and must be exactly '' — a hidden
+    //    field real visitors never see or fill; anything else in it means
+    //    a bot filled every input it could find, and the write is rejected.
+    //  - status can only ever be created as 'pending' — never set by the
+    //    client to anything else; only the coach (isAdmin) can change it.
+    //  - createdByUid must equal the caller's own anonymous uid, and
+    //    createdAt must be the server timestamp, not a client-supplied one.
+    //
+    // Self-service update (the manage-link page) is deliberately narrow:
+    // it can only move a booking between 'pending' and 'cancelled', never
+    // touch anything else, and can never reopen a 'converted' record —
+    // once the coach has turned someone into a real account, this link
+    // stops being able to change anything.
+    match /assessmentBookings/{bookingId} {
+      allow get: if isAuth();
+      allow list: if isAdmin();
+      allow create: if isAuth() &&
+        request.resource.data.keys().hasOnly([
+          'slotId', 'athleteName', 'athleteAge', 'parentName', 'parentPhone',
+          'parentEmail', 'notes', 'status', 'createdByUid', 'createdAt', 'hp'
+        ]) &&
+        request.resource.data.hp == '' &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.createdByUid == request.auth.uid &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.slotId is string && request.resource.data.slotId.size() > 0 &&
+        request.resource.data.athleteName is string &&
+        request.resource.data.athleteName.size() > 0 && request.resource.data.athleteName.size() <= 80 &&
+        request.resource.data.parentName is string &&
+        request.resource.data.parentName.size() > 0 && request.resource.data.parentName.size() <= 80 &&
+        request.resource.data.parentPhone is string &&
+        request.resource.data.parentPhone.size() > 0 && request.resource.data.parentPhone.size() <= 30 &&
+        request.resource.data.parentEmail is string && request.resource.data.parentEmail.size() <= 120 &&
+        request.resource.data.athleteAge is string && request.resource.data.athleteAge.size() <= 10 &&
+        request.resource.data.notes is string && request.resource.data.notes.size() <= 500 &&
+        get(/databases/$(database)/documents/assessmentSlots/$(request.resource.data.slotId)).data.active == true;
+      allow update: if isAdmin() || (
+        isAuth() &&
+        resource.data.status != 'converted' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['slotId', 'status', 'updatedAt']) &&
+        request.resource.data.updatedAt == request.time &&
+        (
+          // cancel: status -> 'cancelled', slotId untouched (kept for history)
+          (request.resource.data.status == 'cancelled' &&
+           request.resource.data.slotId == resource.data.slotId) ||
+          // book/rebook/reschedule: status -> 'pending' into a real, active slot
+          (request.resource.data.status == 'pending' &&
+           request.resource.data.slotId is string && request.resource.data.slotId.size() > 0 &&
+           get(/databases/$(database)/documents/assessmentSlots/$(request.resource.data.slotId)).data.active == true)
+        )
+      );
+      allow delete: if isAdmin();
+    }
+
+    // One lock doc per anonymous uid (doc id == the uid), created in the
+    // same client transaction as the booking above. Its rule requires the
+    // doc not already exist, which caps a single anonymous browser
+    // identity to one assessment booking ever — a cheap, real backstop
+    // against one tab spamming the form on repeat submits, on top of the
+    // honeypot above. Not a substitute for App Check, just defense in depth.
+    match /assessmentBookingLocks/{uid} {
+      allow read: if isAdmin() || (isAuth() && request.auth.uid == uid);
+      allow create: if isAuth() && request.auth.uid == uid && !exists(/databases/$(database)/documents/assessmentBookingLocks/$(uid));
+      allow update, delete: if isAdmin();
     }
   }
 }

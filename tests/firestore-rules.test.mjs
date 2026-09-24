@@ -57,6 +57,26 @@ await t('athlete clears booking on deleted slot', async () => {
   await env.withSecurityRulesDisabled(ctx => deleteDoc(doc(ctx.firestore(), 'facilitySlots/s1')))
   await assertSucceeds(deleteDoc(doc(db('ath'), 'facilitySlots/s1/bookings/ath')))
 })
+await t('athlete clears orphaned booking + mirror when slot has been deleted', async () => {
+  // Simulates the state left behind by the pre-25f82c7 deleteFacilitySlot,
+  // which deleted only the slot doc and left bookings + mirrors behind.
+  // cancelFacilityBooking now skips the slot update and receipt when the
+  // slot is gone, so athletes can still clear "My Bookings".
+  await seed({ count: 1, booked: ['ath'] })
+  await env.withSecurityRulesDisabled(async ctx => {
+    const fdb = ctx.firestore()
+    await setDoc(doc(fdb, 'facilityBookingsByAthlete/ath/slots/s1'), { bookedAt: serverTimestamp() })
+    await deleteDoc(doc(fdb, 'facilitySlots/s1'))
+  })
+  const cancelOrphaned = (fs, uid) => runTransaction(fs, async (tx) => {
+    await tx.get(doc(fs, `facilitySlots/s1/bookings/${uid}`))
+    await tx.get(doc(fs, 'facilitySlots/s1'))
+    tx.delete(doc(fs, `facilitySlots/s1/bookings/${uid}`))
+    tx.delete(doc(fs, `facilityBookingsByAthlete/${uid}/slots/s1`))
+    // No slot update and no receipt when the slot is gone (see cancelFacilityBooking)
+  })
+  await assertSucceeds(cancelOrphaned(db('ath'), 'ath'))
+})
 
 // ── exploit #1 ──
 await t('bare +1 without booking denied', async () => { await seed(); await assertFails(updateDoc(doc(db('ath'), 'facilitySlots/s1'), { bookedCount: 1 })) })

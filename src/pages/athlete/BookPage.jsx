@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import {
   getFacilitySlots, getMyFacilityBookings, bookFacilitySlot, cancelFacilityBooking,
@@ -23,12 +23,29 @@ export default function BookPage() {
   const [confirmSlot, setConfirmSlot] = useState(null) // slot pending a cancel confirmation
   // Which Sun–Sat weeks are expanded in Open Times — keyed by that week's
   // Sunday ('YYYY-MM-DD'). Starts empty; once slots load, the soonest week
-  // with anything in it opens automatically (see the effect below) so the
-  // page isn't just a wall of collapsed headers on first load.
+  // with anything in it opens automatically so the page isn't just a wall
+  // of collapsed headers on first load.
   const [expandedWeeks, setExpandedWeeks] = useState(new Set())
-  const [autoExpanded, setAutoExpanded] = useState(false)
+  // Tracks whether the one-time auto-open has fired. A ref (not state) so
+  // updating it doesn't trigger a re-render — this is purely bookkeeping.
+  const autoExpandedRef = useRef(false)
 
   useEffect(() => { if (currentUser) load() }, [currentUser])
+
+  // Auto-open the soonest week the first time slots are available. Runs
+  // whenever slots or myBookingIds change, but the ref guard means the
+  // expansion only fires once — later slot/booking changes (e.g. the
+  // athlete booking a slot) leave the user's manually expanded/collapsed
+  // state alone.
+  useEffect(() => {
+    if (autoExpandedRef.current) return
+    const openSlots = slots.filter(s => !myBookingIds.has(s.id))
+    const weeks = groupByWeek(openSlots)
+    if (weeks.length > 0) {
+      autoExpandedRef.current = true
+      setExpandedWeeks(new Set([weeks[0].weekStart]))
+    }
+  }, [slots, myBookingIds])
 
   async function load() {
     setLoading(true)
@@ -106,13 +123,6 @@ export default function BookPage() {
   const myBookings = slots.filter(s => myBookingIds.has(s.id))
   const openSlots = slots.filter(s => !myBookingIds.has(s.id))
   const weeks = groupByWeek(openSlots)
-
-  // Auto-open the soonest week once, the first time it's known — not on
-  // every render, so the athlete collapsing it back doesn't get overridden.
-  if (!autoExpanded && weeks.length > 0) {
-    setAutoExpanded(true)
-    setExpandedWeeks(new Set([weeks[0].weekStart]))
-  }
 
   return (
     <div className="min-h-[calc(100vh-56px)] bg-sp-ink-900 px-4 py-4 space-y-5 pb-24">

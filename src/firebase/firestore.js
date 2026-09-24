@@ -669,6 +669,16 @@ export const bookFacilitySlot = (slotId, uid, athleteName) =>
 
 // Cancels the athlete's own booking. A no-op (not an error) if they weren't
 // actually booked — callers don't need to special-case that.
+//
+// Two paths:
+//  Slot still exists  — decrement bookedCount, delete booking + mirror, write
+//                       a cancellation receipt (proof the cancellation was real,
+//                       needed by the alert script before it emails the coach).
+//  Slot was deleted   — the coach removed it without cleaning up bookings first
+//                       (the pre-25f82c7 deleteFacilitySlot left orphans). Just
+//                       delete the booking + mirror so "My Bookings" clears; no
+//                       slot to decrement and no receipt needed. The security
+//                       rules' slot-gone branch covers the booking delete.
 export const cancelFacilityBooking = (slotId, uid) =>
   runTransaction(db, async (tx) => {
     const slotRef = doc(db, 'facilitySlots', slotId)
@@ -676,18 +686,19 @@ export const cancelFacilityBooking = (slotId, uid) =>
     const bookingSnap = await tx.get(bookingRef)
     if (!bookingSnap.exists()) return
     const slotSnap = await tx.get(slotRef)
-    const bookedCount = slotSnap.data()?.bookedCount ?? 0
-    const { date, startTime, endTime } = slotSnap.data() || {}
     const mirrorRef = doc(db, 'facilityBookingsByAthlete', uid, 'slots', slotId)
-    // The receipt the alert script checks before emailing a late
-    // cancellation — see facilityCancellations in firestore.rules. Written
-    // here, in the same transaction that deletes the booking, because that
-    // pairing is the whole proof.
-    const receiptRef = doc(db, 'facilityCancellations', uid, 'slots', slotId)
-    tx.update(slotRef, { bookedCount: Math.max(0, bookedCount - 1) })
     tx.delete(bookingRef)
     tx.delete(mirrorRef)
-    tx.set(receiptRef, { cancelledAt: serverTimestamp(), date, startTime, endTime })
+    if (slotSnap.exists()) {
+      const { bookedCount = 0, date, startTime, endTime } = slotSnap.data()
+      // The receipt the alert script checks before emailing a late
+      // cancellation — see facilityCancellations in firestore.rules. Written
+      // here, in the same transaction that deletes the booking, because that
+      // pairing is the whole proof.
+      const receiptRef = doc(db, 'facilityCancellations', uid, 'slots', slotId)
+      tx.update(slotRef, { bookedCount: Math.max(0, bookedCount - 1) })
+      tx.set(receiptRef, { cancelledAt: serverTimestamp(), date, startTime, endTime })
+    }
   })
 
 export const createRecurringSeries = (data) =>

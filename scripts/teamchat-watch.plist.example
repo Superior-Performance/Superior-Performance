@@ -53,8 +53,15 @@
     <string>REPLACE_ME_HANDLE</string>
     <key>TEAM_CHAT_NAME</key>
     <string>REPLACE_ME_DISPLAY_NAME</string>
-    <key>TEAM_CHAT_POLL_MS</key>
-    <string>20000</string>
+    <!-- Poll interval and messages-per-poll are deliberately NOT set here.
+         team-chat-watch.mjs defaults to 10 messages every 2 minutes (~7,200
+         Firestore reads/day). Overriding them in this file is what caused the
+         2026-09-24 outage: 50 messages every 20s is ~216,000 reads/day, four
+         times Spark's 50,000/day free tier, which exhausted the project's
+         quota by mid-morning and stopped the athlete app reading anything.
+         Work out reads/day before you set them:
+           reads/day = TEAM_CHAT_COUNT * 86400 / (TEAM_CHAT_POLL_MS / 1000)
+         and remember every watcher on every machine shares the one quota. -->
   </dict>
 
   <key>StandardOutPath</key>

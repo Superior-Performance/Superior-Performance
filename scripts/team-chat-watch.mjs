@@ -16,7 +16,8 @@
  *   node scripts/team-chat-watch.mjs --once     # single check, for testing
  *
  * Env:
- *   TEAM_CHAT_POLL_MS   poll interval, default 20000
+ *   TEAM_CHAT_POLL_MS   poll interval, default 120000
+ *   TEAM_CHAT_COUNT     messages read per poll, default 10
  *   TEAM_CHAT_HANDLE    agent handle, default atlas
  *   TEAM_CHAT_NAME      display name, default "Atlas"
  *   CLAUDE_BIN          path to the claude CLI
@@ -33,7 +34,20 @@ const execFileAsync = promisify(execFile)
 
 const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const PROMPT_FILE = path.join(PROJECT_DIR, 'scripts', 'team-chat-agent-prompt.md')
-const POLL_MS = Number(process.env.TEAM_CHAT_POLL_MS || 20_000)
+// Every poll is a billed Firestore read PER MESSAGE it looks at, and this
+// process runs all day whether or not anyone is talking. At the old 50
+// messages every 20s that was ~216,000 reads/day against Spark's 50,000/day
+// free tier — the watcher alone exhausted the project's quota by mid-morning
+// and took the athlete app down with it (reads started returning 429
+// RESOURCE_EXHAUSTED on 2026-09-24). 10 messages every 2 minutes is ~7,200/day.
+// If you lower the interval or raise the count, do the multiplication first:
+//   reads/day = TEAM_CHAT_COUNT * 86400 / (TEAM_CHAT_POLL_MS / 1000)
+const POLL_MS = Number(process.env.TEAM_CHAT_POLL_MS || 120_000)
+// How far back a single poll looks. Only has to cover what can pile up
+// between two polls — an unanswered mention older than the newest COUNT
+// messages is missed, so this is the number to raise if the room ever gets
+// busy enough that questions slip past.
+const COUNT = Number(process.env.TEAM_CHAT_COUNT || 10)
 const HANDLE = process.env.TEAM_CHAT_HANDLE || 'atlas'
 const NAME = process.env.TEAM_CHAT_NAME || 'Atlas'
 const MODEL = process.env.TEAM_CHAT_MODEL || ''
@@ -64,7 +78,7 @@ const log = (...parts) => console.log(`[${new Date().toISOString()}]`, ...parts)
 async function pending() {
   const { stdout } = await execFileAsync(
     process.execPath,
-    [path.join('scripts', 'team-chat.mjs'), 'pending', '--handle', HANDLE],
+    [path.join('scripts', 'team-chat.mjs'), 'pending', '--handle', HANDLE, '--count', String(COUNT)],
     { cwd: PROJECT_DIR, env: process.env, maxBuffer: 10 * 1024 * 1024 },
   )
   const parsed = JSON.parse(stdout)
@@ -132,7 +146,7 @@ if (ONCE) {
   process.exit(0)
 }
 
-log(`watching as ${HANDLE} — polling every ${POLL_MS}ms`)
+log(`watching as ${HANDLE} — ${COUNT} messages every ${POLL_MS}ms (~${Math.round(COUNT * 86400 / (POLL_MS / 1000))} Firestore reads/day)`)
 let failures = 0
 for (;;) {
   try {

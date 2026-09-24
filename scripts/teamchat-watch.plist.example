@@ -1,6 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  launchd template for the team-chat watcher.
+  launchd template for the team-chat watcher — OPTIONAL, and off by default.
+
+  You probably do not want this. The normal way to answer the room is:
+
+      npm run teamchat        # check once, reply if anything is waiting, exit
+
+  This template runs the check in a loop forever instead, and a loop bills
+  Firestore reads around the clock whether or not anyone is talking. Running
+  it at 50 messages every 20s is what exhausted the project's daily read
+  quota overnight on 2026-09-24 and left athletes unable to book — see the
+  header of team-chat-watch.mjs. Jake's copy is currently disabled
+  (renamed to .plist.disabled in ~/Library/LaunchAgents).
+
+  If you do want it running, do the arithmetic first:
+
+      reads/day = TEAM_CHAT_COUNT * 86400 / (TEAM_CHAT_POLL_MS / 1000)
+
+  against 50,000/day, shared by every watcher on every machine. The script's
+  defaults (10 messages every 2 minutes, ~7,200/day) are deliberately modest;
+  don't override them here without redoing that sum.
 
   Copy to ~/Library/LaunchAgents/com.superiorperformance.teamchat-watch.plist
   and replace every REPLACE_ME value, then:

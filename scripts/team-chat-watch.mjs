@@ -1,19 +1,28 @@
 #!/usr/bin/env node
 /**
- * Team chat watcher — the event-driven half of the staff room at /admin/team.
+ * Team chat check — answers @-mentions in the staff room at /admin/team.
  *
- * Replaces the hourly scheduled task. The trade the cron made was backwards:
- * it spent a Claude session every hour whether or not anyone had asked
- * anything, and still made you wait up to an hour for a reply. This polls
- * Firestore instead (a tiny query, a few thousand reads a day against a
- * 50k/day free tier) and only spends a session when there is actually a
- * question waiting. Faster AND cheaper, rather than trading one for the other.
+ *   npm run teamchat                            # check once and reply, then exit
+ *   node scripts/team-chat-watch.mjs --once     # the same thing
+ *   node scripts/team-chat-watch.mjs            # continuous polling (see below)
  *
- * It also doesn't need the Claude Code desktop app open — only this process
- * running, which a launchd agent keeps alive across reboots.
+ * ON DEMAND IS THE DEFAULT MODE NOW, and the launchd agent that used to keep
+ * the polling loop alive is disabled (scripts/teamchat-watch.plist.example
+ * says how to re-enable it). Run the check yourself when you want the room
+ * answered.
  *
- *   node scripts/team-chat-watch.mjs            # run in foreground
- *   node scripts/team-chat-watch.mjs --once     # single check, for testing
+ * Why: the header here used to claim polling cost "a few thousand reads a
+ * day against a 50k/day free tier". That was never true. A poll bills one
+ * Firestore read PER MESSAGE it looks at, and at 50 messages every 20s the
+ * loop cost ~216,000 reads/day — it ate the project's entire daily quota
+ * overnight, with nobody awake, and every read the athlete app tried then
+ * failed with 429. Athletes got "could not book that slot" on every slot for
+ * about a week before anyone connected the two (2026-09-24).
+ *
+ * A check only costs anything when someone actually runs it, which is the
+ * shape this should have had from the start: the room is not urgent, and a
+ * background process that bills by the second to watch a room nobody is
+ * talking in is a bad trade at any interval.
  *
  * Env:
  *   TEAM_CHAT_POLL_MS   poll interval, default 120000
@@ -141,9 +150,23 @@ async function tick() {
 }
 
 if (ONCE) {
-  const did = await tick()
-  log(did ? 'handled' : 'nothing pending')
-  process.exit(0)
+  // This is the mode a human runs, so a failure has to read like a sentence
+  // rather than a stack trace. The loop below can afford to throw and retry;
+  // this can't — there's nobody to retry it but you.
+  try {
+    const did = await tick()
+    log(did ? 'handled' : 'nothing pending')
+    process.exit(0)
+  } catch (err) {
+    const detail = String(err.stderr || err.message || err)
+    if (detail.includes('429') || detail.includes('Quota exceeded')) {
+      log("Firestore's daily read quota is gone, so the room can't be read.")
+      log('It resets at midnight Pacific. Nothing is broken — try again after that.')
+    } else {
+      log('check failed:', detail.split('\n')[0])
+    }
+    process.exit(1)
+  }
 }
 
 log(`watching as ${HANDLE} — ${COUNT} messages every ${POLL_MS}ms (~${Math.round(COUNT * 86400 / (POLL_MS / 1000))} Firestore reads/day)`)

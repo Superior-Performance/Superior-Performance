@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  getAllAthletes, getAllPrograms, getCompletions, getDataLogs, setDataLogFlag,
-  getExerciseWeights, getChatMessages, getAllChatReads, getAthleteGroups,
+  getAllAthletes, getAllPrograms, setDataLogFlag, getChatMessages, getAllChatReads, getAthleteGroups,
+  getCompletionsForPrograms, getFlaggedDataLogs,
+  getLatestCompletionAt, getLatestWeightAt, getLatestDataLogAt,
 } from '../../firebase/firestore'
 import { buildSlots, isSlotComplete, countProgramProgress } from '../../utils/programIds'
 import { computeStreak } from '../../utils/programSchedule'
@@ -59,22 +60,28 @@ function athleteProgress(programs, completions) {
   return total ? Math.round((done / total) * 100) : null
 }
 
-function lastActivityMillis(completionsSnap, logsSnap, weightsSnap) {
-  let max = 0
-  completionsSnap.forEach(d => { const t = d.data().completedAt?.toMillis?.(); if (t && t > max) max = t })
-  logsSnap.forEach(d => { const t = d.data().createdAt?.toMillis?.(); if (t && t > max) max = t })
-  // Logging a working weight inline on a lift (WeightField, SchedulePage) is
-  // real engagement too — without this, an athlete who tracks weights but
-  // rarely taps the completion checkmark reads as "Inactive" despite
-  // training every session. See saveExerciseWeight in firebase/firestore.js.
-  weightsSnap.forEach(d => { const t = d.data().updatedAt?.toMillis?.(); if (t && t > max) max = t })
-  return max || null
+// The three recency probes each come back holding at most one document — the
+// newest — because that is all "when did this athlete last do anything?"
+// needs. Reading an athlete's whole history to find one max was most of what
+// made this page expensive.
+//
+// Logging a working weight inline on a lift (WeightField, SchedulePage) is
+// real engagement too — without the weights probe, an athlete who tracks
+// weights but rarely taps the completion checkmark reads as "Inactive"
+// despite training every session. See saveExerciseWeight in
+// firebase/firestore.js.
+function lastActivityMillis(latestCompletion, latestLog, latestWeight) {
+  const at = (snap, field) => snap?.docs?.[0]?.data()?.[field]?.toMillis?.() || 0
+  return Math.max(
+    at(latestCompletion, 'completedAt'),
+    at(latestLog, 'createdAt'),
+    at(latestWeight, 'updatedAt'),
+  ) || null
 }
 
-// Stands in for a completions snapshot when it's skipped entirely (see
-// below) so the row-building loop doesn't need a separate no-completions
-// code path — it just iterates zero docs.
-const EMPTY_SNAPSHOT = { forEach: () => {} }
+// Stands in for a snapshot that's skipped entirely (see below) so the
+// row-building loop doesn't need a separate absent-data code path.
+const EMPTY_SNAPSHOT = { docs: [], forEach: () => {} }
 
 // This page fans out to Firestore reads per athlete (completions, data
 // logs, chat messages) — real latency on a roster of any size, and it's now
@@ -129,14 +136,21 @@ export default function AdminDashboardPage() {
         activeProgramsByAthlete[a.id] = allPrograms.filter(p => p.athleteId === a.id && p.active === true)
       })
 
-      const [completionsSnaps, weightsSnaps, logsSnaps, messagesSnaps] = await Promise.all([
+      const [completionsByAthlete, weightsSnaps, logsSnaps, flaggedSnaps, completionRecency, messagesSnaps] = await Promise.all([
+        // Scoped to the programs this athlete is actually on. Finished blocks
+        // keep their completion docs forever, and this page has no use for
+        // them — progress is only ever counted against active programs.
         Promise.all(athletes.map(a =>
-          activeProgramsByAthlete[a.id].length > 0 ? getCompletions(a.id) : Promise.resolve(EMPTY_SNAPSHOT)
+          getCompletionsForPrograms(a.id, activeProgramsByAthlete[a.id].map(p => p.id))
         )),
         Promise.all(athletes.map(a =>
-          activeProgramsByAthlete[a.id].length > 0 ? getExerciseWeights(a.id) : Promise.resolve(EMPTY_SNAPSHOT)
+          activeProgramsByAthlete[a.id].length > 0 ? getLatestWeightAt(a.id) : Promise.resolve(EMPTY_SNAPSHOT)
         )),
-        Promise.all(athletes.map(a => getDataLogs(a.id))),
+        Promise.all(athletes.map(a => getLatestDataLogAt(a.id))),
+        Promise.all(athletes.map(a => getFlaggedDataLogs(a.id))),
+        Promise.all(athletes.map(a =>
+          activeProgramsByAthlete[a.id].length > 0 ? getLatestCompletionAt(a.id) : Promise.resolve(EMPTY_SNAPSHOT)
+        )),
         // Narrowed to "created after this athlete's chatReads.lastReadAt" —
         // an established thread with months of history only ever pulls
         // back what might actually be unread, not the whole conversation.
@@ -150,16 +164,15 @@ export default function AdminDashboardPage() {
         const activePrograms = activeProgramsByAthlete[athlete.id]
         const draftCount = athletePrograms.filter(p => p.active === false && !p.archived).length
 
-        const completions = {}
-        completionsSnaps[i].forEach(d => { completions[d.id] = d.data() })
-        const logs = logsSnaps[i].docs.map(d => ({ id: d.id, ...d.data() }))
+        const completions = completionsByAthlete[i]
+        const flaggedLogs = flaggedSnaps[i].docs.map(d => ({ id: d.id, ...d.data() }))
 
-        logs.filter(l => l.flagged).forEach(entry => {
+        flaggedLogs.forEach(entry => {
           flaggedFeed.push({ athleteId: athlete.id, athleteName: athlete.name, entry })
         })
 
         const pct = athleteProgress(activePrograms, completions)
-        const lastActivityMs = lastActivityMillis(completionsSnaps[i], logsSnaps[i], weightsSnaps[i])
+        const lastActivityMs = lastActivityMillis(completionRecency[i], logsSnaps[i], weightsSnaps[i])
         const inactive = activePrograms.length > 0 &&
           (!lastActivityMs || Date.now() - lastActivityMs > INACTIVE_DAYS * 86400000)
         const behind = pct != null && pct < BEHIND_THRESHOLD
@@ -179,7 +192,7 @@ export default function AdminDashboardPage() {
         return {
           athlete, activePrograms, draftCount,
           pct, lastActivityMs, inactive, behind,
-          flagCount: logs.filter(l => l.flagged).length,
+          flagCount: flaggedLogs.length,
           unreadCount: unreadMessages.length,
         }
       })

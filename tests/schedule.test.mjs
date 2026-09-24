@@ -8,6 +8,7 @@ const { computeTodayPosition, dayStats, dayStatsByType, dayCountForWeek, dayInde
 const { compactWeeks, estimateBytes, sizeStatus, FIRESTORE_DOC_LIMIT } = await import(`${ROOT}src/utils/programSize.js`)
 const { matchesGroupFilter, groupsOf, suggestGroupColor, ALL_GROUPS, UNGROUPED } = await import(`${ROOT}src/constants/athleteGroups.js`)
 const { buildProgramWeeksFromRows, parseWeekOrDayRange } = await import(`${ROOT}src/utils/sheetRows.js`)
+const { countProgramProgress, completionKey } = await import(`${ROOT}src/utils/programIds.js`)
 const { assertReadable, redactDoc, collectionSegments, REDACTED } = await import(`${ROOT}scripts/lib/data-policy.mjs`)
 const { snapshotKeyFor, diffAssessments, numericSeries, trendableFields, sortByDateDesc } = await import(`${ROOT}src/utils/assessmentHistory.js`)
 const { ALL_FIELDS, RETIRED_FIELDS, SHEET_COLUMNS, isFlaggedValue, flaggedFindings, computeTotalArcs, TOTAL_ARCS } = await import(`${ROOT}src/constants/assessmentFields.js`)
@@ -472,6 +473,49 @@ t('an athlete with no programs gets nothing, not the library', () => {
 })
 t('a missing athleteId matches nobody, including undefined', () => {
   eq(activeProgramsForAthlete(mixed, undefined), [])
+})
+
+// ── the dashboard reads only the ACTIVE programs' completions ───────────────
+// AdminDashboardPage used to fetch an athlete's entire completions
+// subcollection — every tick from every block they had ever finished — to
+// draw one progress bar. getCompletionsForPrograms now fetches only the keys
+// belonging to the programs they're on now, which is what makes that page's
+// cost stop growing with an athlete's history.
+//
+// Safe only because progress is counted by looking up keys built from the
+// ACTIVE program's id (see isSlotComplete), so a finished block's docs were
+// fetched and then never consulted. These pin that: the extra documents make
+// no difference to the answer, and dropping them changes nothing.
+const progProgram = {
+  id: 'prog-now',
+  weeks: [{ days: [{ exercises: [
+    { id: 'e1', name: 'A' }, { id: 'e2', name: 'B' }, { id: 'e3', name: 'C' }, { id: 'e4', name: 'D' },
+  ] }] }],
+}
+const doneNow = {
+  [completionKey('prog-now', 'e1')]: { completed: true },
+  [completionKey('prog-now', 'e2')]: { completed: true },
+}
+// What the old query also dragged back: ticks from blocks long since finished.
+const historical = {
+  [completionKey('prog-finished-1', 'e1')]: { completed: true },
+  [completionKey('prog-finished-1', 'e2')]: { completed: true },
+  [completionKey('prog-finished-2', 'e9')]: { completed: true },
+}
+
+t('progress is identical with and without finished blocks in the map', () => {
+  const scoped = countProgramProgress(doneNow, progProgram, 0)
+  const everything = countProgramProgress({ ...doneNow, ...historical }, progProgram, 0)
+  eq(scoped, everything)
+})
+t('progress counts only the active program\'s ticks', () => {
+  eq(countProgramProgress(doneNow, progProgram, 0), { total: 4, done: 2 })
+})
+t('a finished block alone contributes nothing to the current program', () => {
+  eq(countProgramProgress(historical, progProgram, 0), { total: 4, done: 0 })
+})
+t('an untouched active program reads as zero done, not as missing', () => {
+  eq(countProgramProgress({}, progProgram, 0), { total: 4, done: 0 })
 })
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

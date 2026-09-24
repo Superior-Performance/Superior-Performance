@@ -28,7 +28,7 @@
 import {
   collection, doc, getDoc, getDocs, setDoc, addDoc,
   updateDoc, deleteDoc, query, where, orderBy, limit, onSnapshot,
-  serverTimestamp, Timestamp, writeBatch, runTransaction, arrayUnion, arrayRemove,
+  serverTimestamp, Timestamp, writeBatch, runTransaction, arrayUnion, arrayRemove, documentId,
 } from 'firebase/firestore'
 import { getStorage, ref as storageRef, deleteObject } from 'firebase/storage'
 import { auth, db } from './config'
@@ -471,6 +471,70 @@ export const migrateCompletionKeys = async (uid, remaps) => {
 
 export const getCompletions = (uid) =>
   getDocs(collection(db, 'completions', uid, 'weeks'))
+
+// ── dashboard-shaped reads ───────────────────────────────────────────────────
+// The admin dashboard asks about every athlete at once, so anything it reads
+// per athlete gets multiplied by the roster. It used to call getCompletions,
+// getDataLogs and getExerciseWeights — all three unbounded — and pull an
+// athlete's ENTIRE history to compute a progress bar and a "last active"
+// date. At 20 athletes that was ~4,800 document reads for one page load,
+// against a 50,000/day free tier, and it grew every week because completion
+// docs are never pruned.
+//
+// These return the same answers from the smallest query that can produce
+// them. Nothing here is denormalised: there is no summary doc to drift out
+// of step with the truth, which this codebase has already been bitten by
+// (see the programTypes flag). The cost is more queries, not more reads —
+// Firestore bills documents returned, and these return one row each.
+
+/** Newest completion timestamp, or null. One document, not the history. */
+export const getLatestCompletionAt = (uid) =>
+  getDocs(query(collection(db, 'completions', uid, 'weeks'), orderBy('completedAt', 'desc'), limit(1)))
+
+/** Newest logged working weight. Only ever used as a recency signal. */
+export const getLatestWeightAt = (uid) =>
+  getDocs(query(collection(db, 'exerciseWeights', uid, 'entries'), orderBy('updatedAt', 'desc'), limit(1)))
+
+/** Newest data-log entry, for the same recency signal. */
+export const getLatestDataLogAt = (uid) =>
+  getDocs(query(collection(db, 'dataLogs', uid, 'entries'), orderBy('createdAt', 'desc'), limit(1)))
+
+/**
+ * Just the flagged notes — what the dashboard's flag feed and flag count
+ * actually need. Reading every entry to keep the few that are flagged was
+ * the second-biggest line on that page.
+ */
+export const getFlaggedDataLogs = (uid) =>
+  getDocs(query(collection(db, 'dataLogs', uid, 'entries'), where('flagged', '==', true)))
+
+/**
+ * Completion docs belonging to specific programs, and no others.
+ *
+ * Completion ids are `${programId}_${exerciseId}` (completionKey in
+ * utils/programIds), so a document-id range per program fetches exactly that
+ * program's ticks. This is the part that stops the dashboard getting slower
+ * and more expensive every month: progress is only ever computed for the
+ * programs an athlete is on NOW, but the old query also dragged in every
+ * finished block they had ever done.
+ *
+ * One query per program — they run in parallel and each returns only its own
+ * rows, so the reads are the completions that actually get used.
+ */
+export const getCompletionsForPrograms = async (uid, programIds) => {
+  if (!programIds?.length) return {}
+  const snaps = await Promise.all(programIds.map(pid =>
+    getDocs(query(
+      collection(db, 'completions', uid, 'weeks'),
+      where(documentId(), '>=', `${pid}_`),
+      // \uf8ff sorts above any character that can appear in an exercise id,
+      // so this is "every key starting with `${pid}_`" and nothing after it.
+      where(documentId(), '<', `${pid}_\uf8ff`),
+    ))
+  ))
+  const out = {}
+  snaps.forEach(snap => snap.forEach(d => { out[d.id] = d.data() }))
+  return out
+}
 
 export const subscribeCompletions = (uid, callback) =>
   onSnapshot(collection(db, 'completions', uid, 'weeks'), callback)

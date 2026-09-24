@@ -169,8 +169,20 @@ export const getProgramForAthlete = (athleteId) =>
 
 // Pass `active: false` to create a draft — tied to an athlete (athleteId) but
 // not yet visible to them, since getProgramForAthlete only returns active ones.
+// `archived` is written explicitly rather than left absent because Firestore
+// cannot query for a field that isn't there: `where('archived','==',false)`
+// silently skips every document missing it. Archived programs are the part of
+// this collection that grows without bound — one more per athlete each time a
+// block is superseded — so being able to exclude them in the query is what
+// keeps the roster's read cost flat. See scripts/backfill-archived-flag.mjs
+// for the docs created before this default existed.
 export const createProgram = (data) =>
-  addDoc(collection(db, 'programs'), { ...data, createdAt: serverTimestamp(), active: data.active ?? true })
+  addDoc(collection(db, 'programs'), {
+    ...data,
+    createdAt: serverTimestamp(),
+    active: data.active ?? true,
+    archived: data.archived ?? false,
+  })
 
 // Reads a program straight from Firestore. Needed where a stale copy would be
 // wrong rather than merely old — publishing clones the program, and cloning
@@ -205,6 +217,31 @@ export const getProgramsForAthlete = (athleteId) =>
 // enough that sorting client-side after the fetch is simpler than managing one.
 export const getGeneralPrograms = () =>
   getDocs(query(collection(db, 'programs'), where('athleteId', '==', null)))
+
+/**
+ * Programs that belong to an athlete — what the admin dashboard's roster is
+ * built from.
+ *
+ * getAllPrograms reads the entire collection: every reusable template, and
+ * every archived block every athlete has ever finished. The dashboard uses
+ * none of those (it filters to `p.athleteId === athlete.id`, and a template
+ * has no athleteId), so they were read and thrown away.
+ *
+ * No orderBy: an inequality filter forces the first sort onto that same
+ * field, which would mean a composite index for an ordering the dashboard
+ * doesn't use — it groups by athlete itself.
+ *
+ * Documents with no athleteId at all — templates from before the field was
+ * written as null — are excluded too, which is correct: they belong to
+ * nobody, so no roster row would have matched them.
+ *
+ * NOTE: this does not yet exclude archived programs, which are the part that
+ * actually grows. That needs `where('archived','==',false)`, which is only
+ * safe once every document has the field — run
+ * scripts/backfill-archived-flag.mjs first, then add the filter here.
+ */
+export const getAssignedPrograms = () =>
+  getDocs(query(collection(db, 'programs'), where('athleteId', '!=', null)))
 
 export const deleteProgram = (programId) =>
   deleteDoc(doc(db, 'programs', programId))
@@ -552,10 +589,21 @@ export const sendChatMessage = (athleteUid, message) =>
     createdAt: serverTimestamp(),
   })
 
+// A coach<->athlete thread runs for as long as the athlete trains here and is
+// never trimmed, and an onSnapshot with no limit re-delivers the whole thing
+// on every open AND on every reconnect — a laptop waking from sleep re-reads
+// a year of messages. Same window and the same reasoning as TEAM_CHAT_WINDOW
+// above; neither chat view paginates, so nothing below the newest screenful
+// is ever looked at.
+export const CHAT_WINDOW = 200
+
+// Newest-first from Firestore so the limit keeps the RECENT window rather
+// than the oldest 200, reversed before handing back so callers still render
+// oldest-to-newest the way a conversation reads.
 export const subscribeChatMessages = (athleteUid, callback) =>
   onSnapshot(
-    query(collection(db, 'chats', athleteUid, 'messages'), orderBy('createdAt')),
-    (snap) => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+    query(collection(db, 'chats', athleteUid, 'messages'), orderBy('createdAt', 'desc'), limit(CHAT_WINDOW)),
+    (snap) => callback(snap.docs.map(d => ({ id: d.id, ...d.data() })).reverse()),
   )
 
 // One-time (non-subscribing) read of a thread — for the dashboard's roster

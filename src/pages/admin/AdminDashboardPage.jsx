@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  getAllAthletes, getAllPrograms, setDataLogFlag, getChatMessages, getAllChatReads, getAthleteGroups,
+  getAllAthletes, getAssignedPrograms, setDataLogFlag, getChatMessages, getAllChatReads, getAthleteGroups,
   getCompletionsForPrograms, getFlaggedDataLogs,
   getLatestCompletionAt, getLatestWeightAt, getLatestDataLogAt,
 } from '../../firebase/firestore'
@@ -120,7 +120,7 @@ export default function AdminDashboardPage() {
       // wave 1 instead of waiting for it — one fewer round trip in the
       // critical path.
       const [athletesSnap, programsSnap, chatReadsSnap, groupsSnap] = await Promise.all([
-        getAllAthletes(), getAllPrograms(), getAllChatReads(), getAthleteGroups(),
+        getAllAthletes(), getAssignedPrograms(), getAllChatReads(), getAthleteGroups(),
       ])
       setGroups(groupsSnap.docs.map(d => ({ id: d.id, ...d.data() })))
       const athletes = athletesSnap.docs.map(d => ({ id: d.id, ...d.data() }))

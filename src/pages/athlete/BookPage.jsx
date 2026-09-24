@@ -14,6 +14,34 @@ import ConfirmDialog from '../../components/ConfirmDialog'
 
 const todayStr = () => format(new Date(), 'yyyy-MM-dd')
 
+// What to tell the athlete when a booking write fails for a reason that isn't
+// about this slot.
+//
+// These all used to collapse into "Could not book that slot.", which reads as
+// "something about this slot is wrong" and sent athletes hunting for a
+// different time. In fact the most common cause has nothing to do with the
+// slot: the project runs on Firestore's free tier, and when the day's read
+// quota is gone EVERY read fails, including the one bookFacilitySlot does
+// first — so every athlete gets the same message on every slot until the
+// quota resets at midnight Pacific.
+//
+// Worth keeping these distinct: "try again in a bit" is true and actionable
+// for a quota/outage, and is the wrong advice for a permissions problem,
+// which will never fix itself.
+function bookingErrorMessage(err, verb) {
+  switch (err?.code) {
+    case 'resource-exhausted':
+      return `Booking is temporarily unavailable. Try again a bit later — if it's still failing tomorrow, tell your coach.`
+    case 'unavailable':
+    case 'deadline-exceeded':
+      return `Couldn't reach the booking system — check your connection and try again.`
+    case 'permission-denied':
+      return `Your account isn't allowed to ${verb} this. Ask your coach to check your profile.`
+    default:
+      return null
+  }
+}
+
 export default function BookPage() {
   const { currentUser, userProfile } = useAuth()
   const [slots, setSlots] = useState([])
@@ -75,9 +103,10 @@ export default function BookPage() {
       // not touch the booking the athlete just made.
       notifyFacilityBooking({ slotId: slot.id })
     } catch (err) {
+      console.error('Booking failed:', err)
       if (err.message === 'FULL') toast.error('That slot just filled up.')
       else if (err.message === 'ALREADY_BOOKED') toast.error('You already have this one booked.')
-      else toast.error('Could not book that slot.')
+      else toast.error(bookingErrorMessage(err, 'book') || 'Could not book that slot.')
       load() // resync — our optimistic state may be stale (e.g. it just filled)
     } finally {
       setBookingId(null)
@@ -94,8 +123,9 @@ export default function BookPage() {
       // Fire-and-forget: the script only actually emails the coach when the
       // session is inside 24h (late cancel); earlier cancels are silent.
       notifyFacilityBooking({ kind: 'cancellation', slotId: slot.id })
-    } catch {
-      toast.error('Could not cancel that booking.')
+    } catch (err) {
+      console.error('Cancellation failed:', err)
+      toast.error(bookingErrorMessage(err, 'cancel') || 'Could not cancel that booking.')
     } finally {
       setBookingId(null)
     }

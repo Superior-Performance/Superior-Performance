@@ -235,13 +235,24 @@ export const getGeneralPrograms = () =>
  * written as null — are excluded too, which is correct: they belong to
  * nobody, so no roster row would have matched them.
  *
- * NOTE: this does not yet exclude archived programs, which are the part that
- * actually grows. That needs `where('archived','==',false)`, which is only
- * safe once every document has the field — run
- * scripts/backfill-archived-flag.mjs first, then add the filter here.
+ * Archived programs are excluded too — they are the only part of this
+ * collection that grows without bound, one more per athlete every time a
+ * block is superseded, and the roster never looks at them. That filter needs
+ * every document to actually carry the field, since Firestore cannot match
+ * one that is absent; scripts/backfill-archived-flag.mjs did the documents
+ * that predate createProgram writing it, and it reports 0 remaining.
+ *
+ * Needs the (archived, athleteId) composite index in firestore.indexes.json.
+ * Deploy the index BEFORE this query ships: a query against an index that is
+ * still building returns nothing rather than failing, which here would read
+ * as every athlete having no program at all.
  */
 export const getAssignedPrograms = () =>
-  getDocs(query(collection(db, 'programs'), where('athleteId', '!=', null)))
+  getDocs(query(
+    collection(db, 'programs'),
+    where('archived', '==', false),
+    where('athleteId', '!=', null),
+  ))
 
 export const deleteProgram = (programId) =>
   deleteDoc(doc(db, 'programs', programId))

@@ -362,6 +362,8 @@ const HERO_CLIPS = [
   { src: '/videos/hero-release-2.mp4', poster: '/videos/hero-release-2-poster.jpg' },
   { src: '/videos/hero-release-3.mp4', poster: '/videos/hero-release-3-poster.jpg' },
   { src: '/videos/hero-release-4.mp4', poster: '/videos/hero-release-4-poster.jpg' },
+  { src: '/videos/hero-release-5.mp4', poster: '/videos/hero-release-5-poster.jpg' },
+  { src: '/videos/hero-release-6.mp4', poster: '/videos/hero-release-6-poster.jpg' },
 ]
 
 function HeroVideo() {

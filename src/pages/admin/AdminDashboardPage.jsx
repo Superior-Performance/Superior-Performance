@@ -14,6 +14,7 @@ import toast from 'react-hot-toast'
 import EmptyState from '../../components/EmptyState'
 import GroupFilterBar from '../../components/GroupFilterBar'
 import ManageGroupsModal from '../../components/ManageGroupsModal'
+import DaySchedule from '../../components/DaySchedule'
 import { ALL_GROUPS, matchesGroupFilter, groupsOf, groupColor } from '../../constants/athleteGroups'
 
 // Below this elapsed-completion % an athlete shows as "Behind" — elapsed
@@ -280,6 +281,11 @@ export default function AdminDashboardPage() {
           <p className="text-sp-ink-300 text-sm">What needs your attention today</p>
         </div>
       </div>
+
+      {/* Who's in the building, before anything that needs chasing — it's the
+          thing a coach checks first and it doesn't depend on the roster
+          fan-out below, so it paints immediately. */}
+      <DaySchedule />
 
       <GroupFilterBar
         groups={groups}

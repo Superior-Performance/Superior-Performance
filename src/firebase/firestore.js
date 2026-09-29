@@ -763,6 +763,23 @@ export const deleteFacilitySlot = async (slotId) => {
 export const getFacilitySlots = (fromDate) =>
   getDocs(query(collection(db, 'facilitySlots'), where('date', '>=', fromDate), orderBy('date'), orderBy('startTime')))
 
+/**
+ * One day's slots, earliest first — what the coach's daily schedule is built
+ * from.
+ *
+ * getFacilitySlots(fromDate) returns everything from that date onward, which
+ * is right for the athlete's "what can I book" list and wrong for "who is in
+ * the building today": it would read a couple of months of slots to show
+ * this afternoon's four. Same (date, startTime) composite index as that
+ * query, so this needed no new index.
+ */
+export const getSlotsForDate = (date) =>
+  getDocs(query(
+    collection(db, 'facilitySlots'),
+    where('date', '==', date),
+    orderBy('startTime'),
+  ))
+
 export const getSlotBookings = (slotId) =>
   getDocs(collection(db, 'facilitySlots', slotId, 'bookings'))
 

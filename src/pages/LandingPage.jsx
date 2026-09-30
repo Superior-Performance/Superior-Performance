@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Menu, X } from 'lucide-react'
 import Logo from '../components/Logo'
+import { SHOW_LEGAL_PAGES } from '../config/legalPages'
 import { C, DISPLAY, BODY, MONO, HAIRLINE, HAIRLINE_STRONG, hatch, eyebrow, h2Style } from './landing/theme'
 import { Reveal, CountUp } from './landing/motion'
 import RequestForm from './landing/RequestForm'
@@ -664,13 +665,15 @@ function Footer() {
         <span style={{ ...footerLinkStyle, letterSpacing: '.1em' }}>
           © {new Date().getFullYear()} Superior Performance · <a href="mailto:superiorperformance.sp@gmail.com" className="lp-link lp-focus" style={{ color: 'inherit' }}>superiorperformance.sp@gmail.com</a>
         </span>
-        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-          {[['Privacy Policy', '/privacy'], ['Terms & Conditions', '/terms'], ['Refund Policy', '/refund-policy']].map(([label, to]) => (
-            <Link key={to} to={to} className="lp-link lp-focus" style={{ ...footerLinkStyle, letterSpacing: '.1em' }}>
-              {label}
-            </Link>
-          ))}
-        </div>
+        {SHOW_LEGAL_PAGES && (
+          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+            {[['Privacy Policy', '/privacy'], ['Terms & Conditions', '/terms'], ['Refund Policy', '/refund-policy']].map(([label, to]) => (
+              <Link key={to} to={to} className="lp-link lp-focus" style={{ ...footerLinkStyle, letterSpacing: '.1em' }}>
+                {label}
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
     </footer>
   )

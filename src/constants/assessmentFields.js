@@ -12,9 +12,9 @@
  * their column forever, empty, because deleting one shifts every cell to its
  * right on every future row.
  */
-export const PASS_FAIL = ['Pass', 'Fail']
-export const YES_NO = ['Yes', 'No']
-export const FULL_LIMITED_SIDES = ['Full', 'Limited (bilateral)', 'Limited (left)', 'Limited (right)']
+const PASS_FAIL = ['Pass', 'Fail']
+const YES_NO = ['Yes', 'No']
+const FULL_LIMITED_SIDES = ['Full', 'Limited (bilateral)', 'Limited (left)', 'Limited (right)']
 
 export const FIELD_GROUPS = [
   {
@@ -168,7 +168,7 @@ export const SHEET_COLUMNS = [
  * clinical judgement in front of a coach. Add them to FLAG_THRESHOLDS when
  * they land.
  */
-export const FLAG_VALUE_PATTERNS = [/limited/i, /^fail$/i, /^yes$/i, /compressed/i, /flared?$/i, /^mild/i]
+const FLAG_VALUE_PATTERNS = [/limited/i, /^fail$/i, /^yes$/i, /compressed/i, /flared?$/i, /^mild/i]
 
 /** key -> { max } or { min }: a degree reading outside this counts as flagged. */
 export const FLAG_THRESHOLDS = {}

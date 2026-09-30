@@ -109,11 +109,6 @@ export function isSlotComplete(completions, programId, slot, wi, di) {
   return slot.items.some(({ ex, i }) => isExerciseComplete(completions, programId, ex, wi, di, i))
 }
 
-/** Count completed slots in a day (an either/or pair counts as one). */
-export function countDayComplete(completions, programId, day, wi, di) {
-  return buildSlots(day?.exercises).filter(slot => isSlotComplete(completions, programId, slot, wi, di)).length
-}
-
 /**
  * Walk a program and total up slots vs completed. Used by the progress
  * rings, which sum across all of an athlete's concurrent programs.

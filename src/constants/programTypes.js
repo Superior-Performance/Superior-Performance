@@ -45,7 +45,7 @@ export const EXERCISE_CATEGORIES = [
   { key: 'Recovery Day Plyos',     label: 'Recovery Day Plyos',     shortLabel: 'Plyos', icon: 'Flame', badgeClass: 'bg-purple-50 text-purple-700', dotClass: 'bg-purple-500', aliases: ['Recovery Plyo', 'Recovery Plyos'] },
 ]
 
-export const CATCH_PLAY_INFO = { key: 'Catch Play', label: 'Catch Play', icon: 'CircleDot', badgeClass: 'bg-indigo-50 text-indigo-700', dotClass: 'bg-indigo-500' }
+const CATCH_PLAY_INFO = { key: 'Catch Play', label: 'Catch Play', icon: 'CircleDot', badgeClass: 'bg-indigo-50 text-indigo-700', dotClass: 'bg-indigo-500' }
 
 // College Remote Athlete Mode's four fixed day types (see AdminAthleteDetail
 // and SchedulePage). A day in ANY of the athlete's active programs
@@ -69,10 +69,6 @@ export const DAY_TYPES = [
   { key: 'synergy',     label: 'Synergy Day',      icon: 'Sparkles' },
   { key: 'recovery',    label: 'Recovery Day',     icon: 'Moon' },
 ]
-
-export function dayTypeInfo(key) {
-  return DAY_TYPES.find(t => t.key === key) || null
-}
 
 // Matches a raw "Day" column value from the Outputs sheet against the day
 // type labels, case/whitespace-insensitively. Returns the day type key, or
@@ -105,10 +101,6 @@ export const LIFTING_DAY_TYPES = [
   { key: 'upper_2', label: 'Upper Day 2', icon: 'Dumbbell' },
   { key: 'lower_2', label: 'Lower Day 2', icon: 'Dumbbell' },
 ]
-
-export function liftingDayTypeInfo(key) {
-  return LIFTING_DAY_TYPES.find(t => t.key === key) || null
-}
 
 // Mirrors matchDayType above, against LIFTING_DAY_TYPES instead of
 // DAY_TYPES — used only when pulling a `lifting` program from the sheet.

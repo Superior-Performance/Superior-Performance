@@ -7,6 +7,7 @@ import LoginPage from './pages/LoginPage'
 import PrivacyPolicyPage from './pages/legal/PrivacyPolicyPage'
 import TermsPage from './pages/legal/TermsPage'
 import RefundPolicyPage from './pages/legal/RefundPolicyPage'
+import { SHOW_LEGAL_PAGES } from './config/legalPages'
 
 // Athlete pages
 import AthleteLayout from './pages/athlete/AthleteLayout'
@@ -59,10 +60,10 @@ export default function App() {
       {/* Landing */}
       <Route path="/" element={<LandingPage />} />
 
-      {/* Legal */}
-      <Route path="/privacy" element={<PrivacyPolicyPage />} />
-      <Route path="/terms" element={<TermsPage />} />
-      <Route path="/refund-policy" element={<RefundPolicyPage />} />
+      {/* Legal — off unless VITE_SHOW_LEGAL_PAGES=1, see config/legalPages */}
+      {SHOW_LEGAL_PAGES && <Route path="/privacy" element={<PrivacyPolicyPage />} />}
+      {SHOW_LEGAL_PAGES && <Route path="/terms" element={<TermsPage />} />}
+      {SHOW_LEGAL_PAGES && <Route path="/refund-policy" element={<RefundPolicyPage />} />}
 
       {/* Login */}
       <Route

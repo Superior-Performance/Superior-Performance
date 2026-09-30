@@ -606,7 +606,7 @@ export const sendChatMessage = (athleteUid, message) =>
 // a year of messages. Same window and the same reasoning as TEAM_CHAT_WINDOW
 // above; neither chat view paginates, so nothing below the newest screenful
 // is ever looked at.
-export const CHAT_WINDOW = 200
+const CHAT_WINDOW = 200
 
 // Newest-first from Firestore so the limit keeps the RECENT window rather
 // than the oldest 200, reversed before handing back so callers still render
@@ -706,14 +706,6 @@ export const saveExerciseWeight = (uid, key, data) =>
 
 export const subscribeExerciseWeights = (uid, callback) =>
   onSnapshot(collection(db, 'exerciseWeights', uid, 'entries'), callback)
-
-// One-time (non-subscribing) read — for the admin dashboard's per-athlete
-// fan-out, where logging a working weight inline needs to count as activity
-// alongside completions and data logs (see lastActivityMillis in
-// AdminDashboardPage.jsx). subscribeExerciseWeights above is for the
-// athlete's own live-updating schedule view.
-export const getExerciseWeights = (uid) =>
-  getDocs(collection(db, 'exerciseWeights', uid, 'entries'))
 
 // ── Facility scheduling ──────────────────────────────────────────────────────
 // facilitySlots/{slotId} — { date: 'YYYY-MM-DD', startTime: 'HH:MM',

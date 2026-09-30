@@ -831,7 +831,7 @@ function ExerciseFields({ ex, label, isLifting, onChange, onRemove, onAddOption,
  * wild get named outright; anything else still surfaces its real message
  * rather than hiding it, and the full error goes to the console.
  */
-export function saveErrorMessage(err, { live, isTemplate, verb = 'save' } = {}) {
+function saveErrorMessage(err, { live, isTemplate, verb = 'save' } = {}) {
   console.error('Program save failed:', err)
   const raw = String(err?.message || '')
   if (err?.code === 'invalid-argument' && /longer than|maximum|1048487|size/i.test(raw)) {

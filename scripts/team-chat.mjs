@@ -102,7 +102,7 @@ const docToObj = (d) => ({
   ...Object.fromEntries(Object.entries(d.fields || {}).map(([k, v]) => [k, decode(v)])),
 })
 
-// Mirrors parseMentions/mentionsAgent in src/utils/teamChat.js. Duplicated
+// Mirrors parseMentions/agentMentions in src/utils/teamChat.js. Duplicated
 // rather than imported because that module is ESM inside the Vite app and this
 // script runs standalone — if the handle grammar changes, change both.
 const MENTION_RE = /@([a-z][a-z0-9_-]{0,30})\b/gi

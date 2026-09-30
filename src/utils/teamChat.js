@@ -23,7 +23,7 @@
  * — without it, typing a human's name like `@ian` would render "waiting on
  * Atlas" forever, since no agent is ever going to claim it.
  */
-export const AGENT_HANDLES = ['atlas', 'skip']
+const AGENT_HANDLES = ['atlas', 'skip']
 
 /**
  * The room addressed a single agent as `@claude` before the agents were named.
@@ -68,12 +68,6 @@ export function effectiveMentions(message) {
 export function agentMentions(mentions) {
   if (!Array.isArray(mentions)) return []
   return mentions.filter(m => AGENT_HANDLES.includes(m))
-}
-
-/** Does `mentions` address the agent identified by `handle`? */
-export function mentionsAgent(mentions, handle) {
-  if (!Array.isArray(mentions) || mentions.length === 0) return false
-  return mentions.includes(String(handle || '').toLowerCase())
 }
 
 /**

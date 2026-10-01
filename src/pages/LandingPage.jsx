@@ -358,6 +358,14 @@ function VeloChart() {
 // the current one plays — swapping which is visible on `ended` is then just a
 // visibility flip, not a fresh load. Swapping `src` on a single element was
 // the cause of an earlier visible blip/black-frame at the cut.
+//
+// They are NOT all preloaded, though. With preload="auto" on every element
+// each visitor downloaded the whole chain — six clips, 4.5 MB — before seeing
+// a single frame, to watch one three-second loop. Only the playing clip loads
+// eagerly now; the next one is fetched once that one is under way, which is
+// several seconds of head start for a file under a megabyte. Initial video
+// cost drops from ~4.5 MB to ~0.5 MB, and this is a marketing page whose
+// largest-contentful-paint is a Google ranking signal.
 const HERO_CLIPS = [
   { src: '/videos/hero-release.mp4', poster: '/videos/hero-release-poster.jpg' },
   { src: '/videos/hero-release-2.mp4', poster: '/videos/hero-release-2-poster.jpg' },
@@ -386,6 +394,8 @@ function HeroVideo() {
   // browsers don't apply the seek before the element is next shown), which
   // showed up as a brief blip: the clip would flash its last instant of
   // playback before immediately re-ending on its next turn.
+  const nextOf = (i) => (i === HERO_CLIPS.length - 1 ? 0 : i + 1)
+
   useEffect(() => {
     videoEls.forEach((el, i) => {
       if (!el) return
@@ -396,10 +406,17 @@ function HeroVideo() {
         el.currentTime = 0
       }
     })
+    // Warm the clip after this one. An explicit load() rather than trusting
+    // the preload attribute flip: browsers treat a change from "none" to
+    // "auto" inconsistently, and load() starts the fetch outright. Guarded on
+    // readyState 0 so it only ever fires for a clip holding nothing yet —
+    // calling it on a buffered element would throw away what it already has.
+    const upcoming = videoEls[nextOf(active)]
+    if (upcoming && upcoming.readyState === 0) upcoming.load()
   }, [active, autoplay])
 
   function handleEnded(i) {
-    setActive(i === HERO_CLIPS.length - 1 ? 0 : i + 1)
+    setActive(nextOf(i))
   }
 
   return (
@@ -413,7 +430,7 @@ function HeroVideo() {
           autoPlay={autoplay && i === 0}
           muted
           playsInline
-          preload="auto"
+          preload={i === active ? 'auto' : 'none'}
           aria-hidden="true"
           tabIndex={-1}
           onEnded={() => handleEnded(i)}

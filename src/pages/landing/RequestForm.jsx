@@ -14,6 +14,7 @@ const REFERRERS = ['Ian Lohse', 'Jake Deakins', 'Danny Hill', 'Other']
 export default function RequestForm() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
   const [gradYear, setGradYear] = useState('')
   const [velo, setVelo] = useState('')
   const [notes, setNotes] = useState('')
@@ -31,6 +32,15 @@ export default function RequestForm() {
     if (!email.trim()) next.email = 'Enter your email.'
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) next.email = "That email doesn't look right."
     if (!gradYear.trim()) next.gradYear = 'Enter your grad year or level.'
+    // Optional — email is already a required way to reach them, and a lead
+    // form earns nothing by refusing a lead over a phone number. Checked only
+    // when given, and loosely: people type (573) 555-0123, 573-555-0123 and
+    // 5735550123, and all three are the same number. Count the digits, allow
+    // a leading 1, say nothing about the punctuation.
+    if (phone.trim()) {
+      const digits = phone.replace(/\D/g, '')
+      if (digits.length < 10 || digits.length > 11) next.phone = 'Enter a 10-digit phone number.'
+    }
     if (velo.trim() && !/^\d+(\.\d+)?$/.test(velo.trim())) next.velo = 'Numbers only.'
     // The question itself is optional — a lead form that interrogates people
     // converts worse, and attribution is worth less than the lead. But picking
@@ -68,7 +78,10 @@ export default function RequestForm() {
         notes.trim() || 'No additional notes.',
       ].join('\n')
 
-      const params = new URLSearchParams({ name: name.trim(), email: email.trim(), phone: '', message })
+      // inquiry.gs has always read a `phone` parameter and printed it in the
+      // notification email — it just had nothing to print, so every inquiry
+      // so far has said "Phone: —". Nothing to change on the script side.
+      const params = new URLSearchParams({ name: name.trim(), email: email.trim(), phone: phone.trim(), message })
       const res = await fetch(`${scriptUrl}?${params.toString()}`)
       const json = await res.json()
 
@@ -122,8 +135,9 @@ export default function RequestForm() {
                 style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }}
               />
 
-              <FormField id="req-name" label="Full name" placeholder="Full name" value={name} onChange={setName} error={errors.name} className="lp-input" style={fieldStyle} />
-              <FormField id="req-email" label="Email" type="email" placeholder="Email" value={email} onChange={setEmail} error={errors.email} className="lp-input" style={fieldStyle} />
+              <FormField id="req-name" label="Full name" autoComplete="name" placeholder="Full name" value={name} onChange={setName} error={errors.name} className="lp-input" style={fieldStyle} />
+              <FormField id="req-email" label="Email" type="email" autoComplete="email" placeholder="Email" value={email} onChange={setEmail} error={errors.email} className="lp-input" style={fieldStyle} />
+              <FormField id="req-phone" label="Phone (optional)" type="tel" autoComplete="tel" placeholder="Phone (optional)" value={phone} onChange={setPhone} error={errors.phone} className="lp-input" style={fieldStyle} />
               <FormField id="req-grad" label="Grad year / level" placeholder="Grad year / level" value={gradYear} onChange={setGradYear} error={errors.gradYear} className="lp-input" style={fieldStyle} />
               <FormField id="req-velo" label="Current top velo (mph)" placeholder="Current top velo (mph)" value={velo} onChange={setVelo} error={errors.velo} className="lp-input" style={fieldStyle} />
               <div style={{ background: C.ink }}>
@@ -223,13 +237,14 @@ export default function RequestForm() {
   )
 }
 
-function FormField({ id, label, type = 'text', placeholder, value, onChange, error, className, style }) {
+function FormField({ id, label, type = 'text', autoComplete, placeholder, value, onChange, error, className, style }) {
   return (
     <div style={{ background: C.ink }}>
       <label htmlFor={id} style={SR_ONLY}>{label}</label>
       <input
         id={id}
         type={type}
+        autoComplete={autoComplete}
         className={className}
         placeholder={placeholder}
         value={value}

@@ -21,7 +21,13 @@ const dayKey = (d) => format(d, 'yyyy-MM-dd')
  */
 export default function DaySchedule() {
   const [date, setDate] = useState(() => new Date())
+  // Three states, not two. slots === null is loading and slots === [] is a
+  // genuinely empty day; an error needs its own, because "No sessions
+  // scheduled today" is a sentence a coach acts on by going home. A
+  // permission error, an exhausted quota or a dropped connection used to
+  // render exactly that.
   const [slots, setSlots] = useState(null)   // null = still loading
+  const [error, setError] = useState(null)
   const reqRef = useRef(0)
 
   useEffect(() => {
@@ -29,6 +35,7 @@ export default function DaySchedule() {
     // newest request is allowed to set state.
     const seq = ++reqRef.current
     setSlots(null)
+    setError(null)
     ;(async () => {
       try {
         const snap = await getSlotsForDate(dayKey(date))
@@ -41,8 +48,11 @@ export default function DaySchedule() {
             .map(d => ({ uid: d.id, name: d.data().athleteName || 'Athlete' }))
             .sort((a, b) => a.name.localeCompare(b.name)),
         })))
-      } catch {
-        if (seq === reqRef.current) setSlots([])
+      } catch (err) {
+        // Bound and logged — the previous bare `catch {}` discarded the error
+        // object entirely, so nothing reached the console either.
+        console.error('Failed to load the day schedule:', err)
+        if (seq === reqRef.current) setError(err.message || 'Could not load this day.')
       }
     })()
   }, [date])
@@ -62,7 +72,7 @@ export default function DaySchedule() {
           </h2>
           <p className="text-xs text-sp-ink-300 mt-0.5">
             {format(date, 'EEEE, MMM d')}
-            {slots?.length > 0 && ` · ${booked} booked across ${slots.length} ${slots.length === 1 ? 'session' : 'sessions'}`}
+            {!error && slots?.length > 0 && ` · ${booked} booked across ${slots.length} ${slots.length === 1 ? 'session' : 'sessions'}`}
           </p>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
@@ -91,7 +101,18 @@ export default function DaySchedule() {
         </div>
       </div>
 
-      {slots === null ? (
+      {error ? (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-4">
+          <p className="text-sm font-semibold text-red-300 mb-1">Couldn't load this day</p>
+          <p className="text-xs text-red-400/80 mb-3">{error}</p>
+          <button
+            onClick={() => setDate(d => new Date(d))}
+            className="text-xs font-semibold text-red-300 hover:text-red-200 transition"
+          >
+            Try again
+          </button>
+        </div>
+      ) : slots === null ? (
         <p className="text-sm text-sp-ink-300 px-1 py-3">Loading…</p>
       ) : slots.length === 0 ? (
         <p className="text-sm text-sp-ink-300 bg-sp-ink-900/40 border border-sp-ink-600/60 rounded-xl px-4 py-5 text-center">

@@ -106,6 +106,13 @@ export default function AdminDashboardPage() {
   const [groups, setGroups] = useState(dashboardCache?.groups || [])
   const [groupFilter, setGroupFilter] = useState(ALL_GROUPS)
   const [showGroups, setShowGroups] = useState(false)
+  // "the queries failed" and "there is nothing to show" are different facts
+  // and have to look different. Without this, any rejection in load() left
+  // rows at [] and the page rendered "No athletes yet — add an athlete to see
+  // them here" at a coach whose roster is full. An exhausted read quota, an
+  // index that was never deployed, or one rejection out of the ~6xN fan-out
+  // all produced that same confident, wrong sentence.
+  const [loadError, setLoadError] = useState(null)
 
   function toggleFilter(key) {
     setActiveFilter(prev => prev === key ? null : key)
@@ -116,6 +123,7 @@ export default function AdminDashboardPage() {
   async function load(isBackgroundRefresh) {
     if (isBackgroundRefresh) setRefreshing(true)
     else setLoading(true)
+    setLoadError(null)
     try {
       // chatReads doesn't depend on the athlete list, so it rides along with
       // wave 1 instead of waiting for it — one fewer round trip in the
@@ -204,6 +212,12 @@ export default function AdminDashboardPage() {
       setRows(nextRows)
       setFlagged(flaggedFeed)
       setUnread(unreadFeed)
+    } catch (err) {
+      console.error('Failed to load dashboard:', err)
+      setLoadError(err.message || 'Something went wrong loading the dashboard.')
+      // Deliberately does NOT clear rows. On a background refresh the cached
+      // roster is stale but true, and showing it under a warning beats
+      // replacing a correct page with an empty one.
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -287,6 +301,32 @@ export default function AdminDashboardPage() {
           fan-out below, so it paints immediately. */}
       <DaySchedule />
 
+      {loadError && rows.length === 0 && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-6 max-w-lg mb-4">
+          <p className="font-semibold text-red-300 mb-1">Couldn't load the dashboard</p>
+          <p className="text-sm text-red-400/80 mb-4">{loadError}</p>
+          <button
+            onClick={() => load(false)}
+            className="px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-500 transition"
+          >
+            Try again
+          </button>
+        </div>
+      )}
+      {loadError && rows.length > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3 mb-4 flex items-center gap-3">
+          <p className="text-sm text-amber-200 flex-1">
+            Showing the last data that loaded — the refresh failed, so this may be out of date.
+          </p>
+          <button
+            onClick={() => load(true)}
+            className="flex-shrink-0 text-xs font-semibold text-amber-300 hover:text-amber-200 transition"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       <GroupFilterBar
         groups={groups}
         athletes={rows.map(r => r.athlete)}
@@ -296,6 +336,13 @@ export default function AdminDashboardPage() {
         className="mb-4"
       />
 
+      {/* Everything below reports on the roster, and with a failed load and no
+          cache we don't know anything about it. Rendering it anyway produced
+          five tiles of zeroes and "No athletes yet — add an athlete to see
+          them here" at a coach whose roster is full: an error panel on top of
+          a page still confidently stating the opposite. The facility schedule
+          above stays, since it loads independently and may well be fine. */}
+      {!(loadError && rows.length === 0) && (<>
       {/* Needs attention tiles — each doubles as a filter, click to narrow the page */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
         <Tile Icon={MessageCircle} value={unreadCount} label="Unread messages" tone="amber" active={activeFilter === 'unread'} onClick={() => toggleFilter('unread')} />
@@ -475,6 +522,7 @@ export default function AdminDashboardPage() {
         )}
       </div>
       )}
+      </>)}
       {showGroups && (
         <ManageGroupsModal
           groups={groups}

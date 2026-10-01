@@ -361,11 +361,21 @@ function VeloChart() {
 //
 // They are NOT all preloaded, though. With preload="auto" on every element
 // each visitor downloaded the whole chain — six clips, 4.5 MB — before seeing
-// a single frame, to watch one three-second loop. Only the playing clip loads
-// eagerly now; the next one is fetched once that one is under way, which is
-// several seconds of head start for a file under a megabyte. Initial video
-// cost drops from ~4.5 MB to ~0.5 MB, and this is a marketing page whose
+// a single frame, to watch one three-second loop. Only the playing clip and
+// the one after it load; the rest stay at preload="none" until their turn
+// comes round. ~1.7 MB instead of ~4.5 MB, on a marketing page whose
 // largest-contentful-paint is a Google ranking signal.
+//
+// Both, not just the active one. An earlier version preloaded only the active
+// clip and called load() on the next to warm it — but load() consults the
+// preload attribute, so telling a preload="none" element to load tells it to
+// fetch nothing. Measured: the next clip transferred 300 bytes and decoded 0.
+// The cut then had to fetch from scratch, which is the visible blip the
+// multi-element design exists to prevent. The attribute has to agree with the
+// intent; a load() call cannot overrule it.
+//
+// Nothing preloads at all when autoplay is off — a reduced-motion visitor
+// never advances past the first poster, so the bytes would be pure waste.
 const HERO_CLIPS = [
   { src: '/videos/hero-release.mp4', poster: '/videos/hero-release-poster.jpg' },
   { src: '/videos/hero-release-2.mp4', poster: '/videos/hero-release-2-poster.jpg' },
@@ -376,18 +386,22 @@ const HERO_CLIPS = [
 ]
 
 function HeroVideo() {
-  const [autoplay, setAutoplay] = useState(true)
+  // Read on the very first render, not corrected afterwards in an effect.
+  // Initialising to true and flipping it later meant the first render had
+  // already emitted autoPlay on clip 0, which starts playing before the
+  // correction lands — removing the attribute afterwards doesn't stop
+  // playback in flight. A reduced-motion visitor got one clip of video, then
+  // the reel froze on clip 1's poster for the rest of the session, because
+  // nothing advances once autoplay is false.
+  const [autoplay] = useState(
+    () => !(typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches),
+  )
   const [active, setActive] = useState(0)
   // Plain array of DOM nodes (not useRef objects) populated via callback
   // refs below — sized to the clip list, so adding another clip to
   // HERO_CLIPS is a one-line change rather than adding another hardcoded
   // useRef.
   const videoEls = useRef([]).current
-
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
-    setAutoplay(!mq.matches)
-  }, [])
 
   // Runs after the `active` state has actually committed — rewinding a
   // just-finished clip inside its own `ended` handler is flaky (some
@@ -401,22 +415,18 @@ function HeroVideo() {
       if (!el) return
       if (i === active) {
         if (autoplay) el.play?.().catch(() => {})
+        else el.pause()
       } else {
         el.pause()
         el.currentTime = 0
       }
     })
-    // Warm the clip after this one. An explicit load() rather than trusting
-    // the preload attribute flip: browsers treat a change from "none" to
-    // "auto" inconsistently, and load() starts the fetch outright. Guarded on
-    // readyState 0 so it only ever fires for a clip holding nothing yet —
-    // calling it on a buffered element would throw away what it already has.
-    const upcoming = videoEls[nextOf(active)]
-    if (upcoming && upcoming.readyState === 0) upcoming.load()
   }, [active, autoplay])
 
   function handleEnded(i) {
-    setActive(nextOf(i))
+    // Don't walk the chain when autoplay is off: the next clip would be shown
+    // but never played, leaving a poster frame that looks like a broken video.
+    if (autoplay) setActive(nextOf(i))
   }
 
   return (
@@ -430,7 +440,7 @@ function HeroVideo() {
           autoPlay={autoplay && i === 0}
           muted
           playsInline
-          preload={i === active ? 'auto' : 'none'}
+          preload={autoplay && (i === active || i === nextOf(active)) ? 'auto' : 'none'}
           aria-hidden="true"
           tabIndex={-1}
           onEnded={() => handleEnded(i)}

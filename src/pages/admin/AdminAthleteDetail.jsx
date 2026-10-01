@@ -577,7 +577,14 @@ export default function AdminAthleteDetail() {
       // was, still assignable to the next athlete. This athlete gets their
       // own independent copy, so editing it never touches the original or
       // anyone else who started from the same template.
-      const { id: _sourceId, athleteId: _sourceAthleteId, createdAt: _sourceCreatedAt, lastEditedAt: _sourceLastEditedAt, ...templateData } = target
+      // `archived` is stripped along with the rest: a program being published
+      // to an athlete is by definition not archived, and inheriting the flag
+      // from the source makes a copy that is active AND archived at once.
+      // getProgramForAthlete filters on active, so the athlete sees it and
+      // trains on it; getAssignedPrograms filters on archived, so the coach's
+      // roster reports "No program" for them. Nothing errors — the two views
+      // simply disagree, which is the same shape as the programTypes drift.
+      const { id: _sourceId, athleteId: _sourceAthleteId, createdAt: _sourceCreatedAt, lastEditedAt: _sourceLastEditedAt, archived: _sourceArchived, ...templateData } = target
       // Reset to today rather than inheriting the source program's start
       // date — a reusable template's original date has no bearing on when
       // *this* athlete is actually starting it. Adjustable after in the editor.
@@ -733,6 +740,12 @@ export default function AdminAthleteDetail() {
     (p.programType || 'correctives') === programTypeTab &&
     p.id !== currentTypeProgram?.id &&
     (!p.athleteId || p.athleteId === uid) &&
+    // Archived programs are excluded explicitly rather than by coincidence.
+    // The clause below happens to hide most of them today, because every
+    // in-app write that archives also sets active: false AND athleteId: uid
+    // — but an archived template (athleteId: null) or an archived program
+    // left active satisfies neither half and would land in this picker.
+    !p.archived &&
     !(p.active === false && p.athleteId === uid)
   )
 

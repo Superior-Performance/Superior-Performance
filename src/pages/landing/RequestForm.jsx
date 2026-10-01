@@ -4,6 +4,12 @@ import { getPublicSettings } from '../../firebase/firestore'
 import { Reveal } from './motion'
 import { C, DISPLAY, BODY, MONO, SR_ONLY } from './theme'
 
+// Who a lead can say sent them. Kept as a list so adding a coach is one line
+// here rather than three edits in the markup. "Other" is last and opens a free
+// text box — a name we haven't thought of is more useful than a shrug, and it
+// is how this list learns what to add next.
+const REFERRERS = ['Ian Lohse', 'Jake Deakins', 'Danny Hill', 'Other']
+
 // ── 3.11 Request form ────────────────────────────────────────────────────────
 export default function RequestForm() {
   const [name, setName] = useState('')
@@ -11,6 +17,8 @@ export default function RequestForm() {
   const [gradYear, setGradYear] = useState('')
   const [velo, setVelo] = useState('')
   const [notes, setNotes] = useState('')
+  const [referrer, setReferrer] = useState('')
+  const [referrerOther, setReferrerOther] = useState('')
   const [consent, setConsent] = useState(false)
   const [honeypot, setHoneypot] = useState('') // spam trap — real users never fill this in
   const [errors, setErrors] = useState({})
@@ -24,6 +32,10 @@ export default function RequestForm() {
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) next.email = "That email doesn't look right."
     if (!gradYear.trim()) next.gradYear = 'Enter your grad year or level.'
     if (velo.trim() && !/^\d+(\.\d+)?$/.test(velo.trim())) next.velo = 'Numbers only.'
+    // The question itself is optional — a lead form that interrogates people
+    // converts worse, and attribution is worth less than the lead. But picking
+    // "Other" and leaving the box empty answers nothing, so that one is caught.
+    if (referrer === 'Other' && !referrerOther.trim()) next.referrerOther = 'Let us know who sent you.'
     if (!consent) next.consent = 'Please confirm you agree before sending.'
     setErrors(next)
     return Object.keys(next).length === 0
@@ -42,9 +54,16 @@ export default function RequestForm() {
         return
       }
 
+      // Folded into the message body rather than sent as its own parameter:
+      // inquiry.gs emails whatever `message` contains, so this arrives today
+      // against the script already deployed. A new parameter would mean
+      // pasting a new version of that script into Apps Script first, and the
+      // referral would silently vanish until someone did.
+      const referredBy = referrer === 'Other' ? referrerOther.trim() : referrer
       const message = [
         `Grad year / level: ${gradYear.trim()}`,
         `Current top velo: ${velo.trim() ? `${velo.trim()} mph` : 'Not provided'}`,
+        `Referred by: ${referredBy || 'Not provided'}`,
         '',
         notes.trim() || 'No additional notes.',
       ].join('\n')
@@ -107,6 +126,49 @@ export default function RequestForm() {
               <FormField id="req-email" label="Email" type="email" placeholder="Email" value={email} onChange={setEmail} error={errors.email} className="lp-input" style={fieldStyle} />
               <FormField id="req-grad" label="Grad year / level" placeholder="Grad year / level" value={gradYear} onChange={setGradYear} error={errors.gradYear} className="lp-input" style={fieldStyle} />
               <FormField id="req-velo" label="Current top velo (mph)" placeholder="Current top velo (mph)" value={velo} onChange={setVelo} error={errors.velo} className="lp-input" style={fieldStyle} />
+              <div style={{ background: C.ink }}>
+                <label htmlFor="req-referrer" style={SR_ONLY}>Referred by</label>
+                <select
+                  id="req-referrer"
+                  className="lp-input lp-focus"
+                  value={referrer}
+                  onChange={e => setReferrer(e.target.value)}
+                  style={{
+                    ...fieldStyle,
+                    // Native select chrome ignores the field's dark fill on
+                    // some browsers and renders a light control mid-form, so
+                    // the arrow is drawn here instead of inherited.
+                    appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none',
+                    color: referrer ? C.paper : 'rgba(242,244,243,.45)',
+                    cursor: 'pointer',
+                    backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' stroke='%23F2F4F3' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>")`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right 22px center',
+                    paddingRight: 52,
+                  }}
+                >
+                  {/* Empty default so this reads as a placeholder like every
+                      other field, and so skipping it stays the easy path. */}
+                  <option value="" style={{ color: '#111' }}>Referred by (optional)</option>
+                  {REFERRERS.map(r => (
+                    <option key={r} value={r} style={{ color: '#111' }}>{r}</option>
+                  ))}
+                </select>
+              </div>
+
+              {referrer === 'Other' && (
+                <FormField
+                  id="req-referrer-other"
+                  label="Who referred you"
+                  placeholder="Who referred you?"
+                  value={referrerOther}
+                  onChange={setReferrerOther}
+                  error={errors.referrerOther}
+                  className="lp-input"
+                  style={fieldStyle}
+                />
+              )}
+
               <div style={{ background: C.ink }}>
                 <label htmlFor="req-notes" style={SR_ONLY}>Goals, availability, anything we should know</label>
                 <textarea

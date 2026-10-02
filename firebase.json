@@ -1,6 +1,10 @@
 {
   "hosting": {
     "site": "superior-performance-ba102",
+    "predeploy": [
+      "npm --prefix \"$PROJECT_DIR\" run build",
+      "node \"$PROJECT_DIR/scripts/smoke-test.mjs\""
+    ],
     "public": "dist",
     "ignore": [
       "firebase.json",

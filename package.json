@@ -10,7 +10,8 @@
     "test:rules": "firebase emulators:exec --only firestore --project demo-sp \"node tests/firestore-rules.test.mjs && node tests/apps-script.test.mjs\"",
     "dev:emulator": "firebase emulators:exec --only firestore,auth --project demo-sp \"node scripts/seed-emulator.mjs && VITE_USE_EMULATORS=1 VITE_FIREBASE_PROJECT_ID=demo-sp vite\"",
     "test:unit": "node tests/schedule.test.mjs",
-    "teamchat": "node scripts/team-chat-watch.mjs --once"
+    "teamchat": "node scripts/team-chat-watch.mjs --once",
+    "deploy": "firebase deploy --only hosting --project superior-performance-ba102 --account superiorperformance.sp@gmail.com"
   },
   "dependencies": {
     "date-fns": "^3.6.0",

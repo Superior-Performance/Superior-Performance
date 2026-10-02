@@ -9,6 +9,7 @@ const { compactWeeks, estimateBytes, sizeStatus, FIRESTORE_DOC_LIMIT } = await i
 const { matchesGroupFilter, groupsOf, suggestGroupColor, ALL_GROUPS, UNGROUPED } = await import(`${ROOT}src/constants/athleteGroups.js`)
 const { buildProgramWeeksFromRows, parseWeekOrDayRange } = await import(`${ROOT}src/utils/sheetRows.js`)
 const { countProgramProgress, completionKey } = await import(`${ROOT}src/utils/programIds.js`)
+const { isInactive, opportunitySinceMs } = await import(`${ROOT}src/utils/rosterStatus.js`)
 const { assertReadable, redactDoc, collectionSegments, REDACTED } = await import(`${ROOT}scripts/lib/data-policy.mjs`)
 const { snapshotKeyFor, diffAssessments, numericSeries, trendableFields, sortByDateDesc } = await import(`${ROOT}src/utils/assessmentHistory.js`)
 const { ALL_FIELDS, RETIRED_FIELDS, SHEET_COLUMNS, isFlaggedValue, flaggedFindings, computeTotalArcs, TOTAL_ARCS } = await import(`${ROOT}src/constants/assessmentFields.js`)
@@ -516,6 +517,50 @@ t('a finished block alone contributes nothing to the current program', () => {
 })
 t('an untouched active program reads as zero done, not as missing', () => {
   eq(countProgramProgress({}, progProgram, 0), { total: 4, done: 0 })
+})
+
+// ── "Inactive 10+ days" ─────────────────────────────────────────────────────
+// An athlete with no activity on record used to be treated as though their
+// last session was infinitely long ago, so the dashboard flagged them red the
+// moment a program was assigned — on the same row that read "Not started yet".
+// Quiet only counts once there has been something to be quiet about.
+const DAY = 86400000
+const NOW = new Date('2026-10-02T12:00:00Z').getTime()
+const ago = (d) => NOW - d * DAY
+const dayStr = (d) => new Date(NOW - d * DAY).toISOString().slice(0, 10)
+const startedDaysAgo = (d) => [{ startDate: dayStr(d) }]
+
+t('an athlete who started today is not inactive', () => {
+  eq(isInactive(startedDaysAgo(0), null, ago(0), 10, NOW), false)
+})
+t("a cohort set up for a start date that hasn't arrived is not inactive", () => {
+  eq(isInactive([{ startDate: new Date(NOW + 3 * DAY).toISOString().slice(0, 10) }], null, ago(1), 10, NOW), false)
+})
+t('no activity, but only three days since the program began — not yet', () => {
+  eq(isInactive(startedDaysAgo(3), null, ago(3), 10, NOW), false)
+})
+t('no activity and the program began three weeks ago — inactive', () => {
+  eq(isInactive(startedDaysAgo(21), null, ago(21), 10, NOW), true)
+})
+t('recent activity keeps them active even on an old program', () => {
+  eq(isInactive(startedDaysAgo(60), ago(2), ago(60), 10, NOW), false)
+})
+t('activity, but twenty days ago — inactive', () => {
+  eq(isInactive(startedDaysAgo(60), ago(20), ago(60), 10, NOW), true)
+})
+t('no active program means never inactive, whatever the dates', () => {
+  eq(isInactive([], null, ago(999), 10, NOW), false)
+})
+t('a program with no start date falls back to when the account was created', () => {
+  eq(isInactive([{}], null, ago(30), 10, NOW), true)
+  eq(isInactive([{}], null, ago(2), 10, NOW), false)
+})
+t('nothing to judge by is not an accusation', () => {
+  eq(isInactive([{}], null, null, 10, NOW), false)
+})
+t('opportunity starts at the EARLIEST active program', () => {
+  eq(opportunitySinceMs([{ startDate: dayStr(5) }, { startDate: dayStr(40) }], ago(90)),
+     new Date(`${dayStr(40)}T12:00:00`).getTime())
 })
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

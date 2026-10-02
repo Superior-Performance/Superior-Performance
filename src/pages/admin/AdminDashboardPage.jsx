@@ -16,6 +16,7 @@ import GroupFilterBar from '../../components/GroupFilterBar'
 import ManageGroupsModal from '../../components/ManageGroupsModal'
 import DaySchedule from '../../components/DaySchedule'
 import { ALL_GROUPS, matchesGroupFilter, groupsOf, groupColor } from '../../constants/athleteGroups'
+import { isInactive } from '../../utils/rosterStatus'
 
 // Below this elapsed-completion % an athlete shows as "Behind" — elapsed
 // meaning weeks that have actually started, not the whole program, so
@@ -182,8 +183,7 @@ export default function AdminDashboardPage() {
 
         const pct = athleteProgress(activePrograms, completions)
         const lastActivityMs = lastActivityMillis(completionRecency[i], logsSnaps[i], weightsSnaps[i])
-        const inactive = activePrograms.length > 0 &&
-          (!lastActivityMs || Date.now() - lastActivityMs > INACTIVE_DAYS * 86400000)
+        const inactive = isInactive(activePrograms, lastActivityMs, toMillis(athlete.createdAt), INACTIVE_DAYS)
         const behind = pct != null && pct < BEHIND_THRESHOLD
 
         // Athlete-authored messages newer than the coach's last-opened marker

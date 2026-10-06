@@ -15,7 +15,7 @@
       "runtimeExecutable": "/bin/sh",
       "runtimeArgs": [
         "-c",
-        "PATH=\"/opt/homebrew/Cellar/openjdk@21/21.0.12.1/bin:$PATH\" exec npm run dev:emulator"
+        "PATH=\"/opt/homebrew/opt/openjdk@21/bin:$PATH\" exec npm run dev:emulator"
       ],
       "port": 5173
     }

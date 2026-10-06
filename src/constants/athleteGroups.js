@@ -1,3 +1,5 @@
+import { athleteTypeOf } from './programTypes.js'
+
 /**
  * Roster groups — a winter camp cohort, a travel team training elsewhere.
  *
@@ -38,16 +40,46 @@ export function groupsOf(athlete, groups) {
 }
 
 /**
+ * A group that is one of the Premier tier's pools, rather than a free-standing
+ * cohort like a winter camp.
+ *
+ * Marked explicitly on the group document instead of inferred from "has
+ * training days" or from who happens to be in it: the roster nests pools
+ * underneath Premier, and a camp cohort that drifted in there because it also
+ * had a weekly schedule would be filed under a tier it has nothing to do with.
+ * Groups with no `kind` are ordinary groups, which is every group that existed
+ * before pools did.
+ */
+export const PREMIER_POOL = 'premier_pool'
+
+export const isPremierPool = (group) => group?.kind === PREMIER_POOL
+export const premierPools  = (groups = []) => groups.filter(isPremierPool)
+export const plainGroups   = (groups = []) => groups.filter(g => !isPremierPool(g))
+
+/**
  * The filter bar's special selections. A real group id is anything else.
+ *
  * 'ungrouped' earns its place: an athlete nobody has filed yet is invisible
  * in every group view, and that's exactly who a coach needs to find.
+ *
+ * A service tier is encoded as a prefixed string rather than given its own
+ * parameter, so the roster pages keep ONE filter value to hold and pass around.
+ * The prefix can't collide with a Firestore document id, which never contains
+ * a colon.
  */
 export const ALL_GROUPS = null
 export const UNGROUPED = '__ungrouped__'
+const TIER_PREFIX = 'tier:'
+
+export const tierFilter = (tierKey) => `${TIER_PREFIX}${tierKey}`
+export const tierOfFilter = (filter) =>
+  typeof filter === 'string' && filter.startsWith(TIER_PREFIX) ? filter.slice(TIER_PREFIX.length) : null
 
 /** Does this athlete belong in the current filter? */
 export function matchesGroupFilter(athlete, filter) {
   if (filter === ALL_GROUPS) return true
   if (filter === UNGROUPED) return !(athlete?.groupIds?.length > 0)
+  const tier = tierOfFilter(filter)
+  if (tier) return athleteTypeOf(athlete) === tier
   return (athlete?.groupIds || []).includes(filter)
 }

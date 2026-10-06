@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const { computeTodayPosition, dayStats, dayStatsByType, dayCountForWeek, dayIndexFor, activeProgramsForAthlete, cellDate } = await import(`${ROOT}src/utils/programSchedule.js`)
 const { compactWeeks, estimateBytes, sizeStatus, FIRESTORE_DOC_LIMIT } = await import(`${ROOT}src/utils/programSize.js`)
-const { matchesGroupFilter, groupsOf, suggestGroupColor, ALL_GROUPS, UNGROUPED } = await import(`${ROOT}src/constants/athleteGroups.js`)
+const { matchesGroupFilter, groupsOf, suggestGroupColor, ALL_GROUPS, UNGROUPED, tierFilter, tierOfFilter, premierPools, plainGroups, isPremierPool, PREMIER_POOL } = await import(`${ROOT}src/constants/athleteGroups.js`)
 const { buildProgramWeeksFromRows, parseWeekOrDayRange } = await import(`${ROOT}src/utils/sheetRows.js`)
 const { countProgramProgress, completionKey } = await import(`${ROOT}src/utils/programIds.js`)
 const { isInactive, opportunitySinceMs } = await import(`${ROOT}src/utils/rosterStatus.js`)
@@ -638,6 +638,42 @@ t('the same pull with no training days is unchanged from before', () => {
 t('a weekday name in the Day column ignores training days entirely', () => {
   const rows = [{ Week: '1', Day: 'Wednesday', Exercise: 'A' }]
   eq(buildProgramWeeksFromRows(rows, 'throwing', { trainingDays: [1, 2] })[0].days[0].dayNum, 3)
+})
+
+/* ── Roster filters: service tier, and Premier's pools ──────────────────── */
+
+t('a tier filter matches only athletes on that tier', () => {
+  eq(matchesGroupFilter({ athleteType: 'premier' }, tierFilter('premier')), true)
+  eq(matchesGroupFilter({ athleteType: 'remote' },  tierFilter('premier')), false)
+  eq(matchesGroupFilter({ athleteType: 'remote' },  tierFilter('remote')),  true)
+})
+// Most athletes have no athleteType stored at all; they are in-house, and the
+// In-House chip has to find them or it undercounts the bulk of the roster.
+t('an athlete with no tier stored counts as In-House', () => {
+  eq(matchesGroupFilter({}, tierFilter('in_house')), true)
+  eq(matchesGroupFilter({}, tierFilter('premier')), false)
+})
+t('tier filters and group filters stay distinguishable', () => {
+  eq(tierOfFilter(tierFilter('premier')), 'premier')
+  eq(tierOfFilter('XKqS5d13T4fN2iRtXfjR'), null)   // a Firestore id, not a tier
+  eq(tierOfFilter(ALL_GROUPS), null)
+  eq(tierOfFilter(UNGROUPED), null)
+})
+// Membership, not tier: a group filter must keep working the way it always has
+// even now that tiers share the same value space.
+t('a pool id still filters by membership, not by tier', () => {
+  const inPool = { athleteType: 'premier', groupIds: ['pool-a'] }
+  const notIn  = { athleteType: 'premier', groupIds: ['pool-b'] }
+  eq([matchesGroupFilter(inPool, 'pool-a'), matchesGroupFilter(notIn, 'pool-a')], [true, false])
+})
+t('pools are split out from ordinary groups by kind, not by having a schedule', () => {
+  const groups = [
+    { id: 'p', name: 'Pool A', kind: PREMIER_POOL },
+    { id: 'c', name: 'Winter Camp', trainingDays: [1, 3, 5] },
+  ]
+  eq(premierPools(groups).map(g => g.name), ['Pool A'])
+  eq(plainGroups(groups).map(g => g.name), ['Winter Camp'])
+  eq(isPremierPool(groups[1]), false, 'a camp with training days is not a pool:')
 })
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Plus, Trash2, X, Check, Pencil } from 'lucide-react'
 import toast from 'react-hot-toast'
 import ConfirmDialog from './ConfirmDialog'
-import { GROUP_COLORS, groupColor, suggestGroupColor } from '../constants/athleteGroups'
+import { GROUP_COLORS, groupColor, suggestGroupColor, PREMIER_POOL, isPremierPool } from '../constants/athleteGroups'
 import { createAthleteGroup, updateAthleteGroup, deleteAthleteGroup } from '../firebase/firestore'
 import TrainingDayPicker from './TrainingDayPicker'
 import { normalizeTrainingDays, formatTrainingDays } from '../utils/trainingDays'
@@ -33,9 +33,10 @@ export default function ManageGroupsModal({ groups, athletes, onClose, onChanged
   const [color, setColor] = useState(() => suggestGroupColor(groups))
   const [startDate, setStartDate] = useState('')
   const [trainingDays, setTrainingDays] = useState([])
+  const [isPool, setIsPool] = useState(false)
   const [saving, setSaving] = useState(false)
   const [editingId, setEditingId] = useState(null)
-  const [draft, setDraft] = useState({ name: '', color: 'blue', startDate: '', trainingDays: [] })
+  const [draft, setDraft] = useState({ name: '', color: 'blue', startDate: '', trainingDays: [], isPool: false })
   const [confirm, setConfirm] = useState(null)
 
   const membersOf = (groupId) => athletes.filter(a => (a.groupIds || []).includes(groupId))
@@ -50,10 +51,14 @@ export default function ManageGroupsModal({ groups, athletes, onClose, onChanged
     }
     setSaving(true)
     try {
-      await createAthleteGroup({ name: trimmed, color, startDate: startDate || null, trainingDays })
+      await createAthleteGroup({
+        name: trimmed, color, startDate: startDate || null, trainingDays,
+        kind: isPool ? PREMIER_POOL : null,
+      })
       setName('')
       setStartDate('')
       setTrainingDays([])
+      setIsPool(false)
       setColor(suggestGroupColor([...groups, { color }]))
       await onChanged()
       toast.success(`${trimmed} created.`)
@@ -71,6 +76,7 @@ export default function ManageGroupsModal({ groups, athletes, onClose, onChanged
       color: group.color || 'blue',
       startDate: group.startDate || '',
       trainingDays: normalizeTrainingDays(group.trainingDays),
+      isPool: isPremierPool(group),
     })
   }
 
@@ -84,6 +90,7 @@ export default function ManageGroupsModal({ groups, athletes, onClose, onChanged
         color: draft.color,
         startDate: draft.startDate || null,
         trainingDays: normalizeTrainingDays(draft.trainingDays),
+        kind: draft.isPool ? PREMIER_POOL : null,
       })
       setEditingId(null)
       await onChanged()
@@ -115,6 +122,20 @@ export default function ManageGroupsModal({ groups, athletes, onClose, onChanged
 
   const toggleDay = (days, num) => normalizeTrainingDays(
     days.includes(num) ? days.filter(d => d !== num) : [...days, num]
+  )
+
+  const poolToggle = (checked, onToggle, id) => (
+    <label htmlFor={id} className="flex items-center gap-2 text-xs text-sp-ink-200 cursor-pointer select-none">
+      <input
+        id={id}
+        type="checkbox"
+        checked={checked}
+        onChange={e => onToggle(e.target.checked)}
+        className="w-3.5 h-3.5 rounded border-sp-ink-600 bg-sp-ink-900 text-sp-green-500 focus:ring-sp-green-500 focus:ring-offset-0"
+      />
+      Premier pool
+      <span className="text-sp-ink-300">— shows under Premier on the roster</span>
+    </label>
   )
 
   const colorPicker = (selected, onPick) => (
@@ -188,6 +209,7 @@ export default function ManageGroupsModal({ groups, athletes, onClose, onChanged
                       label={`Training days for ${g.name}`}
                     />
                   </div>
+                  {poolToggle(draft.isPool, (v) => setDraft(d => ({ ...d, isPool: v })), `pool-${g.id}`)}
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => saveEdit(g)}
@@ -216,6 +238,7 @@ export default function ManageGroupsModal({ groups, athletes, onClose, onChanged
                     {members.length} athlete{members.length === 1 ? '' : 's'}
                     {g.startDate && ` · starts ${g.startDate}`}
                     {normalizeTrainingDays(g.trainingDays).length > 0 && ` · ${formatTrainingDays(g.trainingDays)}`}
+                    {isPremierPool(g) && ' · Premier pool'}
                   </p>
                 </div>
                 <button
@@ -276,6 +299,7 @@ export default function ManageGroupsModal({ groups, athletes, onClose, onChanged
               label="Training days for the new group"
             />
           </div>
+          {poolToggle(isPool, setIsPool, 'new-group-pool')}
         </form>
       </div>
 

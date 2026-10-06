@@ -67,7 +67,11 @@ export async function fetchOutputRows(scriptUrl, athleteName, tabs) {
 // re-pulling while iterating on the sheet leaves stale drafts stacking up.
 // `existingPrograms` lets a caller that already has this athlete's programs
 // loaded (the detail page) skip a redundant read; bulk callers can omit it.
-export async function generateDraftProgram(scriptUrl, uid, athleteName, group, existingPrograms = null, startDate = null) {
+// `trainingDays` are the weekdays this athlete trains (Monday=1..Sunday=7,
+// see utils/trainingDays). They decide which day of the week each of the
+// program's day types lands on; an empty array keeps the old consecutive
+// 1/2/3/4 numbering, so an athlete nobody has configured pulls as before.
+export async function generateDraftProgram(scriptUrl, uid, athleteName, group, existingPrograms = null, startDate = null, trainingDays = []) {
   const { rows, error } = await fetchOutputRows(scriptUrl, athleteName, group.tabs)
   if (!rows.length) return { label: group.label, ok: false, error: error || `No rows in ${group.tabs.join(' or ')}` }
 
@@ -80,7 +84,7 @@ export async function generateDraftProgram(scriptUrl, uid, athleteName, group, e
   // whenever anything in between threw — a bad cell, a slow tab, a network
   // blip — and every later save then failed with "no entity to update",
   // permanently, because the document was gone.
-  const weeks = buildProgramWeeksFromRows(rows, group.programType)
+  const weeks = buildProgramWeeksFromRows(rows, group.programType, { trainingDays })
   await createProgram({
     name:       `${athleteName} — ${group.nameSuffix}`,
     athleteId:  uid,
@@ -102,13 +106,13 @@ export async function generateDraftProgram(scriptUrl, uid, athleteName, group, e
 // each still becomes its own draft (an athlete can have one active program
 // per type at once, so there's no such thing as a single program spanning
 // all of them).
-export async function generateAllDraftPrograms(scriptUrl, uid, athleteName, existingPrograms = null, startDate = null) {
+export async function generateAllDraftPrograms(scriptUrl, uid, athleteName, existingPrograms = null, startDate = null, trainingDays = []) {
   const programs = existingPrograms ?? (await getProgramsForAthlete(uid)).docs.map(d => ({ id: d.id, ...d.data() }))
   // allSettled, not all: one group rejecting used to abort the aggregate
   // while the others had already written their drafts, so the caller skipped
   // its refresh and kept showing program ids that no longer existed.
   const settled = await Promise.allSettled(
-    OUTPUT_PULL_GROUPS.map(group => generateDraftProgram(scriptUrl, uid, athleteName, group, programs, startDate))
+    OUTPUT_PULL_GROUPS.map(group => generateDraftProgram(scriptUrl, uid, athleteName, group, programs, startDate, trainingDays))
   )
   return settled.map((r, i) => r.status === 'fulfilled'
     ? r.value

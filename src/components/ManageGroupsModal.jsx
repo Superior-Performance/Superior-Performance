@@ -4,14 +4,25 @@ import toast from 'react-hot-toast'
 import ConfirmDialog from './ConfirmDialog'
 import { GROUP_COLORS, groupColor, suggestGroupColor } from '../constants/athleteGroups'
 import { createAthleteGroup, updateAthleteGroup, deleteAthleteGroup } from '../firebase/firestore'
+import TrainingDayPicker from './TrainingDayPicker'
+import { normalizeTrainingDays, formatTrainingDays } from '../utils/trainingDays'
 
 /**
  * Create and edit roster groups.
  *
- * Deliberately small: a name, a colour, and an optional start date for the
- * block the group is running. Membership isn't edited here — it's set from
- * the roster (select athletes → add to group) and from an athlete's own page,
- * both of which are where a coach already is when they think about it.
+ * Deliberately small: a name, a colour, an optional start date for the block
+ * the group is running, and the weekdays the group trains on. Membership isn't
+ * edited here — it's set from the roster (select athletes → add to group) and
+ * from an athlete's own page, both of which are where a coach already is when
+ * they think about it.
+ *
+ * Training days are what make this double as Premier pool management. A pool is
+ * just a group whose members share a weekly schedule: set the days once here
+ * and every athlete in the pool inherits them on their next program pull,
+ * unless they have days of their own (see utils/trainingDays'
+ * effectiveTrainingDays). That inheritance is the whole "roughly the same
+ * schedule" property — the pool sets the shape, and one athlete with a class
+ * conflict can differ without leaving the pool.
  *
  * Deleting a group clears it off every athlete carrying it, so the count in
  * the confirm is the number of people about to lose the tag. The athletes and
@@ -21,9 +32,10 @@ export default function ManageGroupsModal({ groups, athletes, onClose, onChanged
   const [name, setName] = useState('')
   const [color, setColor] = useState(() => suggestGroupColor(groups))
   const [startDate, setStartDate] = useState('')
+  const [trainingDays, setTrainingDays] = useState([])
   const [saving, setSaving] = useState(false)
   const [editingId, setEditingId] = useState(null)
-  const [draft, setDraft] = useState({ name: '', color: 'blue', startDate: '' })
+  const [draft, setDraft] = useState({ name: '', color: 'blue', startDate: '', trainingDays: [] })
   const [confirm, setConfirm] = useState(null)
 
   const membersOf = (groupId) => athletes.filter(a => (a.groupIds || []).includes(groupId))
@@ -38,9 +50,10 @@ export default function ManageGroupsModal({ groups, athletes, onClose, onChanged
     }
     setSaving(true)
     try {
-      await createAthleteGroup({ name: trimmed, color, startDate: startDate || null })
+      await createAthleteGroup({ name: trimmed, color, startDate: startDate || null, trainingDays })
       setName('')
       setStartDate('')
+      setTrainingDays([])
       setColor(suggestGroupColor([...groups, { color }]))
       await onChanged()
       toast.success(`${trimmed} created.`)
@@ -53,7 +66,12 @@ export default function ManageGroupsModal({ groups, athletes, onClose, onChanged
 
   function startEdit(group) {
     setEditingId(group.id)
-    setDraft({ name: group.name, color: group.color || 'blue', startDate: group.startDate || '' })
+    setDraft({
+      name: group.name,
+      color: group.color || 'blue',
+      startDate: group.startDate || '',
+      trainingDays: normalizeTrainingDays(group.trainingDays),
+    })
   }
 
   async function saveEdit(group) {
@@ -61,7 +79,12 @@ export default function ManageGroupsModal({ groups, athletes, onClose, onChanged
     if (!trimmed) return
     setSaving(true)
     try {
-      await updateAthleteGroup(group.id, { name: trimmed, color: draft.color, startDate: draft.startDate || null })
+      await updateAthleteGroup(group.id, {
+        name: trimmed,
+        color: draft.color,
+        startDate: draft.startDate || null,
+        trainingDays: normalizeTrainingDays(draft.trainingDays),
+      })
       setEditingId(null)
       await onChanged()
     } catch (err) {
@@ -90,6 +113,10 @@ export default function ManageGroupsModal({ groups, athletes, onClose, onChanged
     })
   }
 
+  const toggleDay = (days, num) => normalizeTrainingDays(
+    days.includes(num) ? days.filter(d => d !== num) : [...days, num]
+  )
+
   const colorPicker = (selected, onPick) => (
     <div className="flex items-center gap-1.5">
       {GROUP_COLORS.map(c => (
@@ -114,7 +141,8 @@ export default function ManageGroupsModal({ groups, athletes, onClose, onChanged
           <div>
             <h2 className="text-lg font-bold text-white">Groups</h2>
             <p className="text-xs text-sp-ink-300 mt-0.5">
-              Cohorts you train together — a camp, a team. An athlete can be in more than one.
+              Cohorts you train together — a camp, a team, a Premier pool. Give a group training
+              days and its athletes inherit that weekly schedule. An athlete can be in more than one.
             </p>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-white/10 text-sp-ink-300 rounded-lg" aria-label="Close">
@@ -152,6 +180,14 @@ export default function ManageGroupsModal({ groups, athletes, onClose, onChanged
                       className="px-2 py-1 border border-sp-ink-600 rounded-lg text-xs text-sp-ink-50 bg-sp-ink-900 focus:outline-none focus:ring-2 focus:ring-sp-green-500"
                     />
                   </div>
+                  <div>
+                    <p className="text-[11px] font-semibold text-sp-ink-300 uppercase tracking-wider mb-1.5">Training days</p>
+                    <TrainingDayPicker
+                      value={draft.trainingDays}
+                      onToggle={(num) => setDraft(d => ({ ...d, trainingDays: toggleDay(d.trainingDays, num) }))}
+                      label={`Training days for ${g.name}`}
+                    />
+                  </div>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => saveEdit(g)}
@@ -179,6 +215,7 @@ export default function ManageGroupsModal({ groups, athletes, onClose, onChanged
                   <p className="text-[11px] text-sp-ink-300">
                     {members.length} athlete{members.length === 1 ? '' : 's'}
                     {g.startDate && ` · starts ${g.startDate}`}
+                    {normalizeTrainingDays(g.trainingDays).length > 0 && ` · ${formatTrainingDays(g.trainingDays)}`}
                   </p>
                 </div>
                 <button
@@ -228,6 +265,16 @@ export default function ManageGroupsModal({ groups, athletes, onClose, onChanged
                 className="px-2 py-1 border border-sp-ink-600 rounded-lg text-xs text-sp-ink-50 bg-sp-ink-900 focus:outline-none focus:ring-2 focus:ring-sp-green-500"
               />
             </label>
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold text-sp-ink-300 uppercase tracking-wider mb-1.5">
+              Training days <span className="font-normal normal-case tracking-normal">— optional, inherited by members</span>
+            </p>
+            <TrainingDayPicker
+              value={trainingDays}
+              onToggle={(num) => setTrainingDays(d => toggleDay(d, num))}
+              label="Training days for the new group"
+            />
           </div>
         </form>
       </div>

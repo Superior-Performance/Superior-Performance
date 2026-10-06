@@ -162,25 +162,49 @@ export function categoryRank(label) {
   return viaAlias === -1 ? Infinity : CATEGORY_ORDER.indexOf(EXERCISE_CATEGORIES[viaAlias].key)
 }
 
-// How an athlete's program reaches them. Stored on users/{uid}.athleteType;
-// anything unset counts as in-house, which is what every athlete was before
-// College Remote existed. These are two modes of one setting, not a flag —
-// see AdminAthleteDetail (where a coach switches between them) and
-// SchedulePage (which branches on the result).
+// Which service an athlete is on. Stored on users/{uid}.athleteType; anything
+// unset counts as in-house, which is what every athlete was before the other
+// tiers existed. Mutually exclusive — an athlete is on exactly one of these.
+//
+// This field used to decide HOW the schedule was presented: in-house athletes
+// got the dated calendar and College Remote athletes got a dateless
+// pick-a-day-type screen whose completions were never recorded. That split is
+// gone. Every tier now runs on the one dated calendar, and which weekdays an
+// athlete trains on is its own setting (users/{uid}.trainingDays, inheritable
+// from a Premier pool — see utils/trainingDays), which is what the difference
+// between a remote guy and an in-house guy always actually was.
+//
+// So this is now a service tier, not a scheduling mode. Nothing reads it to
+// decide what to render; it drives roster filtering, grouping and reporting.
+// Resist re-adding a branch on it in a view — if a tier needs to behave
+// differently, that difference almost certainly belongs in its own field, the
+// way training days do.
 export const ATHLETE_TYPES = [
   {
     key: 'in_house',
-    label: 'In-House Scheduled',
-    blurb: 'Follows the calendar — dated weeks and days, built around set training days at the facility.',
+    label: 'In-House',
+    blurb: 'Trains at the facility on set days. Follows the dated calendar and books facility slots.',
   },
   {
     key: 'remote',
     label: 'College Remote',
-    blurb: "No fixed schedule to plan around. Picks the day type that fits their session — High Intent, Hybrid, Synergy or Recovery — and sees every program's content for it together.",
+    blurb: 'Training off-site, usually at school. Same dated calendar and the same progress tracking as everyone else — their training days are just their own.',
+  },
+  {
+    key: 'premier',
+    label: 'Premier',
+    blurb: 'Top tier, trained in pools. Each pool runs its own weekly schedule, which every athlete in it inherits and can be adjusted off individually.',
   },
 ]
 
-// Normalizes the stored value, including the empty/missing case.
+const ATHLETE_TYPE_KEYS = new Set(ATHLETE_TYPES.map(t => t.key))
+
+// Normalizes the stored value, including the empty/missing case and any tier
+// that no longer exists.
 export function athleteTypeOf(user) {
-  return user?.athleteType === 'remote' ? 'remote' : 'in_house'
+  return ATHLETE_TYPE_KEYS.has(user?.athleteType) ? user.athleteType : 'in_house'
+}
+
+export function athleteTypeInfo(key) {
+  return ATHLETE_TYPES.find(t => t.key === key) || ATHLETE_TYPES[0]
 }

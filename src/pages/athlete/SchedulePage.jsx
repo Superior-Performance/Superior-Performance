@@ -13,27 +13,13 @@ import { format } from 'date-fns'
 import EmptyState from '../../components/EmptyState'
 import ProgressRing from '../../components/ProgressRing'
 import Skeleton from '../../components/Skeleton'
-import { PROGRAM_TYPES, programTypeInfo, exerciseCategoryInfo, categoryRank, DAY_TYPES, LIFTING_DAY_TYPES } from '../../constants/programTypes'
+import { PROGRAM_TYPES, programTypeInfo, exerciseCategoryInfo, categoryRank, LIFTING_DAY_TYPES } from '../../constants/programTypes'
 import { isExerciseComplete, keyForWrite, groupIntoSlots, buildSlots, isSlotComplete } from '../../utils/programIds'
 import { computeStreak, dayStats } from '../../utils/programSchedule'
 import DayStrip from './DayStrip'
 
 const CATEGORY_ICONS = { Wind, Heart, Zap, Flame, CircleDot, ListChecks, Dumbbell }
-const DAY_TYPE_ICONS = { Moon, Flame, Zap, Sparkles }
 const LIFTING_DAY_TYPE_ICONS = { Dumbbell }
-
-// The one day (first found, in week order) in this program tagged with the
-// given College Remote Athlete day type — see ProgramEditorModal's Day
-// Type dropdown. A program only ever defines one instance of each type;
-// it isn't repeated per week the way an in-house athlete's calendar is.
-function findDayForType(program, typeKey) {
-  for (const week of program.weeks || []) {
-    for (const day of week.days || []) {
-      if (day.dayType === typeKey && day.exercises?.length) return day
-    }
-  }
-  return null
-}
 
 // Labels are custom here rather than pulled from programTypeInfo because
 // "Throwing/Post-Throw" reads better as a tab name than the program badge's
@@ -102,15 +88,15 @@ function toEmbedUrl(url) {
 }
 
 export default function SchedulePage() {
-  const { currentUser, userProfile } = useAuth()
-  // College Remote Athlete Mode — no fixed calendar to plan around, so
-  // instead of "today" mapping to one dated day, the athlete picks which of
-  // the program's four day types (Recovery/High-Intent/Hybrid 1/Hybrid 2 —
-  // see constants/programTypes' DAY_TYPES) fits that session. See
-  // RemoteDayTypePicker below, which takes over the whole page for these
-  // athletes; everything from here through `dayMap` is in-house-only.
-  const isRemote = userProfile?.athleteType === 'remote'
-
+  const { currentUser } = useAuth()
+  // Every athlete — in-house, remote and Premier alike — runs on this one
+  // dated calendar. College Remote athletes used to get a separate dateless
+  // screen here where they picked a day type and nothing they did was ever
+  // recorded; which weekdays they train is now a setting on the athlete
+  // (users/{uid}.trainingDays, see utils/trainingDays) rather than a whole
+  // parallel view, so there is deliberately no athleteType branch on this
+  // page. Day types still exist — they just decide which weekday a session
+  // lands on at pull time instead of replacing the calendar.
   const [programs, setPrograms]       = useState([]) // every active program, any type
   const [completions, setCompletions] = useState({})
   const [weights, setWeights]         = useState({}) // this week's working weight per exercise
@@ -243,47 +229,6 @@ export default function SchedulePage() {
           subtitle="Your coach will assign a program soon."
           dark
         />
-      </div>
-    )
-  }
-
-  // College Remote Athletes get a completely different page — no calendar,
-  // no weeks, just a pick-a-day-type flow. See RemoteDayTypePicker. Lifting
-  // is not part of that flow at all — see LiftingBrowser below, used
-  // identically here and for in-house athletes.
-  if (isRemote) {
-    const liftingPrograms  = programs.filter(p => (p.programType || 'correctives') === 'lifting')
-    const trainingPrograms = programs.filter(p => (p.programType || 'correctives') !== 'lifting')
-    return (
-      <div className="min-h-[calc(100vh-56px)] bg-sp-ink-900 px-4 py-4 space-y-6">
-        <UpdateNotice programs={updatedPrograms} onDismiss={dismissUpdateNotice} dismissing={dismissing} />
-        {trainingPrograms.length > 0 && (
-          <RemoteDayTypePicker
-            title="Training"
-            programs={trainingPrograms}
-            dayTypes={DAY_TYPES}
-            dayTypeIcons={DAY_TYPE_ICONS}
-            emptyHint="Ask your coach to tag a day as Recovery, High-Intent, Synergy, or Hybrid."
-            weights={weights}
-            onSaveWeight={saveWeight}
-            onOpenDetail={setDetail}
-          />
-        )}
-        {liftingPrograms.length > 0 && (
-          <div>
-            <p className="text-xs font-bold text-sp-ink-300 uppercase tracking-wider mb-3">Lifting</p>
-            <LiftingBrowser
-              programs={liftingPrograms}
-              completions={completions}
-              weights={weights}
-              onToggleComplete={toggleExerciseComplete}
-              onChooseSlotOption={chooseSlotOption}
-              onOpenDetail={setDetail}
-              onSaveWeight={saveWeight}
-            />
-          </div>
-        )}
-        <ExerciseDetailModal detail={detail} onClose={() => setDetail(null)} />
       </div>
     )
   }
@@ -609,144 +554,6 @@ function DayBody({
   )
 }
 
-// One College Remote Athlete Mode day-type picker: pick one of `dayTypes`,
-// then see every program in `programs` tagged with it, merged via the same
-// DayBody/CategoryTiles machinery in-house athletes use. Rendered twice by
-// SchedulePage — once for training (correctives/throwing/mobility, sharing
-// the High Intent/Hybrid/Synergy/Recovery vocabulary) and once for lifting
-// (its own independent Upper/Lower vocabulary) — each instance's state is
-// fully independent since they're separate component instances.
-// Deliberately self-contained — none of this touches the real `completions`
-// from Firestore. A college athlete might run the same day type many times
-// over a season, and re-running it should start fresh each time rather
-// than showing everything already checked off from weeks ago, so
-// completion here is ephemeral local state that resets on every selection
-// instead of being persisted per exercise like the in-house flow.
-function RemoteDayTypePicker({ title, programs, dayTypes, dayTypeIcons, emptyHint, weights, onSaveWeight, onOpenDetail }) {
-  const [selectedDayType, setSelectedDayType] = useState(null)
-  const [activeProgramTab, setActiveProgramTab] = useState(null)
-  const [ephemeral, setEphemeral] = useState({})
-  const [openBlock, setOpenBlock] = useState({})
-  const [openSlot, setOpenSlot] = useState({})
-
-  function toggleBlock(groupKey, blockKey) {
-    setOpenBlock(prev => ({ ...prev, [groupKey]: prev[groupKey] === blockKey ? null : blockKey }))
-  }
-  function toggleSlot(scopeKey, altGroup) {
-    setOpenSlot(prev => ({ ...prev, [scopeKey]: prev[scopeKey] === altGroup ? null : altGroup }))
-  }
-
-  function selectDayType(key) {
-    setSelectedDayType(key)
-    setActiveProgramTab(null)
-    setEphemeral({})
-    setOpenBlock({})
-    setOpenSlot({})
-  }
-
-  function ephemeralToggle(programId, exercise, wi, di, ei, wouldFinishDay) {
-    const key = keyForWrite(programId, exercise, wi, di, ei)
-    const wasComplete = isExerciseComplete(ephemeral, programId, exercise, wi, di, ei)
-    setEphemeral(prev => ({ ...prev, [key]: { completed: !wasComplete } }))
-    if (!wasComplete && wouldFinishDay) toast.success('Workout complete.')
-  }
-
-  function ephemeralChooseSlotOption(programId, slot, chosenPos, wi, di, wouldFinishDay) {
-    slot.items.forEach(({ ex, i }, pos) => {
-      if (pos === chosenPos) return
-      if (isExerciseComplete(ephemeral, programId, ex, wi, di, i)) {
-        ephemeralToggle(programId, ex, wi, di, i, false)
-      }
-    })
-    const { ex, i } = slot.items[chosenPos]
-    ephemeralToggle(programId, ex, wi, di, i, wouldFinishDay)
-  }
-
-  const availableTypes = dayTypes.filter(dt =>
-    programs.some(p => findDayForType(p, dt.key))
-  )
-
-  const typeInfo = dayTypes.find(dt => dt.key === selectedDayType) || null
-  const entries = selectedDayType
-    ? programs
-        .map(program => {
-          const day = findDayForType(program, selectedDayType)
-          return day ? { program, day } : null
-        })
-        .filter(Boolean)
-    : []
-
-  return (
-    <div>
-      <p className="text-xs font-bold text-sp-ink-300 uppercase tracking-wider mb-3">{title}</p>
-
-      {availableTypes.length === 0 ? (
-        <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 p-8 text-center">
-          <ListChecks size={26} className="mx-auto mb-2 text-sp-ink-300" />
-          <p className="text-sm font-medium text-white">No day types set up yet</p>
-          <p className="text-xs text-sp-ink-300 mt-0.5">{emptyHint}</p>
-        </div>
-      ) : !selectedDayType ? (
-        <div>
-          <p className="text-sm text-sp-ink-300 mb-3">Pick whichever day type fits the session you're about to run.</p>
-          <div className="grid grid-cols-2 gap-3">
-            {availableTypes.map(dt => {
-              const Icon = dayTypeIcons[dt.icon] || Zap
-              return (
-                <button
-                  key={dt.key}
-                  onClick={() => selectDayType(dt.key)}
-                  className="bg-sp-ink-800 border border-sp-ink-600 rounded-2xl p-4 text-left hover:border-sp-green-500/40 transition"
-                >
-                  <div className="w-9 h-9 rounded-full bg-sp-green-500/15 flex items-center justify-center mb-3">
-                    <Icon size={17} className="text-sp-green-500" />
-                  </div>
-                  <p className="font-semibold text-white text-sm">{dt.label}</p>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      ) : (
-        <div>
-          <button
-            onClick={() => setSelectedDayType(null)}
-            className="flex items-center gap-1.5 text-sm text-sp-ink-300 hover:text-white transition mb-3"
-          >
-            <ChevronLeft size={16} /> Change day type
-          </button>
-          <p className="font-display text-lg font-bold text-white mb-3">{typeInfo?.label}</p>
-
-          {entries.length === 0 ? (
-            <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 p-6 text-center text-sm text-sp-ink-300">
-              Nothing tagged {typeInfo?.label} yet.
-            </div>
-          ) : (
-            <DayBody
-              entries={entries}
-              weekIdx={0}
-              dayIdx={0}
-              groupPrefix={`remote_${selectedDayType}`}
-              completions={ephemeral}
-              weights={weights}
-              selectedType={activeProgramTab}
-              onSelectType={setActiveProgramTab}
-              openBlock={openBlock}
-              toggleBlock={toggleBlock}
-              openSlot={openSlot}
-              toggleSlot={toggleSlot}
-              onToggleComplete={ephemeralToggle}
-              onChooseSlotOption={ephemeralChooseSlotOption}
-              onOpenDetail={onOpenDetail}
-              onSaveWeight={onSaveWeight}
-            />
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
 // A day type is "done" for a given program/week once every exercise in it
 // is checked off — the unit LiftingBrowser's week-gating counts against.
 function isLiftingDayTypeDone(program, weekIdx, dayTypeKey, completions) {
@@ -782,9 +589,9 @@ function computeLiftingWeekIdx(program, completions) {
 // blocks (Block A/B/C, each a collapsible tile via the same CategoryTiles
 // machinery, since a lifting exercise's `category` is literally "Block A"
 // etc. — see AdminAthleteDetail's createDraftFromRows). Real Firestore
-// completions are used (unlike RemoteDayTypePicker's ephemeral state) since
-// Week + Day Type together pick out one specific, non-repeating day for
-// every athlete, in-house or remote.
+// completions are used, since Week + Day Type together pick out one
+// specific, non-repeating day — the same for every athlete, whatever tier
+// they're on.
 function LiftingBrowser({ programs, completions, weights, onToggleComplete, onChooseSlotOption, onOpenDetail, onSaveWeight }) {
   const primaryProgram = programs[0]
   const totalWeeks = primaryProgram?.weeks?.length || 1

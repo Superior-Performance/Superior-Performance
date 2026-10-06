@@ -6,7 +6,7 @@ import {
 import { getDataLogs, addDataLog, setDataLogFlag } from '../../firebase/firestore'
 import { ensureExerciseIds, completionKey, legacyCompletionKey, countProgramProgress } from '../../utils/programIds'
 import Avatar from '../../components/Avatar'
-import { ArrowLeft, Save, Zap, Scale, MessageCircle, Pencil, Trash2, X, Sparkles, KeyRound, XCircle, FileSpreadsheet, Download, ChevronDown, GraduationCap, Users2, Search, Plus, Flag, Target } from 'lucide-react'
+import { ArrowLeft, Save, Zap, Scale, MessageCircle, Pencil, Trash2, X, Sparkles, KeyRound, XCircle, FileSpreadsheet, Download, ChevronDown, GraduationCap, CalendarRange, Users2, Search, Plus, Flag, Target } from 'lucide-react'
 import Papa from 'papaparse'
 import { sendPasswordResetEmail } from 'firebase/auth'
 import { auth } from '../../firebase/config'
@@ -15,7 +15,9 @@ import { format } from 'date-fns'
 import ProgramEditorModal from '../../components/ProgramEditorModal'
 import Skeleton from '../../components/Skeleton'
 import ConfirmDialog from '../../components/ConfirmDialog'
-import { PROGRAM_TYPES, ATHLETE_TYPES, athleteTypeOf } from '../../constants/programTypes'
+import { PROGRAM_TYPES, ATHLETE_TYPES, athleteTypeOf, athleteTypeInfo } from '../../constants/programTypes'
+import TrainingDayPicker from '../../components/TrainingDayPicker'
+import { normalizeTrainingDays, effectiveTrainingDays, formatTrainingDays } from '../../utils/trainingDays'
 import { compactWeeks } from '../../utils/programSize'
 import { groupColor } from '../../constants/athleteGroups'
 import AssessmentHistory from '../../components/AssessmentHistory'
@@ -66,6 +68,7 @@ export default function AdminAthleteDetail() {
   const [togglingType, setTogglingType] = useState(false)
   const [groups, setGroups] = useState([])
   const [savingGroup, setSavingGroup] = useState(null)
+  const [savingDays, setSavingDays] = useState(false)
   // Program tab shows one program type at a time (a sub-tab) instead of all
   // four stacked, and "Assign Existing" is a search modal instead of an
   // always-open list — both purely to keep this page from ballooning as an
@@ -223,17 +226,17 @@ export default function AdminAthleteDetail() {
     }
   }
 
-  // Athlete type — set straight from the profile page rather than through
+  // Service tier — set straight from the profile page rather than through
   // the Edit modal, since it's the kind of thing a coach needs to change
   // quickly (an athlete heading off to campus, or back) without clicking
-  // through a form. Two named options rather than the old on/off switch:
-  // "off" never said what the athlete then was, and the two modes are a
-  // real either/or, not a feature flag. Athletes in this mode aren't on a
-  // per-week calendar at all — they pick from a fixed set of day types
-  // (High Intent/Hybrid/Synergy/Recovery, tagged per day — usually auto-detected
-  // from the Outputs sheet's Day column, see createDraftFromRows) that
-  // apply across the whole program, not any specific week — see the
-  // isRemote branch in SchedulePage.
+  // through a form.
+  //
+  // This no longer changes what the athlete sees. College Remote used to put
+  // them on an entirely separate dateless screen; every tier now runs the one
+  // dated calendar, and the thing that actually differs between a remote guy
+  // and an in-house guy — which weekdays they train — is the Training Days
+  // card below. Switching tiers is therefore safe at any time and touches no
+  // program content.
   const athleteType = athleteTypeOf(athlete)
 
   // Which groups exist, so the chips below can offer every one of them —
@@ -266,14 +269,38 @@ export default function AdminAthleteDetail() {
     setAthlete(a => ({ ...a, athleteType: nextType })) // optimistic
     try {
       await updateUser(uid, { athleteType: nextType })
-      toast.success(nextType === 'remote'
-        ? 'Switched to College Remote — they now pick a day type.'
-        : 'Switched to In-House Scheduled — they now follow the calendar.')
+      toast.success(`Switched to ${athleteTypeInfo(nextType).label}.`)
     } catch {
       setAthlete(a => ({ ...a, athleteType: prevType }))
       toast.error('Could not update athlete type.')
     } finally {
       setTogglingType(false)
+    }
+  }
+
+  // The athlete's own training days, or the pool's if they have none of their
+  // own — see effectiveTrainingDays. This is what a program pull uses to decide
+  // which weekday each day type lands on.
+  const ownTrainingDays = normalizeTrainingDays(athlete?.trainingDays)
+  const inheritedPool = ownTrainingDays.length
+    ? null
+    : groups.find(g => (athlete?.groupIds || []).includes(g.id) && normalizeTrainingDays(g.trainingDays).length)
+
+  async function toggleTrainingDay(num) {
+    const next = ownTrainingDays.includes(num)
+      ? ownTrainingDays.filter(d => d !== num)
+      : [...ownTrainingDays, num]
+    const normalized = normalizeTrainingDays(next)
+    setSavingDays(true)
+    const prev = athlete.trainingDays
+    setAthlete(a => ({ ...a, trainingDays: normalized })) // optimistic
+    try {
+      await updateUser(uid, { trainingDays: normalized })
+    } catch {
+      setAthlete(a => ({ ...a, trainingDays: prev }))
+      toast.error('Could not update training days.')
+    } finally {
+      setSavingDays(false)
     }
   }
 
@@ -325,7 +352,9 @@ export default function AdminAthleteDetail() {
         toast.error('No Assessment Intake script URL set. Go to Settings first.')
         return
       }
-      const result = await generateDraftProgram(scriptUrl, uid, athlete.name, group, programs)
+      // Pass the athlete's training days (their own, else their pool's) so the
+      // sheet's day types land on the weekdays they actually train.
+      const result = await generateDraftProgram(scriptUrl, uid, athlete.name, group, programs, null, effectiveTrainingDays(athlete, groups))
       if (!result.ok) {
         toast.error(result.error)
         return
@@ -363,7 +392,7 @@ export default function AdminAthleteDetail() {
         return
       }
 
-      const results = await generateAllDraftPrograms(scriptUrl, uid, athlete.name, programs)
+      const results = await generateAllDraftPrograms(scriptUrl, uid, athlete.name, programs, null, effectiveTrainingDays(athlete, groups))
       const succeeded = results.filter(r => r.ok)
       const failed = results.filter(r => !r.ok)
 
@@ -803,7 +832,9 @@ export default function AdminAthleteDetail() {
         </div>
       </div>
 
-      {/* Athlete type — In-House Scheduled vs College Remote */}
+      {/* Service tier — In-House / College Remote / Premier. Purely a
+          classification now: every tier runs on the same dated calendar, and
+          which weekdays they train is the Training Days card below. */}
       <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 px-5 py-4 mb-6">
         <div className="flex items-start gap-3 mb-4">
           <div className="w-9 h-9 rounded-full bg-sp-green-500/15 text-sp-green-400 flex items-center justify-center flex-shrink-0">
@@ -812,13 +843,13 @@ export default function AdminAthleteDetail() {
           <div>
             <p className="font-semibold text-white text-sm">Athlete Type</p>
             <p className="text-xs text-sp-ink-300 mt-0.5 max-w-xl">
-              How this athlete's program reaches them. Switching keeps every program exactly as
-              it is — it only changes what they see on their schedule.
+              Which service this athlete is on. Every tier follows the same dated schedule — to
+              change which days they train, use Training Days below.
             </p>
           </div>
         </div>
 
-        <div className="grid sm:grid-cols-2 gap-3" role="radiogroup" aria-label="Athlete type">
+        <div className="grid sm:grid-cols-3 gap-3" role="radiogroup" aria-label="Athlete type">
           {ATHLETE_TYPES.map(({ key, label, blurb }) => {
             const active = athleteType === key
             return (
@@ -848,6 +879,32 @@ export default function AdminAthleteDetail() {
             )
           })}
         </div>
+      </div>
+
+      {/* Training days — which weekdays this athlete actually trains. Drives
+          where a program's day types land when pulled from the Outputs sheet
+          (see utils/trainingDays), which is what used to be hardcoded as four
+          consecutive days for everyone. */}
+      <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 px-5 py-4 mb-6">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="w-9 h-9 rounded-full bg-sp-green-500/15 text-sp-green-400 flex items-center justify-center flex-shrink-0">
+            <CalendarRange size={17} />
+          </div>
+          <div>
+            <p className="font-semibold text-white text-sm">Training Days</p>
+            <p className="text-xs text-sp-ink-300 mt-0.5 max-w-xl">
+              The days of the week this athlete trains. A program pulled from the sheet puts its
+              day types on these days, in order. Changing this affects the next pull — programs
+              already built keep the days they were built with.
+            </p>
+          </div>
+        </div>
+        <TrainingDayPicker
+          value={ownTrainingDays}
+          onToggle={toggleTrainingDay}
+          disabled={savingDays}
+          inheritedFrom={inheritedPool?.name || null}
+        />
       </div>
 
       {/* Groups — membership is a tag, so this is a row of toggles rather
@@ -1047,7 +1104,6 @@ export default function AdminAthleteDetail() {
         <AthleteProgramView
           programs={programs}
           completions={completions}
-          athleteType={athleteType}
           athleteId={uid}
         />
       )}

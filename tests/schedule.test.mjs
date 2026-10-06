@@ -10,6 +10,7 @@ const { matchesGroupFilter, groupsOf, suggestGroupColor, ALL_GROUPS, UNGROUPED }
 const { buildProgramWeeksFromRows, parseWeekOrDayRange } = await import(`${ROOT}src/utils/sheetRows.js`)
 const { countProgramProgress, completionKey } = await import(`${ROOT}src/utils/programIds.js`)
 const { isInactive, opportunitySinceMs } = await import(`${ROOT}src/utils/rosterStatus.js`)
+const { normalizeTrainingDays, dayTypeDayNums, effectiveTrainingDays, isMondayStart, formatTrainingDays } = await import(`${ROOT}src/utils/trainingDays.js`)
 const { assertReadable, redactDoc, collectionSegments, REDACTED } = await import(`${ROOT}scripts/lib/data-policy.mjs`)
 const { snapshotKeyFor, diffAssessments, numericSeries, trendableFields, sortByDateDesc } = await import(`${ROOT}src/utils/assessmentHistory.js`)
 const { ALL_FIELDS, RETIRED_FIELDS, SHEET_COLUMNS, isFlaggedValue, flaggedFindings, computeTotalArcs, TOTAL_ARCS } = await import(`${ROOT}src/constants/assessmentFields.js`)
@@ -561,6 +562,82 @@ t('nothing to judge by is not an accusation', () => {
 t('opportunity starts at the EARLIEST active program', () => {
   eq(opportunitySinceMs([{ startDate: dayStr(5) }, { startDate: dayStr(40) }], ago(90)),
      new Date(`${dayStr(40)}T12:00:00`).getTime())
+})
+
+/* ── Training days: which weekday a day type lands on ───────────────────── */
+
+t('training days are deduped, bounded to 1-7 and sorted', () => {
+  eq(normalizeTrainingDays([5, 1, 1, 9, 2, '4', 0, null]), [1, 2, 4, 5])
+})
+t('day types land on the chosen training days, in week order', () => {
+  eq(dayTypeDayNums(['high_intent', 'medium', 'synergy', 'recovery'], [1, 2, 4, 5]),
+     { high_intent: 1, medium: 2, synergy: 4, recovery: 5 })
+})
+t('tapping the days out of order still places them in week order', () => {
+  eq(dayTypeDayNums(['a', 'b'], [5, 2]), dayTypeDayNums(['a', 'b'], [2, 5]))
+})
+// The whole safety property of this change: an athlete nobody has configured
+// pulls exactly the way they did before training days existed.
+t('no training days set reproduces the old consecutive numbering', () => {
+  eq(dayTypeDayNums(['a', 'b', 'c', 'd'], []), { a: 1, b: 2, c: 3, d: 4 })
+  eq(dayTypeDayNums(['a', 'b', 'c', 'd'], null), { a: 1, b: 2, c: 3, d: 4 })
+})
+// Overflow must never double up two day types on one date — that would merge
+// two separate sessions into a single day's work.
+t('more day types than training days spills onto rest days, never collides', () => {
+  const placed = dayTypeDayNums(['a', 'b', 'c', 'd'], [2, 5])
+  eq(placed.a, 2)
+  eq(placed.b, 5)
+  eq(new Set(Object.values(placed)).size, 4, 'every day type needs its own dayNum:')
+})
+t('an athlete inherits their pool\'s training days', () => {
+  const pool = { id: 'p1', trainingDays: [1, 3, 5] }
+  eq(effectiveTrainingDays({ groupIds: ['p1'] }, [pool]), [1, 3, 5])
+})
+t('an athlete\'s own training days beat the pool\'s', () => {
+  const pool = { id: 'p1', trainingDays: [1, 3, 5] }
+  eq(effectiveTrainingDays({ groupIds: ['p1'], trainingDays: [2, 4] }, [pool]), [2, 4])
+})
+t('no pool and no setting means no training days, not an invented default', () => {
+  eq(effectiveTrainingDays({}, []), [])
+  eq(effectiveTrainingDays({ groupIds: ['p1'] }, [{ id: 'p1' }]), [])
+})
+t('formatTrainingDays says so when nothing is set', () => {
+  eq(formatTrainingDays([]), 'Not set')
+  eq(formatTrainingDays([1, 2, 4, 5]), 'Mon, Tue, Thu, Fri')
+})
+// dayNum is an offset from startDate, so the sheet's Monday=1 mapping only
+// lines up when the program actually starts on a Monday.
+t('isMondayStart separates a bad start date from a missing one', () => {
+  eq(isMondayStart('2026-10-05'), true)
+  eq(isMondayStart('2026-10-06'), false)
+  eq(isMondayStart(null), null)
+  eq(isMondayStart('nonsense'), null)
+})
+// End to end through the real pull: the sheet says "High Intent Day", and the
+// athlete trains Mon/Tue/Thu/Fri, so it has to come out on a Thursday-capable
+// grid rather than four consecutive days.
+t('a day-type pull places days on the athlete\'s training days', () => {
+  const rows = [
+    { Week: '1', Day: 'High Intent Day', Exercise: 'A' },
+    { Week: '1', Day: 'Hybrid Day',      Exercise: 'B' },
+    { Week: '1', Day: 'Synergy Day',     Exercise: 'C' },
+    { Week: '1', Day: 'Recovery Day',    Exercise: 'D' },
+  ]
+  const weeks = buildProgramWeeksFromRows(rows, 'throwing', { trainingDays: [1, 2, 4, 5] })
+  eq(weeks[0].days.map(d => d.dayNum), [1, 2, 4, 5])
+  eq(weeks[0].days.map(d => d.dayType), ['high_intent', 'medium', 'synergy', 'recovery'])
+})
+t('the same pull with no training days is unchanged from before', () => {
+  const rows = [
+    { Week: '1', Day: 'High Intent Day', Exercise: 'A' },
+    { Week: '1', Day: 'Recovery Day',    Exercise: 'D' },
+  ]
+  eq(buildProgramWeeksFromRows(rows, 'throwing')[0].days.map(d => d.dayNum), [1, 4])
+})
+t('a weekday name in the Day column ignores training days entirely', () => {
+  const rows = [{ Week: '1', Day: 'Wednesday', Exercise: 'A' }]
+  eq(buildProgramWeeksFromRows(rows, 'throwing', { trainingDays: [1, 2] })[0].days[0].dayNum, 3)
 })
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

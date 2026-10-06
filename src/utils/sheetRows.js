@@ -8,14 +8,12 @@
  */
 import { DAY_TYPES, LIFTING_DAY_TYPES, matchDayType, matchLiftingDayType } from '../constants/programTypes.js'
 import { makeExerciseId } from './programIds.js'
+import { dayTypeDayNums } from './trainingDays.js'
 
-// Each day type's stable position in the draft's day grid — see
-// buildProgramWeeksFromRows below.
-const DAY_TYPE_DAYNUM = Object.fromEntries(DAY_TYPES.map((dt, i) => [dt.key, i + 1]))
-// Lifting's day types get their own stable day-bucket numbering — separate
-// map, separate vocabulary (Upper/Lower vs. High Intent/Hybrid/Synergy/
-// Recovery), same purpose.
-const LIFTING_DAY_TYPE_DAYNUM = Object.fromEntries(LIFTING_DAY_TYPES.map((dt, i) => [dt.key, i + 1]))
+const DAY_TYPE_KEYS = DAY_TYPES.map(dt => dt.key)
+// Lifting's day types are a separate vocabulary (Upper/Lower vs. High
+// Intent/Hybrid/Synergy/Recovery) and get placed from their own list.
+const LIFTING_DAY_TYPE_KEYS = LIFTING_DAY_TYPES.map(dt => dt.key)
 
 const WEEKDAY_TO_NUM = { monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6, sunday: 7 }
 
@@ -57,7 +55,14 @@ export function parseWeekOrDayRange(raw) {
 // Notes/Video URL for a same-row either/or option). Pure — no network or
 // Firestore calls — so it's cheap to unit-reason about independent of the
 // fetch/create side.
-export function buildProgramWeeksFromRows(rows, programType = 'correctives') {
+export function buildProgramWeeksFromRows(rows, programType = 'correctives', { trainingDays = [] } = {}) {
+  const isLiftingProgram = programType === 'lifting'
+  // Which dayNum each day type occupies. With training days set, the day
+  // types land on the weekdays the athlete actually trains (Mon/Tue/Thu/Fri
+  // rather than four consecutive days); with none set this returns the same
+  // 1-based positions this function always used, so an unconfigured athlete
+  // pulls exactly as before. See utils/trainingDays.
+  const dayNumMap = dayTypeDayNums(isLiftingProgram ? LIFTING_DAY_TYPE_KEYS : DAY_TYPE_KEYS, trainingDays)
   const weeksMap = {}
   rows.forEach(row => {
     const weekNums = parseWeekOrDayRange(row['Week'])
@@ -70,8 +75,7 @@ export function buildProgramWeeksFromRows(rows, programType = 'correctives') {
     // stable day bucket, tagged automatically so the athlete's day-type
     // picker (see SchedulePage) works right after the pull instead of
     // needing the coach to re-tag it by hand.
-    const dayTypeKey = programType === 'lifting' ? matchLiftingDayType(row['Day']) : matchDayType(row['Day'])
-    const dayNumMap = programType === 'lifting' ? LIFTING_DAY_TYPE_DAYNUM : DAY_TYPE_DAYNUM
+    const dayTypeKey = isLiftingProgram ? matchLiftingDayType(row['Day']) : matchDayType(row['Day'])
     const dayNums = dayTypeKey
       ? [dayNumMap[dayTypeKey]]
       : (row['Day'] !== undefined && row['Day'] !== '' ? parseWeekOrDayRange(row['Day']) : [1])
@@ -97,12 +101,11 @@ export function buildProgramWeeksFromRows(rows, programType = 'correctives') {
         // see buildCategoryBlocks (SchedulePage) and buildDayGroups
         // (ProgramEditorModal); `blockSlot` is just for ordering exercises
         // within that block correctly.
-        const isLifting = programType === 'lifting'
-        const category = isLifting
+        const category = isLiftingProgram
           ? (row['Block'] ? `Block ${String(row['Block']).trim().toUpperCase()}` : '')
           : (row['Category'] || row['Type'] || '')
         const slotRaw = row['Slot #'] ?? row['Slot#'] ?? row['Slot']
-        const blockSlot = isLifting && slotRaw !== undefined && slotRaw !== '' ? Number(slotRaw) : NaN
+        const blockSlot = isLiftingProgram && slotRaw !== undefined && slotRaw !== '' ? Number(slotRaw) : NaN
         weeksMap[wk].days[day].exercises.push({
           id:        makeExerciseId(),   // stable across later edits — see utils/programIds
           name:      String(row['Exercise'] ?? ''),

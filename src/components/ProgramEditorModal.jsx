@@ -6,6 +6,8 @@ import { libraryEntryId, buildLibraryEntries, matchLibraryEntries } from '../uti
 import ConfirmDialog from './ConfirmDialog'
 import ProgramMonthView from './ProgramMonthView'
 import { computeTodayPosition } from '../utils/programSchedule'
+import { isMondayStart } from '../utils/trainingDays'
+import { format } from 'date-fns'
 import { getExerciseLibrary, upsertExerciseLibraryEntries } from '../firebase/firestore'
 import { EXERCISE_CATEGORIES, exerciseCategoryInfo, categoryRank, DAY_TYPES, LIFTING_DAY_TYPES } from '../constants/programTypes'
 import { compactWeeks, estimateBytes, sizeStatus, formatBytes } from '../utils/programSize'
@@ -451,6 +453,23 @@ export default function ProgramEditorModal({ program, onClose, onSave, onPublish
           />
           <p className="text-[11px] text-sp-ink-300">Day 1 of Week 1 — controls the dates the athlete sees.</p>
         </div>
+
+        {/* A program's day numbers are offsets from the start date, while the
+            Outputs sheet (and an athlete's training days) name real weekdays —
+            Monday=1. The two only line up when Week 1 Day 1 IS a Monday; start
+            on a Wednesday and every named weekday in the program silently
+            shifts by two days. Warn rather than block: a mid-week start is
+            occasionally what the coach wants, they just need to know. */}
+        {isMondayStart(startDate) === false && (
+          <div className="flex items-start gap-2 px-6 py-2.5 border-b border-sp-ink-600 bg-amber-500/10 flex-shrink-0">
+            <AlertTriangle size={14} className="text-amber-400 flex-shrink-0 mt-0.5" />
+            <p className="text-[11px] text-amber-200/90">
+              This program starts on a {format(new Date(`${startDate}T12:00:00`), 'EEEE')}. Day numbers count
+              from the start date, so a day meant for Monday will land on {format(new Date(`${startDate}T12:00:00`), 'EEEE')}.
+              Use a Monday unless you intend the shift.
+            </p>
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
           {weeks.length > 0 && (

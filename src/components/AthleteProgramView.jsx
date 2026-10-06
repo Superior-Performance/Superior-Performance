@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { CalendarDays, Moon, Check, Dumbbell } from 'lucide-react'
 import { format } from 'date-fns'
-import { PROGRAM_TYPES, programTypeInfo, exerciseCategoryInfo, categoryRank, DAY_TYPES, LIFTING_DAY_TYPES } from '../constants/programTypes'
+import { PROGRAM_TYPES, programTypeInfo, exerciseCategoryInfo, categoryRank, LIFTING_DAY_TYPES } from '../constants/programTypes'
 import { buildSlots, isSlotComplete, isExerciseComplete } from '../utils/programIds'
 import { cellDate, computeTodayPosition, dayIndexFor, dayCountForWeek, dayStatsByType, activeProgramsForAthlete } from '../utils/programSchedule'
 
@@ -15,31 +15,29 @@ import { cellDate, computeTodayPosition, dayIndexFor, dayCountForWeek, dayStatsB
  * they do it" without putting a single editable control on the screen.
  *
  * Mirrors the athlete's own experience rather than the editor's:
- *  - in-house athletes get dated weeks and days, with every program type that
- *    lands on that date merged into one view, the way their phone shows it
- *  - College Remote athletes have no dates at all, so they get the day-type
- *    picker instead — the same four types their schedule offers
+ *  - dated weeks and days, with every program type that lands on that date
+ *    merged into one view, the way their phone shows it. Every tier reads the
+ *    same way: there is no separate College Remote view any more, because
+ *    remote athletes now run on this same calendar (see SchedulePage).
  *  - lifting is always separate, because a lift day is Upper/Lower rather than
- *    a weekday (see LIFTING_DAY_TYPE_DAYNUM)
+ *    a weekday (see utils/trainingDays)
  *
  * Completion marks come from the same helpers the athlete's page and the
  * streak use, so "done" here means exactly what it means everywhere else.
  */
-export default function AthleteProgramView({ programs = [], completions = {}, athleteType = 'in_house', athleteId }) {
+export default function AthleteProgramView({ programs = [], completions = {}, athleteId }) {
   // Filtered here rather than by the caller: the page's program list carries
   // the general library too, and a template rendered as this athlete's work
   // is the bug this view shipped with.
   const active = activeProgramsForAthlete(programs, athleteId)
   const lifting = active.filter(p => (p.programType || 'correctives') === 'lifting')
   const dated = active.filter(p => (p.programType || 'correctives') !== 'lifting')
-  const isRemote = athleteType === 'remote'
 
   const totalWeeks = Math.max(1, ...active.map(p => p.weeks?.length || 0))
   const today = computeTodayPosition(dated, totalWeeks)
   const [weekIdx, setWeekIdx] = useState(() =>
     today.hasStart && !today.notStartedYet && !today.pastProgram ? today.weekIdx : 0)
   const [dayNum, setDayNum] = useState(() => (today.hasStart ? today.dayNum : 1))
-  const [dayType, setDayType] = useState(DAY_TYPES[0].key)
 
   if (active.length === 0) {
     return (
@@ -61,29 +59,23 @@ export default function AthleteProgramView({ programs = [], completions = {}, at
           <div className="min-w-0">
             <h2 className="font-semibold text-white text-sm">Schedule</h2>
             <p className="text-xs text-sp-ink-300 mt-0.5 max-w-xl">
-              {isRemote
-                ? 'This athlete picks a day type rather than following dates, so this shows what each type holds across every program.'
-                : 'What this athlete sees, day by day, with everything they have completed. Read-only — nothing here can change a program.'}
+              What this athlete sees, day by day, with everything they have completed. Read-only — nothing here can change a program.
             </p>
           </div>
         </div>
       </div>
 
-      {isRemote
-        ? <RemoteView programs={dated} lifting={lifting} completions={completions} dayType={dayType} onPickType={setDayType} />
-        : (
-          <DatedView
-            programs={dated} lifting={lifting} completions={completions}
-            totalWeeks={totalWeeks} today={today}
-            weekIdx={weekIdx} dayNum={dayNum}
-            onPickWeek={setWeekIdx} onPickDay={setDayNum}
-          />
-        )}
+      <DatedView
+        programs={dated} lifting={lifting} completions={completions}
+        totalWeeks={totalWeeks} today={today}
+        weekIdx={weekIdx} dayNum={dayNum}
+        onPickWeek={setWeekIdx} onPickDay={setDayNum}
+      />
     </div>
   )
 }
 
-/* ── in-house: dated weeks and days ─────────────────────────────────────── */
+/* ── dated weeks and days ───────────────────────────────────────────────── */
 
 function DatedView({ programs, lifting, completions, totalWeeks, today, weekIdx, dayNum, onPickWeek, onPickDay }) {
   const startDate = today.startDate
@@ -165,53 +157,6 @@ function DatedView({ programs, lifting, completions, totalWeeks, today, weekIdx,
       />
 
       {lifting.length > 0 && <LiftingSection programs={lifting} completions={completions} weekIdx={weekIdx} />}
-    </>
-  )
-}
-
-/* ── College Remote: day types, no dates ────────────────────────────────── */
-
-function RemoteView({ programs, lifting, completions, dayType, onPickType }) {
-  const entries = programs.flatMap(p =>
-    (p.weeks || []).flatMap((week, wi) =>
-      (week.days || []).map((day, di) => ({ program: p, day, dayIdx: di, weekIdx: wi }))
-    ).filter(e => e.day?.dayType === dayType && e.day?.exercises?.length)
-  ).sort((a, b) => typeOrder(a.program) - typeOrder(b.program))
-
-  return (
-    <>
-      <div className="bg-sp-ink-800 rounded-2xl border border-sp-ink-600 p-4">
-        <div className="flex flex-wrap gap-2">
-          {DAY_TYPES.map(dt => (
-            <button
-              key={dt.key}
-              type="button"
-              onClick={() => onPickType(dt.key)}
-              className={`px-3.5 py-2 rounded-xl border text-sm font-medium transition ${
-                dt.key === dayType
-                  ? 'border-sp-green-500 bg-sp-green-500/15 text-white'
-                  : 'border-sp-ink-600 bg-sp-ink-900/40 text-sp-ink-300 hover:border-sp-ink-300/40'
-              }`}
-            >
-              {dt.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <DayDetail
-        title={DAY_TYPES.find(d => d.key === dayType)?.label || 'Day'}
-        entries={entries}
-        completions={completions}
-        weekIdx={null}
-        // Remote completions are ephemeral by design on the athlete side, so
-        // a tick column and a "0/2 done" here would read as an athlete who
-        // did nothing rather than a mode that records nothing.
-        showCompletion={false}
-        note="College Remote sessions aren't ticked off — their day types repeat, so nothing is recorded as done."
-      />
-
-      {lifting.length > 0 && <LiftingSection programs={lifting} completions={completions} weekIdx={0} />}
     </>
   )
 }

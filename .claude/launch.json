@@ -4,7 +4,19 @@
     {
       "name": "dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "emulator",
+      "runtimeExecutable": "/bin/sh",
+      "runtimeArgs": [
+        "-c",
+        "PATH=\"/opt/homebrew/Cellar/openjdk@21/21.0.12.1/bin:$PATH\" exec npm run dev:emulator"
+      ],
       "port": 5173
     }
   ]

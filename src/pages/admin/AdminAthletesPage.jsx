@@ -12,11 +12,12 @@ import { Users, Users2, Plus, Search, ChevronRight, ChevronDown, X, FileSpreadsh
 import toast from 'react-hot-toast'
 import EmptyState from '../../components/EmptyState'
 import Skeleton from '../../components/Skeleton'
-import { programTypeInfo } from '../../constants/programTypes'
+import { programTypeInfo, athleteTypeOf, athleteTypeInfo } from '../../constants/programTypes'
 import Avatar from '../../components/Avatar'
 import GroupFilterBar from '../../components/GroupFilterBar'
 import ManageGroupsModal from '../../components/ManageGroupsModal'
 import { ALL_GROUPS, matchesGroupFilter, groupsOf, groupColor } from '../../constants/athleteGroups'
+import { effectiveTrainingDays } from '../../utils/trainingDays'
 
 // "Generate Programs" bulk menu — same 5 choices as the single-athlete
 // page's "Generate Program" dropdown, so a coach who already knows that
@@ -210,11 +211,11 @@ export default function AdminAthletesPage() {
         setBulkRunning(prev => ({ ...prev, current: i + 1, label: a.name }))
         try {
           if (item.kind === 'all') {
-            const groupResults = await generateAllDraftPrograms(scriptUrl, a.id, a.name, null, groupStart)
+            const groupResults = await generateAllDraftPrograms(scriptUrl, a.id, a.name, null, groupStart, effectiveTrainingDays(a, groups))
             const ok = groupResults.filter(r => r.ok)
             results.push({ name: a.name, ok: ok.length > 0, detail: ok.length ? `${ok.length}/${groupResults.length} types` : 'No rows found' })
           } else {
-            const r = await generateDraftProgram(scriptUrl, a.id, a.name, item.group, null, groupStart)
+            const r = await generateDraftProgram(scriptUrl, a.id, a.name, item.group, null, groupStart, effectiveTrainingDays(a, groups))
             results.push({ name: a.name, ok: r.ok, detail: r.ok ? `${r.count} rows` : r.error })
           }
         } catch (err) {
@@ -475,6 +476,15 @@ export default function AdminAthletesPage() {
                       <Avatar name={a.name} photoURL={a.photoURL} size={8} />
                       <div className="min-w-0">
                         <span className="font-medium text-white hover:text-sp-green-400 transition">{a.name}</span>
+                        {/* Service tier — only shown when it isn't the default.
+                            Tagging all 40-odd in-house athletes "In-House" is
+                            noise; what a coach scans this column for is the
+                            handful who are remote or Premier. */}
+                        {athleteTypeOf(a) !== 'in_house' && (
+                          <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded border border-sp-ink-600 bg-sp-ink-900/60 text-[10px] font-semibold text-sp-ink-300 whitespace-nowrap align-middle">
+                            {athleteTypeInfo(athleteTypeOf(a)).label}
+                          </span>
+                        )}
                         {groupsOf(a, groups).length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-0.5">
                             {groupsOf(a, groups).map(g => (

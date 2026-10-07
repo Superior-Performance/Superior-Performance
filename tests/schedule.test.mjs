@@ -11,6 +11,7 @@ const { buildProgramWeeksFromRows, parseWeekOrDayRange } = await import(`${ROOT}
 const { countProgramProgress, completionKey } = await import(`${ROOT}src/utils/programIds.js`)
 const { isInactive, opportunitySinceMs } = await import(`${ROOT}src/utils/rosterStatus.js`)
 const { normalizeTrainingDays, dayTypeDayNums, effectiveTrainingDays, isMondayStart, formatTrainingDays } = await import(`${ROOT}src/utils/trainingDays.js`)
+const { replaceProgramDays } = await import(`${ROOT}src/utils/replaceProgramDays.js`)
 const { assertReadable, redactDoc, collectionSegments, REDACTED } = await import(`${ROOT}scripts/lib/data-policy.mjs`)
 const { snapshotKeyFor, diffAssessments, numericSeries, trendableFields, sortByDateDesc } = await import(`${ROOT}src/utils/assessmentHistory.js`)
 const { ALL_FIELDS, RETIRED_FIELDS, SHEET_COLUMNS, isFlaggedValue, flaggedFindings, computeTotalArcs, TOTAL_ARCS } = await import(`${ROOT}src/constants/assessmentFields.js`)
@@ -674,6 +675,71 @@ t('pools are split out from ordinary groups by kind, not by having a schedule', 
   eq(premierPools(groups).map(g => g.name), ['Pool A'])
   eq(plainGroups(groups).map(g => g.name), ['Winter Camp'])
   eq(isPremierPool(groups[1]), false, 'a camp with training days is not a pool:')
+})
+
+/* ── Re-placing an existing program onto new training days ──────────────── */
+
+const typedDay = (dayNum, dayType) => ({ dayNum, dayType, exercises: [{ id: `x${dayNum}${dayType}` }] })
+const fourDayProgram = () => ({
+  programType: 'throwing',
+  weeks: [{ days: [
+    typedDay(1, 'high_intent'), typedDay(2, 'medium'), typedDay(3, 'synergy'), typedDay(4, 'recovery'),
+  ] }],
+})
+
+t('re-placing moves day types onto the new training days', () => {
+  const r = replaceProgramDays(fourDayProgram(), [1, 2, 4, 5])
+  eq(r.ok, true)
+  eq(r.weeks[0].days.map(d => d.dayNum), [1, 2, 4, 5])
+  eq(r.weeks[0].days.map(d => d.dayType), ['high_intent', 'medium', 'synergy', 'recovery'])
+})
+// The array order must survive, because legacy completions are keyed by
+// (week, day, exercise) position — see keyForWrite. Reordering would slide old
+// completion documents onto different exercises.
+t('re-placing renumbers in place and never reorders the days array', () => {
+  const r = replaceProgramDays(fourDayProgram(), [5, 4, 2, 1])
+  eq(r.weeks[0].days.map(d => d.dayType), ['high_intent', 'medium', 'synergy', 'recovery'])
+  eq(r.weeks[0].days.map(d => d.exercises[0].id),
+     ['x1high_intent', 'x2medium', 'x3synergy', 'x4recovery'])
+})
+t('the source program is not mutated', () => {
+  const prog = fourDayProgram()
+  replaceProgramDays(prog, [1, 2, 4, 5])
+  eq(prog.weeks[0].days.map(d => d.dayNum), [1, 2, 3, 4])
+})
+// A day with real work but no day type has no principled new position, so the
+// whole program is refused rather than half-moved into a week nobody designed.
+t('a program with an untyped working day is refused, not partly moved', () => {
+  const prog = fourDayProgram()
+  prog.weeks[0].days.push({ dayNum: 6, exercises: [{ id: 'orphan' }] })
+  const r = replaceProgramDays(prog, [1, 2, 4, 5])
+  eq(r.ok, false)
+  eq(r.reason, 'untyped-days')
+  eq(r.untypedDays, 1)
+})
+// Empty padding days are fine, but must not be left sitting on a number a real
+// day just moved onto — dayIndexFor matches the first day with that number, so
+// a collision makes the real day's work unreachable.
+t('empty padding days are pushed off numbers that real days now occupy', () => {
+  const prog = fourDayProgram()
+  prog.weeks[0].days.push({ dayNum: 5, exercises: [] })   // would collide with recovery
+  const r = replaceProgramDays(prog, [1, 2, 4, 5])
+  eq(r.ok, true)
+  const nums = r.weeks[0].days.map(d => d.dayNum)
+  eq(new Set(nums).size, nums.length, 'every day in a week needs a distinct number:')
+})
+t('lifting re-places against its own day-type vocabulary', () => {
+  const lift = {
+    programType: 'lifting',
+    weeks: [{ days: [typedDay(1, 'upper_1'), typedDay(2, 'lower_1')] }],
+  }
+  eq(replaceProgramDays(lift, [2, 5]).weeks[0].days.map(d => d.dayNum), [2, 5])
+})
+t('a program already on those days reports unchanged rather than rewriting', () => {
+  eq(replaceProgramDays(fourDayProgram(), [1, 2, 3, 4]).reason, 'unchanged')
+})
+t('no training days means nothing to place against', () => {
+  eq(replaceProgramDays(fourDayProgram(), []).reason, 'no-training-days')
 })
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

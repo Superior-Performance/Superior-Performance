@@ -3,7 +3,9 @@ import { Plus, Trash2, X, Check, Pencil } from 'lucide-react'
 import toast from 'react-hot-toast'
 import ConfirmDialog from './ConfirmDialog'
 import { GROUP_COLORS, groupColor, suggestGroupColor, PREMIER_POOL, isPremierPool } from '../constants/athleteGroups'
-import { createAthleteGroup, updateAthleteGroup, deleteAthleteGroup } from '../firebase/firestore'
+import { createAthleteGroup, updateAthleteGroup, deleteAthleteGroup, getActiveProgramsForAthletes, updateLiveProgram } from '../firebase/firestore'
+import { replaceProgramDays, skipReasonText } from '../utils/replaceProgramDays'
+import { effectiveTrainingDays } from '../utils/trainingDays'
 import TrainingDayPicker from './TrainingDayPicker'
 import { normalizeTrainingDays, formatTrainingDays } from '../utils/trainingDays'
 
@@ -38,6 +40,7 @@ export default function ManageGroupsModal({ groups, athletes, onClose, onChanged
   const [editingId, setEditingId] = useState(null)
   const [draft, setDraft] = useState({ name: '', color: 'blue', startDate: '', trainingDays: [], isPool: false })
   const [confirm, setConfirm] = useState(null)
+  const [replacing, setReplacing] = useState(false)
 
   const membersOf = (groupId) => athletes.filter(a => (a.groupIds || []).includes(groupId))
 
@@ -83,17 +86,24 @@ export default function ManageGroupsModal({ groups, athletes, onClose, onChanged
   async function saveEdit(group) {
     const trimmed = draft.name.trim()
     if (!trimmed) return
+    const nextDays = normalizeTrainingDays(draft.trainingDays)
+    const daysChanged = JSON.stringify(nextDays) !== JSON.stringify(normalizeTrainingDays(group.trainingDays))
     setSaving(true)
     try {
       await updateAthleteGroup(group.id, {
         name: trimmed,
         color: draft.color,
         startDate: draft.startDate || null,
-        trainingDays: normalizeTrainingDays(draft.trainingDays),
+        trainingDays: nextDays,
         kind: draft.isPool ? PREMIER_POOL : null,
       })
       setEditingId(null)
       await onChanged()
+      // Saving the schedule and moving existing programs onto it are two
+      // separate decisions. The days are already saved at this point and take
+      // effect on the next pull either way; this only asks about programs that
+      // already exist, and declining leaves them exactly as they were.
+      if (daysChanged && nextDays.length) await offerReplace({ ...group, trainingDays: nextDays })
     } catch (err) {
       toast.error(err.message || 'Could not save that change.')
     } finally {
@@ -101,10 +111,88 @@ export default function ManageGroupsModal({ groups, athletes, onClose, onChanged
     }
   }
 
+  /**
+   * After a pool's training days change, offer to move its athletes' existing
+   * programs onto the new days.
+   *
+   * Only athletes who actually FOLLOW the pool are considered: someone with
+   * training days of their own ignores the pool's (see effectiveTrainingDays),
+   * so re-placing their program to match it would override a deliberate
+   * exception the coach set for that athlete.
+   *
+   * The whole plan is computed before anything is written, so the confirm can
+   * state exactly what will move and what won't — and nothing is touched if
+   * the coach says no.
+   */
+  async function offerReplace(group) {
+    const followers = athletes.filter(a =>
+      (a.groupIds || []).includes(group.id) &&
+      effectiveTrainingDays(a, [group]).join() === normalizeTrainingDays(group.trainingDays).join()
+    )
+    if (followers.length === 0) return
+
+    let programs
+    try {
+      programs = await getActiveProgramsForAthletes(followers.map(a => a.id))
+    } catch {
+      toast.error('Days saved, but the existing programs could not be checked.')
+      return
+    }
+    if (programs.length === 0) return
+
+    const plans = programs.map(p => ({ program: p, result: replaceProgramDays(p, group.trainingDays) }))
+    const movable = plans.filter(p => p.result.ok)
+    const blocked = plans.filter(p => !p.result.ok && p.result.reason !== 'unchanged')
+
+    if (movable.length === 0) {
+      if (blocked.length) {
+        toast(`Days saved. ${blocked.length} program${blocked.length === 1 ? '' : 's'} couldn't be moved — ${skipReasonText(blocked[0].result.reason, blocked[0].result)}.`)
+      }
+      return
+    }
+
+    const nameOf = (uid) => athletes.find(a => a.id === uid)?.name || 'an athlete'
+    const athleteCount = new Set(movable.map(p => p.program.athleteId)).size
+
+    setConfirm({
+      title: `Move ${movable.length} existing program${movable.length === 1 ? '' : 's'} onto these days?`,
+      message:
+        `${formatTrainingDays(group.trainingDays)} is saved for ${group.name} and applies to everything pulled from now on.\n\n` +
+        `${movable.length} program${movable.length === 1 ? '' : 's'} across ${athleteCount} athlete${athleteCount === 1 ? '' : 's'} can also be moved now — their sessions keep their day types and everything already completed, they just land on the new weekdays.` +
+        (blocked.length
+          ? `\n\n${blocked.length} will be left alone: ${nameOf(blocked[0].program.athleteId)}'s ${blocked[0].program.programType || 'program'} because ${skipReasonText(blocked[0].result.reason, blocked[0].result)}.`
+          : ''),
+      confirmLabel: 'Move them',
+      onConfirmFn: async () => {
+        setReplacing(true)
+        let done = 0
+        const failed = []
+        for (const { program, result } of movable) {
+          try {
+            // updateLiveProgram, not updateProgram: this changes what the
+            // athlete sees next time they open the app, so it should raise
+            // their "your coach updated this" notice rather than move the
+            // week under them silently.
+            await updateLiveProgram(program.id, { weeks: result.weeks })
+            done++
+          } catch {
+            failed.push(nameOf(program.athleteId))
+          }
+        }
+        setReplacing(false)
+        await onChanged()
+        if (failed.length) toast.error(`Moved ${done}; ${failed.length} failed (${[...new Set(failed)].join(', ')}).`)
+        else toast.success(`Moved ${done} program${done === 1 ? '' : 's'} onto ${formatTrainingDays(group.trainingDays)}.`)
+      },
+    })
+  }
+
   function askDelete(group) {
     const members = membersOf(group.id)
     setConfirm({
       title: `Delete "${group.name}"?`,
+      confirmLabel: 'Delete',
+      danger: true,
       message: members.length
         ? `${members.length} athlete${members.length === 1 ? '' : 's'} will lose this tag. Their programs, schedules and history are untouched.`
         : 'Nothing is in this group yet.',
@@ -166,10 +254,24 @@ export default function ManageGroupsModal({ groups, athletes, onClose, onChanged
               days and its athletes inherit that weekly schedule. An athlete can be in more than one.
             </p>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-white/10 text-sp-ink-300 rounded-lg" aria-label="Close">
+          {/* Closing mid-run would hide a loop that is still writing to
+              programs one at a time, leaving the coach unsure which athletes
+              actually moved. */}
+          <button
+            onClick={onClose}
+            disabled={replacing}
+            className="p-1 hover:bg-white/10 text-sp-ink-300 rounded-lg disabled:opacity-40"
+            aria-label="Close"
+          >
             <X size={18} />
           </button>
         </div>
+
+        {replacing && (
+          <p className="px-6 py-2 text-xs text-sp-green-300 border-b border-sp-ink-600 flex-shrink-0">
+            Moving programs onto the new days…
+          </p>
+        )}
 
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2">
           {groups.length === 0 && (
@@ -307,8 +409,8 @@ export default function ManageGroupsModal({ groups, athletes, onClose, onChanged
         <ConfirmDialog
           title={confirm.title}
           message={confirm.message}
-          confirmLabel="Delete"
-          danger
+          confirmLabel={confirm.confirmLabel || 'Confirm'}
+          danger={!!confirm.danger}
           onCancel={() => setConfirm(null)}
           onConfirm={async () => {
             const run = confirm.onConfirmFn

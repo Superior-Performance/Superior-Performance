@@ -8,7 +8,7 @@ export default function ConfirmDialog({ title, message, confirmLabel = 'Confirm'
     <div className="animate-modal-backdrop fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4" onClick={onCancel}>
       <div className="animate-modal-panel bg-sp-ink-800 border border-sp-ink-600 rounded-2xl w-full max-w-sm p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-lg font-bold text-white mb-2">{title}</h2>
-        <p className="text-sm text-sp-ink-300 mb-5">{message}</p>
+        <p className="text-sm text-sp-ink-300 mb-5 whitespace-pre-line">{message}</p>
         <div className="flex gap-3">
           <button onClick={onCancel} className="flex-1 py-2.5 border border-sp-ink-600 text-sp-ink-100 rounded-xl text-sm font-medium hover:bg-white/5 transition">
             Cancel

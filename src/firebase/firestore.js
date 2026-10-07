@@ -210,6 +210,25 @@ export const getAllPrograms = () =>
 export const getProgramsForAthlete = (athleteId) =>
   getDocs(query(collection(db, 'programs'), where('athleteId', '==', athleteId)))
 
+// Every active, non-archived program belonging to any of these athletes —
+// what a pool's schedule change would actually affect.
+//
+// One query per athlete rather than a single `athleteId in [...]` query paired
+// with `active == true`: that combination needs a composite index, and a query
+// against an index Firestore is still building comes back EMPTY rather than
+// erroring. Here that failure mode would read as "no programs to re-place" and
+// silently do nothing. A handful of single-field queries can't be wrong that
+// way, and this runs when a coach changes a pool's days, not on a loop.
+export const getActiveProgramsForAthletes = async (uids = []) => {
+  const snaps = await Promise.all(uids.map(uid => getProgramsForAthlete(uid)))
+  const out = []
+  snaps.forEach(snap => snap.forEach(d => {
+    const data = d.data()
+    if (data.active && !data.archived) out.push({ id: d.id, ...data })
+  }))
+  return out
+}
+
 // Reusable template programs not yet tied to any athlete — the library on
 // the Programs page and the assignable pool on each athlete's Program tab.
 // No orderBy here on purpose: pairing an equality filter with orderBy on a

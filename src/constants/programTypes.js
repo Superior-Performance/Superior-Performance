@@ -1,12 +1,13 @@
 // An athlete can have up to one active program per type running concurrently
 // — pre-throwing (key stays 'correctives' for backward compatibility),
-// throwing, mobility and lifting are independent tracks, not one program at
-// a time. Programs missing `programType` predate this and are treated as
+// throwing, arm care, mobility and lifting are independent tracks, not one
+// program at a time. Programs missing `programType` predate this and are treated as
 // 'correctives' everywhere they're read. Each type gets its own tab on the
 // athlete's schedule — see SchedulePage.jsx.
 export const PROGRAM_TYPES = [
   { key: 'correctives', label: 'Pre-Throwing', shortLabel: 'Pre-Throwing', badgeClass: 'bg-sp-green-100 text-sp-green-800', dotClass: 'bg-sp-green-500', textClass: 'text-sp-green-600' },
   { key: 'throwing',    label: 'Throwing',      shortLabel: 'Throwing',    badgeClass: 'bg-blue-100 text-blue-700',       dotClass: 'bg-blue-500',       textClass: 'text-blue-600' },
+  { key: 'arm_care',    label: 'Arm Care',      shortLabel: 'Arm Care',    badgeClass: 'bg-purple-100 text-purple-800',   dotClass: 'bg-purple-500',     textClass: 'text-purple-600' },
   { key: 'mobility',    label: 'Mobility',      shortLabel: 'Mobility',    badgeClass: 'bg-teal-100 text-teal-800',       dotClass: 'bg-teal-500',        textClass: 'text-teal-600' },
   { key: 'lifting',     label: 'Lifting',       shortLabel: 'Lifting',     badgeClass: 'bg-amber-100 text-amber-800',     dotClass: 'bg-amber-500',      textClass: 'text-amber-600' },
 ]

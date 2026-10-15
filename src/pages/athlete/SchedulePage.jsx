@@ -27,10 +27,15 @@ const LIFTING_DAY_TYPE_ICONS = { Dumbbell }
 const TAB_META = {
   correctives: { label: 'Pre-Throwing',        fallbackCategory: 'General' },
   throwing:    { label: 'Throwing/Post-Throw', fallbackCategory: 'Catch Play' },
+  arm_care:    { label: 'Arm Care',             fallbackCategory: 'Arm Care' },
   mobility:    { label: 'Mobility',             fallbackCategory: 'Mobility' },
   lifting:     { label: 'Lift',                 fallbackCategory: 'Lift' },
 }
-const TAB_ORDER = ['correctives', 'throwing', 'mobility', 'lifting']
+// Deliberately a separate list from PROGRAM_TYPES rather than derived from it:
+// this is the order the work happens in a session, and the badge order is not
+// obliged to match it. A new program type has to be added in BOTH places or it
+// renders everywhere else and is silently missing from the athlete's tabs.
+const TAB_ORDER = ['correctives', 'throwing', 'arm_care', 'mobility', 'lifting']
 
 // One day's exercises split into their own category tiles instead of one
 // flat list — Mobilization / Correctives / Movement Activation / a plyo

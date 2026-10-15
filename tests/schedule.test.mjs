@@ -2,11 +2,14 @@
 // what each day holds per program type, and how close a program is to the
 // document-size cap. No emulator, no browser — run with `npm run test:unit`.
 import { fileURLToPath } from 'node:url'
+import { readFileSync } from 'node:fs'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const { computeTodayPosition, dayStats, dayStatsByType, dayCountForWeek, dayIndexFor, activeProgramsForAthlete, cellDate } = await import(`${ROOT}src/utils/programSchedule.js`)
 const { compactWeeks, estimateBytes, sizeStatus, FIRESTORE_DOC_LIMIT } = await import(`${ROOT}src/utils/programSize.js`)
 const { matchesGroupFilter, groupsOf, suggestGroupColor, ALL_GROUPS, UNGROUPED, tierFilter, tierOfFilter, premierPools, plainGroups, isPremierPool, PREMIER_POOL } = await import(`${ROOT}src/constants/athleteGroups.js`)
+const { PROGRAM_TYPES, programTypeInfo } = await import(`${ROOT}src/constants/programTypes.js`)
+const schedulePageSource = readFileSync(new URL('../src/pages/athlete/SchedulePage.jsx', import.meta.url), 'utf8')
 const { buildProgramWeeksFromRows, parseWeekOrDayRange } = await import(`${ROOT}src/utils/sheetRows.js`)
 const { countProgramProgress, completionKey } = await import(`${ROOT}src/utils/programIds.js`)
 const { isInactive, opportunitySinceMs } = await import(`${ROOT}src/utils/rosterStatus.js`)
@@ -740,6 +743,36 @@ t('a program already on those days reports unchanged rather than rewriting', () 
 })
 t('no training days means nothing to place against', () => {
   eq(replaceProgramDays(fourDayProgram(), []).reason, 'no-training-days')
+})
+
+/* ── Program types ──────────────────────────────────────────────────────── */
+
+// The athlete's schedule keeps its OWN tab list (TAB_META/TAB_ORDER in
+// SchedulePage) rather than deriving one from PROGRAM_TYPES, because the tab
+// order is the order work happens in a session. The cost is that a new program
+// type added to PROGRAM_TYPES alone renders in every admin view and is
+// silently missing from the athlete's tabs — which is exactly the mistake
+// these two tests exist to catch, by reading the source rather than the DOM.
+t('every program type has a tab on the athlete schedule', () => {
+  const order = schedulePageSource.match(/const TAB_ORDER = \[([^\]]*)\]/)[1]
+  const missing = PROGRAM_TYPES.map(t => t.key).filter(k => !order.includes(`'${k}'`))
+  eq(missing, [], 'program types with no entry in TAB_ORDER:')
+})
+t('every program type has a label and fallback category on the schedule', () => {
+  const meta = schedulePageSource.match(/const TAB_META = \{([\s\S]*?)\n\}/)[1]
+  const missing = PROGRAM_TYPES.map(t => t.key).filter(k => !meta.includes(`${k}:`))
+  eq(missing, [], 'program types with no entry in TAB_META:')
+})
+t('arm care is a program type between throwing and mobility', () => {
+  const keys = PROGRAM_TYPES.map(t => t.key)
+  eq(keys, ['correctives', 'throwing', 'arm_care', 'mobility', 'lifting'])
+  eq(programTypeInfo('arm_care').label, 'Arm Care')
+})
+// An unknown key falling back to Pre-Throwing is load-bearing: programs
+// written before programType existed carry no type at all.
+t('an unknown program type still resolves to Pre-Throwing', () => {
+  eq(programTypeInfo(undefined).key, 'correctives')
+  eq(programTypeInfo('nonsense').key, 'correctives')
 })
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

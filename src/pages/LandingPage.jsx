@@ -23,6 +23,7 @@ import RequestForm from './landing/RequestForm'
 const NAV_LINKS = [
   { label: 'Process', href: '#process' },
   { label: 'Results', href: '#results' },
+  { label: 'Shop', href: '#shop' },
   { label: 'FAQ', href: '#faq' },
 ]
 
@@ -96,6 +97,7 @@ export default function LandingPage() {
       <Process />
       <ImageBand />
       <Results />
+      <MerchBand />
       <Faq />
       <FourUpStrip />
       <RequestForm />
@@ -591,6 +593,98 @@ function Results() {
       <p style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.08em', color: 'rgba(8,17,12,.8)', marginTop: 20 }}>
         Averages across athletes completing a full 12-week block. Individual results vary based on starting point, consistency, and training age.
       </p>
+    </section>
+  )
+}
+
+// ── 3.7 Merch band ───────────────────────────────────────────────────────────
+// The team store lives on SquadLocker (print-on-demand, they handle fulfilment),
+// so this is an announcement and a door, not a storefront — no cart, no prices,
+// nothing here to keep in sync with stock we don't control.
+//
+// The visual is the actual embroidery artwork from brand/Hat Logos, shown as a
+// mark rather than as a product photo. That is a deliberate limit: presenting a
+// rendered design as a photograph of a garment is a claim about what arrives in
+// the box. When real product shots exist, swap the two <img>s below for them and
+// the layout holds.
+const SHOP_URL = 'https://teamlocker.squadlocker.com/#/lockers/superior-performance'
+
+function MerchBand() {
+  return (
+    <section
+      id="shop"
+      className="lp-anchor"
+      style={{
+        padding: 'clamp(72px,9vw,140px) clamp(24px,5vw,88px)',
+        borderTop: HAIRLINE, borderBottom: HAIRLINE,
+        background: C.inkDeep, position: 'relative', overflow: 'hidden',
+      }}
+    >
+      {/* Soft green wash behind the badge so the band reads as its own surface
+          without another full-bleed photo competing with ImageBand above. */}
+      <div aria-hidden="true" style={{
+        position: 'absolute', top: '50%', left: 'clamp(24px,16vw,280px)', width: 'min(70vw, 620px)', aspectRatio: '1',
+        transform: 'translateY(-50%)', borderRadius: '50%', pointerEvents: 'none',
+        background: `radial-gradient(circle, ${C.green}22 0%, transparent 68%)`,
+      }} />
+
+      <div style={{
+        position: 'relative', display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))',
+        gap: 'clamp(36px,6vw,88px)', alignItems: 'center', maxWidth: 1180, margin: '0 auto',
+      }}>
+        {/* Two marks rather than one, because two reads as "a collection" where
+            one reads as "a logo" — but laid out side by side, not overlapping.
+            Tucking the monogram into the crest's corner covered the PERFORMANCE
+            wordmark at every width: the crest is a circle inscribed in a square,
+            so its corners look empty and aren't. */}
+        <Reveal style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 'clamp(14px,3vw,30px)' }}>
+          <img
+            src="/brand/shop-badge.svg"
+            alt="The Superior Performance crest embroidered on the team store gear"
+            loading="lazy"
+            style={{ width: 'min(52vw, 300px)', height: 'auto', display: 'block', flexShrink: 0 }}
+          />
+          <img
+            src="/brand/shop-monogram.svg"
+            alt="The Superior Performance SP monogram"
+            loading="lazy"
+            style={{
+              width: 'min(22vw, 124px)', height: 'auto', display: 'block', flexShrink: 0,
+              padding: 'clamp(10px,2vw,18px)', background: C.ink, borderRadius: '50%', border: HAIRLINE_STRONG,
+            }}
+          />
+        </Reveal>
+
+        <Reveal delay={90}>
+          <p style={eyebrow}>The Team Store</p>
+          <h2 style={h2Style({ maxWidth: '14ch', margin: 0, color: C.paper })}>
+            The locker<br />is open.
+          </h2>
+          <p style={{ fontFamily: BODY, fontSize: 16, lineHeight: 1.65, color: 'rgba(242,244,243,.6)', maxWidth: '38ch', marginTop: 22 }}>
+            Superior Performance gear, carrying the same crest the athletes train under.
+            Printed to order and shipped straight to you — pick your size, we never sit on stock.
+          </p>
+
+          <a
+            href={SHOP_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 12, marginTop: 34,
+              padding: '16px 30px', background: C.green, color: C.inkOnGreen,
+              fontFamily: MONO, fontSize: 12, letterSpacing: '.16em', textTransform: 'uppercase', fontWeight: 600,
+            }}
+          >
+            Shop the collection
+            <span aria-hidden="true">&rarr;</span>
+          </a>
+
+          <p style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.16em', textTransform: 'uppercase', color: 'rgba(242,244,243,.4)', marginTop: 18 }}>
+            Opens in a new tab &middot; Fulfilled by SquadLocker
+          </p>
+        </Reveal>
+      </div>
     </section>
   )
 }

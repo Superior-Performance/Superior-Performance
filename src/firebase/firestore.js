@@ -599,8 +599,60 @@ export const getCompletionsForPrograms = async (uid, programIds) => {
   return out
 }
 
-export const subscribeCompletions = (uid, callback) =>
-  onSnapshot(collection(db, 'completions', uid, 'weeks'), callback)
+/**
+ * Live completions for just the programs an athlete is currently on.
+ *
+ * The unscoped version of this read the athlete's ENTIRE completion history —
+ * every tick of every block they have ever been given — on every mount of the
+ * Schedule and Progress pages. Tabs unmount, so Today → Progress → Today paid
+ * it three times, and the collection only grows: unticking writes
+ * `completed: false` rather than deleting, and finished blocks are never
+ * pruned. Across a roster that is the largest single read cost in the app, and
+ * it is what repeatedly exhausted the free tier's 50,000 reads/day.
+ *
+ * Completion ids are `${programId}_${exerciseId}` (and the legacy
+ * `${programId}_${wi}_${di}_${ei}`, which shares the prefix), so a documentId
+ * range per program fetches exactly the docs those pages consult and nothing
+ * else. Same trick as getCompletionsForPrograms, which cut the admin dashboard
+ * from ~14,200 reads to ~3,300.
+ *
+ * One listener per program rather than one for all: Firestore has no "id
+ * starts with any of these prefixes" filter, and `in` queries cap at 30. The
+ * callback gets the MERGED map (a plain object, not a snapshot) because N
+ * listeners cannot produce one snapshot between them — callers built that map
+ * themselves anyway.
+ *
+ * Passing no programs yields an empty map and subscribes to nothing, which is
+ * correct: an athlete with no active program has no ticks worth watching.
+ */
+const subscribeKeyedByProgram = (path, uid, programIds, callback) => {
+  const ids = [...new Set(programIds || [])].filter(Boolean)
+  if (!ids.length) { callback({}); return () => {} }
+
+  const byProgram = new Map()
+  const emit = () => {
+    const merged = {}
+    byProgram.forEach(docs => Object.assign(merged, docs))
+    callback(merged)
+  }
+  const unsubs = ids.map(pid => onSnapshot(
+    query(
+      collection(db, path, uid, path === 'completions' ? 'weeks' : 'entries'),
+      where(documentId(), '>=', `${pid}_`),
+      where(documentId(), '<', `${pid}_\uf8ff`),
+    ),
+    (snap) => {
+      const docs = {}
+      snap.forEach(d => { docs[d.id] = d.data() })
+      byProgram.set(pid, docs)
+      emit()
+    },
+  ))
+  return () => unsubs.forEach(u => u())
+}
+
+export const subscribeCompletionsForPrograms = (uid, programIds, callback) =>
+  subscribeKeyedByProgram('completions', uid, programIds, callback)
 
 // ── Chat ─────────────────────────────────────────────────────────────────────
 // chats/{athleteUid}/messages/{messageId} — { text, senderUid, senderName,
@@ -671,8 +723,11 @@ export const saveExerciseWeight = (uid, key, data) =>
     { merge: true },
   )
 
-export const subscribeExerciseWeights = (uid, callback) =>
-  onSnapshot(collection(db, 'exerciseWeights', uid, 'entries'), callback)
+// Same shape, same reasoning, same key format as completions above — weights
+// are keyed `${programId}_${exerciseId}` too, and the unscoped version read
+// every working weight the athlete had ever entered on every page mount.
+export const subscribeExerciseWeightsForPrograms = (uid, programIds, callback) =>
+  subscribeKeyedByProgram('exerciseWeights', uid, programIds, callback)
 
 // ── Facility scheduling ──────────────────────────────────────────────────────
 // facilitySlots/{slotId} — { date: 'YYYY-MM-DD', startTime: 'HH:MM',

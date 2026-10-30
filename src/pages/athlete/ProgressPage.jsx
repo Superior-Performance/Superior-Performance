@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import {
-  getProgramForAthlete, subscribeCompletions, subscribeExerciseWeights,
+  getProgramForAthlete, subscribeCompletionsForPrograms, subscribeExerciseWeightsForPrograms,
   addDataLog, subscribeDataLogs,
 } from '../../firebase/firestore'
 import { buildSlots, isSlotComplete } from '../../utils/programIds'
@@ -54,23 +54,20 @@ export default function ProgressPage() {
     })
   }, [currentUser])
 
-  useEffect(() => {
-    if (!currentUser) return
-    return subscribeCompletions(currentUser.uid, (snap) => {
-      const map = {}
-      snap.forEach((d) => { map[d.id] = d.data() })
-      setCompletions(map)
-    })
-  }, [currentUser])
+  // Scoped to the active programs — see subscribeCompletionsForPrograms. This
+  // page only ever renders `programs` (active), so nothing it shows needs the
+  // completions of blocks the athlete has already finished.
+  const programKey = programs.map(p => p.id).join(',')
 
   useEffect(() => {
     if (!currentUser) return
-    return subscribeExerciseWeights(currentUser.uid, (snap) => {
-      const map = {}
-      snap.forEach((d) => { map[d.id] = d.data() })
-      setWeights(map)
-    })
-  }, [currentUser])
+    return subscribeCompletionsForPrograms(currentUser.uid, programKey ? programKey.split(',') : [], setCompletions)
+  }, [currentUser, programKey])
+
+  useEffect(() => {
+    if (!currentUser) return
+    return subscribeExerciseWeightsForPrograms(currentUser.uid, programKey ? programKey.split(',') : [], setWeights)
+  }, [currentUser, programKey])
 
   useEffect(() => {
     if (!currentUser) return

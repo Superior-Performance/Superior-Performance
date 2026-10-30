@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import {
-  getProgramForAthlete, subscribeCompletions, setExerciseComplete, getAthletePrefs, saveAthletePrefs,
-  subscribeExerciseWeights, saveExerciseWeight,
+  getProgramForAthlete, subscribeCompletionsForPrograms, setExerciseComplete, getAthletePrefs, saveAthletePrefs,
+  subscribeExerciseWeightsForPrograms, saveExerciseWeight,
 } from '../../firebase/firestore'
 import {
   CheckCircle2, Circle, ChevronDown, ChevronUp, ChevronLeft, Dumbbell, Sparkles, X, Wind, Heart, Zap, Flame,
@@ -136,23 +136,22 @@ export default function SchedulePage() {
     })
   }, [currentUser])
 
-  useEffect(() => {
-    if (!currentUser) return
-    return subscribeCompletions(currentUser.uid, (snap) => {
-      const map = {}
-      snap.forEach((d) => { map[d.id] = d.data() })
-      setCompletions(map)
-    })
-  }, [currentUser])
+  // Scoped to the active programs rather than the whole collection — see
+  // subscribeCompletionsForPrograms. Keyed on the joined ids, not the array,
+  // because a fresh array identity on every render would tear the listeners
+  // down and rebuild them (and re-bill every document) on each pass.
+  const programIds = programs.map(p => p.id)
+  const programKey = programIds.join(',')
 
   useEffect(() => {
     if (!currentUser) return
-    return subscribeExerciseWeights(currentUser.uid, (snap) => {
-      const map = {}
-      snap.forEach((d) => { map[d.id] = d.data() })
-      setWeights(map)
-    })
-  }, [currentUser])
+    return subscribeCompletionsForPrograms(currentUser.uid, programKey ? programKey.split(',') : [], setCompletions)
+  }, [currentUser, programKey])
+
+  useEffect(() => {
+    if (!currentUser) return
+    return subscribeExerciseWeightsForPrograms(currentUser.uid, programKey ? programKey.split(',') : [], setWeights)
+  }, [currentUser, programKey])
 
   function toggleBlock(groupKey, blockKey) {
     setOpenBlock(prev => ({ ...prev, [groupKey]: prev[groupKey] === blockKey ? null : blockKey }))

@@ -24,7 +24,6 @@ import AdminDashboardPage from './pages/admin/AdminDashboardPage'
 import AdminAthletesPage from './pages/admin/AdminAthletesPage'
 import AdminProgramsPage from './pages/admin/AdminProgramsPage'
 import AdminChatPage     from './pages/admin/AdminChatPage'
-import AdminTeamChatPage from './pages/admin/AdminTeamChatPage'
 import AdminAthleteDetail from './pages/admin/AdminAthleteDetail'
 import AdminSettingsPage  from './pages/admin/AdminSettingsPage'
 import AdminFacilityPage  from './pages/admin/AdminFacilityPage'
@@ -99,7 +98,6 @@ export default function App() {
         <Route path="programs"          element={<AdminProgramsPage />} />
         <Route path="chat"              element={<AdminChatPage />} />
         <Route path="chat/:athleteUid"  element={<AdminChatPage />} />
-        <Route path="team"              element={<AdminTeamChatPage />} />
         <Route path="facility"          element={<AdminFacilityPage />} />
         <Route path="settings"          element={<AdminSettingsPage />} />
       </Route>

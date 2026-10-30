@@ -12,10 +12,6 @@
  *  assessments/{uid}/history/{YYYY-MM-DD} — one snapshot per assessment date
  *  chats/{uid}/messages/{}   — { text, senderUid, senderName, role: 'admin'|'athlete', createdAt }
  *  chatReads/{uid}           — { lastReadAt } — admin-only "coach last opened this thread" marker
- *  teamChat/{messageId}      — { text, authorId, authorName, authorType: 'human'|'claude',
- *                              mentions: string[], answeredBy: string|null, createdAt } — one flat
- *                              staff room (admin-only), separate from the per-athlete chats above
- *  teamChatReads/{uid}       — { lastReadAt } — per-admin unread marker for the staff room
  *  facilitySlots/{id}        — { date, startTime, endTime, capacity, bookedCount, seriesId? } —
  *                              see the "Facility scheduling" section below for the full shape,
  *                              including the bookings sub-collection and its athlete-side mirror.
@@ -662,54 +658,6 @@ export const getAllChatReads = () =>
 
 export const markChatRead = (athleteUid) =>
   setDoc(doc(db, 'chatReads', athleteUid), { lastReadAt: serverTimestamp() }, { merge: true })
-
-// ── Team chat ────────────────────────────────────────────────────────────────
-// teamChat/{messageId} — { text, authorId, authorName, authorType:
-// 'human'|'claude', mentions: string[], answeredBy: string|null, createdAt }
-//
-// One flat staff thread, unlike chats/{athleteUid}/messages which is a thread
-// per athlete — everyone with an admin account is in the same room, so there's
-// no per-thread key to nest under. Admin-only on both read and write.
-//
-// `mentions` is parsed from the body at write time (see utils/teamChat.js) so
-// a scheduled Claude agent can find "someone asked me something" without
-// re-parsing every message. `answeredBy` is the handle of whichever agent has
-// already replied to that message — it's the idempotency guard that stops an
-// agent from answering the same question again on its next wake-up, and stops
-// two agents from both jumping on the same bare `@claude`.
-//
-// TEAM_CHAT_WINDOW caps the live subscription. A staff room accumulates
-// forever but nobody scrolls back a year in practice, and an unbounded
-// onSnapshot would re-deliver the entire history on every reconnect.
-export const TEAM_CHAT_WINDOW = 200
-
-export const sendTeamChatMessage = (message) =>
-  addDoc(collection(db, 'teamChat'), {
-    answeredBy: null,
-    mentions: [],
-    ...message,
-    createdAt: serverTimestamp(),
-  })
-
-// Newest-first from Firestore (so the limit keeps the RECENT window, not the
-// oldest 200), reversed before handing back so callers render oldest-to-newest
-// the way a chat log reads.
-export const subscribeTeamChat = (callback) =>
-  onSnapshot(
-    query(collection(db, 'teamChat'), orderBy('createdAt', 'desc'), limit(TEAM_CHAT_WINDOW)),
-    (snap) => callback(snap.docs.map(d => ({ id: d.id, ...d.data() })).reverse()),
-  )
-
-// Live variant — the unread badge needs this rather than a one-time read, or
-// it would keep counting messages the reader is looking at right now (the
-// chat page updates this marker as they sit there, and a stale local copy
-// would leave the badge stuck until a remount).
-export const subscribeTeamChatRead = (uid, callback) =>
-  onSnapshot(doc(db, 'teamChatReads', uid), (snap) =>
-    callback(snap.exists() ? snap.data() : null))
-
-export const markTeamChatRead = (uid) =>
-  setDoc(doc(db, 'teamChatReads', uid), { lastReadAt: serverTimestamp() }, { merge: true })
 
 // ── Exercise weight tracking ───────────────────────────────────────────────────
 // exerciseWeights/{uid}/entries/{programId_exerciseId} — { value, exercise, updatedAt }

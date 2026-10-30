@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 /**
- * Read-only Firestore access for the team-chat agent.
+ * Read-only Firestore access for diagnostics.
  *
- * The agent answers questions in a shared room and runs unattended, so it gets
- * a tool that *cannot* write: this script only ever issues GET and runQuery,
- * and there is deliberately no code path here that POSTs, PATCHes or DELETEs.
- * That's the safety property — not a prompt rule the agent could be talked out
- * of, but a capability it doesn't have.
+ * Built for an unattended agent that no longer exists (the team-chat room and
+ * its watchers were removed after they exhausted the project's read quota);
+ * kept because a tool that *cannot* write is the right thing to reach for when
+ * poking at production. This script only ever issues GET and runQuery, and
+ * there is deliberately no code path here that POSTs, PATCHes or DELETEs —
+ * that's a capability it doesn't have, not a rule it could be talked out of.
  *
  * Auth is the firebase-tools OAuth token already on this machine (project-owner
  * IAM, so it bypasses security rules the way the Admin SDK would). Whoever runs

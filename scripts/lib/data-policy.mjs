@@ -1,5 +1,5 @@
 /**
- * What the unattended team-chat agent is allowed to read out of production.
+ * What a read-only diagnostic tool is allowed to pull out of production.
  *
  * fs-read.mjs authenticates with a project-owner token, so Firestore's own
  * security rules do not apply to it — the rules protect athletes from each
@@ -20,13 +20,14 @@
  */
 
 /**
- * Collections the agent may never read, at any depth.
+ * Collections this tool may never read, at any depth.
  *
  * `assessments` holds injuryHistory, elbowPainType, posture screening and free
  * text about a minor's body. `chats` is the athlete's private thread with their
- * coach. `teamChat` is excluded because team-chat.mjs is the way into the room
- * — reaching it through the owner-token path would sidestep that script's own
- * shape and hand the agent every staff conversation at once.
+ * coach. The two `teamChat` entries stay on the list even though that room has
+ * been deleted: this runs on an owner token that bypasses security rules, so
+ * the list is the only thing standing between it and those documents, and a
+ * collection that comes back one day should come back already covered.
  */
 export const BLOCKED_COLLECTIONS = new Set(['assessments', 'chats', 'teamChat', 'teamChatReads', 'chatReads'])
 

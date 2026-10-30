@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Outlet, NavLink } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { subscribeTeamChat, subscribeTeamChatRead } from '../../firebase/firestore'
-import { LayoutDashboard, Users, LayoutList, MessageCircle, LogOut, Settings, Menu, X, CalendarClock, MessagesSquare } from 'lucide-react'
+import { LayoutDashboard, Users, LayoutList, MessageCircle, LogOut, Settings, Menu, X, CalendarClock } from 'lucide-react'
 import Logo from '../../components/Logo'
 
 const NAV = [
@@ -10,42 +9,13 @@ const NAV = [
   { to: '/admin/athletes', label: 'Athletes',  Icon: Users           },
   { to: '/admin/programs', label: 'Programs',  Icon: LayoutList      },
   { to: '/admin/chat',     label: 'Messages',  Icon: MessageCircle   },
-  { to: '/admin/team',     label: 'Team Chat', Icon: MessagesSquare, badge: 'teamChat' },
   { to: '/admin/facility', label: 'Facility',  Icon: CalendarClock   },
   { to: '/admin/settings', label: 'Settings',  Icon: Settings        },
 ]
 
-// Messages in the staff room that landed after this admin last opened it and
-// weren't written by them. Both halves are live subscriptions: the read marker
-// updates while they sit on the chat page, so a one-time read of it would
-// leave the badge stuck on.
-function useTeamChatUnread(uid) {
-  const [count, setCount] = useState(0)
-
-  useEffect(() => {
-    if (!uid) return
-    let messages = []
-    let lastReadMs = 0
-    const recompute = () => setCount(
-      messages.filter(m =>
-        m.authorId !== uid && (m.createdAt?.toMillis?.() ?? 0) > lastReadMs
-      ).length
-    )
-    const unsubMessages = subscribeTeamChat(msgs => { messages = msgs; recompute() })
-    const unsubRead = subscribeTeamChatRead(uid, data => {
-      lastReadMs = data?.lastReadAt?.toMillis?.() ?? 0
-      recompute()
-    })
-    return () => { unsubMessages(); unsubRead() }
-  }, [uid])
-
-  return count
-}
-
 export default function AdminLayout() {
   const { currentUser, userProfile, logout } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
-  const teamUnread = useTeamChatUnread(currentUser?.uid)
 
   return (
     <div className="admin-shell md:flex h-screen bg-sp-ink-900 [color-scheme:dark]">
@@ -100,7 +70,7 @@ export default function AdminLayout() {
         </div>
 
         <nav className="relative flex-1 px-3 py-4 space-y-1">
-          {NAV.map(({ to, label, Icon, badge }) => (
+          {NAV.map(({ to, label, Icon }) => (
             <NavLink
               key={to}
               to={to}
@@ -115,14 +85,6 @@ export default function AdminLayout() {
             >
               <Icon size={17} />
               <span className="flex-1">{label}</span>
-              {badge === 'teamChat' && teamUnread > 0 && (
-                <span
-                  className="min-w-[20px] h-5 px-1.5 rounded-full bg-sp-green-500 text-white text-[11px] font-bold flex items-center justify-center"
-                  aria-label={`${teamUnread} unread`}
-                >
-                  {teamUnread > 99 ? '99+' : teamUnread}
-                </span>
-              )}
             </NavLink>
           ))}
         </nav>

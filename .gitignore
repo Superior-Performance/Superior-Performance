@@ -13,3 +13,17 @@ Images/
 firestore-debug.log
 firebase-debug.log
 ui-debug.log
+
+# Raw capture and rendered video. "IG Posts" alone is 4.2GB and brand/motion is
+# 167MB of exported stings — git stores every version of a binary forever, so
+# one accidental `git add -A` would bloat the repo permanently. The clips the
+# site actually serves are committed, optimised, under public/videos.
+#
+# Note what is NOT ignored: brand/logos and brand/Hat Logos are ~1.5MB of logo
+# and merch artwork, and they belong in the repo. Ignoring brand/ wholesale
+# would have hidden them.
+IG Posts/
+brand/motion/
+
+# One-off mockup, not a project asset.
+Nutrution Mock up.pdf

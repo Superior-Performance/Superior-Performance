@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { CalendarDays, ChevronLeft, ChevronRight, Users } from 'lucide-react'
 import { format, addDays } from 'date-fns'
-import { getSlotsForDate, getSlotBookings } from '../firebase/firestore'
+import { getSlotsForDate, getSlotBookings } from '../firebase/facility'
 import { formatSlotTimeRange } from '../utils/facilitySchedule'
 
 const dayKey = (d) => format(d, 'yyyy-MM-dd')

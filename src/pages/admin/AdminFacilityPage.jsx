@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   getFacilitySlots, deleteFacilitySlot, createFacilitySlot, getSlotBookings,
   getRecurringSeries, createRecurringSeries, updateRecurringSeries, generateSeriesSlots,
-} from '../../firebase/firestore'
+} from '../../firebase/facility'
 import { generateSeriesDates, DAY_NAMES, formatSlotTimeRange } from '../../utils/facilitySchedule'
 import { Calendar, Plus, Trash2, ChevronDown, ChevronUp, Repeat, Users, X, Pause, Play } from 'lucide-react'
 import toast from 'react-hot-toast'

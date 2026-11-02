@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getAllAthletes, sendChatMessage, subscribeChatMessages, markChatRead } from '../../firebase/firestore'
+import { getAllAthletes } from '../../firebase/firestore'
+import { sendChatMessage, subscribeChatMessages, markChatRead } from '../../firebase/chat'
 import { useAuth } from '../../context/AuthContext'
 import { Send, MessageCircle } from 'lucide-react'
 import { format, isToday, isYesterday } from 'date-fns'

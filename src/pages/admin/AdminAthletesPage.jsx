@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
-  getAllAthletes, getAllAssessments, getSettings, createUser,
+  getAllAthletes, getAllAssessments, createUser,
   getAthleteGroups, setGroupMembership,
 } from '../../firebase/firestore'
+import { getSettings } from '../../firebase/settings'
 import { createAthleteAuth } from '../../firebase/adminAuth'
 import {
   OUTPUT_PULL_GROUPS, generateDraftProgram, generateAllDraftPrograms, sendAssessmentToIntakeSheet,

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
+import { getSettings, saveSettings, getPublicSettings, savePublicSettings } from '../../firebase/settings'
 import {
-  getSettings, saveSettings, getPublicSettings, savePublicSettings,
   getAllPrograms, getExerciseLibrary, upsertExerciseLibraryEntries,
 } from '../../firebase/firestore'
 import { buildLibraryEntries } from '../../utils/exerciseLibrary'

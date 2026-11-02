@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  getAllAthletes, getAssignedPrograms, setDataLogFlag, getChatMessages, getAllChatReads, getAthleteGroups,
+  getAllAthletes, getAssignedPrograms, setDataLogFlag, getAthleteGroups,
   getCompletionsForPrograms, getFlaggedDataLogs,
   getLatestCompletionAt, getLatestWeightAt, getLatestDataLogAt,
 } from '../../firebase/firestore'
+import { getChatMessages, getAllChatReads } from '../../firebase/chat'
 import { buildSlots, isSlotComplete, countProgramProgress } from '../../utils/programIds'
 import { computeStreak } from '../../utils/programSchedule'
 import Avatar from '../../components/Avatar'

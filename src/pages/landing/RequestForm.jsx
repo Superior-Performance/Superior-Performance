@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import toast from 'react-hot-toast'
-import { getPublicSettings } from '../../firebase/firestore'
+import { getPublicSettings } from '../../firebase/settings'
 import { Reveal } from './motion'
 import { C, DISPLAY, BODY, MONO, SR_ONLY } from './theme'
 

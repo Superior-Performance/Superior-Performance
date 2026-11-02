@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
-import { subscribeChatMessages, sendChatMessage } from '../../firebase/firestore'
+import { subscribeChatMessages, sendChatMessage } from '../../firebase/chat'
 import { Send } from 'lucide-react'
 import { format, isToday, isYesterday } from 'date-fns'
 import EmptyState from '../../components/EmptyState'

@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import {
   getFacilitySlots, getMyFacilityBookings, bookFacilitySlot, cancelFacilityBooking,
   notifyFacilityBooking,
-} from '../../firebase/firestore'
+} from '../../firebase/facility'
 import { CalendarClock, Clock, Check, X, ChevronDown, ChevronUp } from 'lucide-react'
 import { format } from 'date-fns'
 import { formatSlotTime, formatSlotTimeRange, weekStartFor, weekEndFor } from '../../utils/facilitySchedule'

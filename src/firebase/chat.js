@@ -51,11 +51,19 @@ export const subscribeChatMessages = (athleteUid, callback) =>
 // messages that might actually be unread, not the whole conversation. Safe
 // to filter and order by the same field (createdAt) without a composite
 // index.
+//
+// Always capped at UNREAD_SCAN_LIMIT newest messages. A thread the coach has
+// never opened has no chatReads marker to narrow by, so without a cap this
+// read the athlete's entire history on every dashboard load. The cap bounds
+// the unread count too — past it the number is a floor, not an exact count.
+export const UNREAD_SCAN_LIMIT = 100
+
 export const getChatMessages = (athleteUid, sinceMs) =>
   getDocs(query(
     collection(db, 'chats', athleteUid, 'messages'),
     ...(sinceMs ? [where('createdAt', '>', Timestamp.fromMillis(sinceMs))] : []),
     orderBy('createdAt', 'desc'),
+    limit(UNREAD_SCAN_LIMIT),
   ))
 
 // chatReads/{athleteUid} — { lastReadAt } — when the coach last opened this

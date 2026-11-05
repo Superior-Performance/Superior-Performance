@@ -9,7 +9,7 @@ import { getChatMessages, getAllChatReads } from '../../firebase/chat'
 import { buildSlots, isSlotComplete, countProgramProgress } from '../../utils/programIds'
 import { computeStreak } from '../../utils/programSchedule'
 import Avatar from '../../components/Avatar'
-import { LayoutDashboard, Flag, Clock, TrendingDown, FileClock, MessageCircle, Zap, Scale, ChevronRight, X } from 'lucide-react'
+import { LayoutDashboard, Flag, Clock, TrendingDown, FileClock, MessageCircle, Zap, Scale, ChevronRight, X, RefreshCw } from 'lucide-react'
 import { format, formatDistanceToNow } from 'date-fns'
 import toast from 'react-hot-toast'
 import EmptyState from '../../components/EmptyState'
@@ -93,6 +93,11 @@ const EMPTY_SNAPSHOT = { docs: [], forEach: () => {} }
 // reload): the second-and-later visit paints instantly from this while a
 // background refresh quietly brings it up to date, instead of re-paying the
 // full fan-out and showing a blank loading state every single time.
+// A load is ~3,300 document reads, and the free tier allows 50,000 a day —
+// opening the dashboard on every trip back from an athlete page cost a
+// quarter of a day's quota per five clicks. Inside this window a remembered
+// result is shown as-is; the Refresh button forces a reload.
+const CACHE_FRESH_MS = 10 * 60 * 1000
 let dashboardCache = null
 
 export default function AdminDashboardPage() {
@@ -120,7 +125,10 @@ export default function AdminDashboardPage() {
     setActiveFilter(prev => prev === key ? null : key)
   }
 
-  useEffect(() => { load(!!dashboardCache) }, [])
+  useEffect(() => {
+    if (dashboardCache && Date.now() - dashboardCache.loadedAt < CACHE_FRESH_MS) return
+    load(!!dashboardCache)
+  }, [])
 
   async function load(isBackgroundRefresh) {
     if (isBackgroundRefresh) setRefreshing(true)
@@ -209,7 +217,7 @@ export default function AdminDashboardPage() {
 
       flaggedFeed.sort((a, b) => toMillis(b.entry.date) - toMillis(a.entry.date))
       unreadFeed.sort((a, b) => toMillis(b.latest.createdAt) - toMillis(a.latest.createdAt))
-      dashboardCache = { rows: nextRows, flagged: flaggedFeed, unread: unreadFeed, groups: groupsSnap.docs.map(d => ({ id: d.id, ...d.data() })) }
+      dashboardCache = { loadedAt: Date.now(), rows: nextRows, flagged: flaggedFeed, unread: unreadFeed, groups: groupsSnap.docs.map(d => ({ id: d.id, ...d.data() })) }
       setRows(nextRows)
       setFlagged(flaggedFeed)
       setUnread(unreadFeed)
@@ -292,6 +300,14 @@ export default function AdminDashboardPage() {
             {refreshing && (
               <div className="w-3.5 h-3.5 border-2 border-sp-green-500 border-t-transparent rounded-full animate-spin" title="Refreshing…" />
             )}
+            <button
+              onClick={() => load(true)}
+              disabled={refreshing || loading}
+              title="Reload the dashboard (about 3,300 reads)"
+              className="ml-1 p-1 text-sp-ink-300 hover:text-white disabled:opacity-40 rounded-lg hover:bg-white/10"
+            >
+              <RefreshCw size={16} />
+            </button>
           </div>
           <p className="text-sp-ink-300 text-sm">What needs your attention today</p>
         </div>

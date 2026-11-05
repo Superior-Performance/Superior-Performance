@@ -25,7 +25,7 @@
 import {
   collection, doc, getDoc, getDocs, setDoc, addDoc,
   updateDoc, deleteDoc, query, where, orderBy, limit, onSnapshot,
-  serverTimestamp, writeBatch, arrayUnion, arrayRemove, documentId,
+  serverTimestamp, writeBatch, arrayUnion, arrayRemove, documentId, getCountFromServer,
 } from 'firebase/firestore'
 import { getStorage, ref as storageRef, deleteObject } from 'firebase/storage'
 import { db } from './config'
@@ -554,6 +554,26 @@ export const getCompletionsForPrograms = async (uid, programIds) => {
   const out = {}
   snaps.forEach(snap => snap.forEach(d => { out[d.id] = d.data() }))
   return out
+}
+
+/**
+ * How many exercises the athlete has ticked off in these programs — the
+ * number only, via a server-side count (about one read per 1,000 documents
+ * counted) rather than downloading every document. The roster uses it where
+ * it would otherwise read them all just to add them up; see
+ * utils/dashboardProgress for what that trades away.
+ */
+export const countCompletedForPrograms = async (uid, programIds) => {
+  if (!programIds?.length) return 0
+  const snaps = await Promise.all(programIds.map(pid =>
+    getCountFromServer(query(
+      collection(db, 'completions', uid, 'weeks'),
+      where('completed', '==', true),
+      where(documentId(), '>=', `${pid}_`),
+      where(documentId(), '<', `${pid}_\uf8ff`),
+    ))
+  ))
+  return snaps.reduce((sum, snap) => sum + snap.data().count, 0)
 }
 
 /**

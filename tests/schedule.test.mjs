@@ -12,6 +12,7 @@ const { PROGRAM_TYPES, programTypeInfo } = await import(`${ROOT}src/constants/pr
 const schedulePageSource = readFileSync(new URL('../src/pages/athlete/SchedulePage.jsx', import.meta.url), 'utf8')
 const { buildProgramWeeksFromRows, parseWeekOrDayRange } = await import(`${ROOT}src/utils/sheetRows.js`)
 const { countProgramProgress, completionKey } = await import(`${ROOT}src/utils/programIds.js`)
+const { approxProgress } = await import(`${ROOT}src/utils/dashboardProgress.js`)
 const { isInactive, opportunitySinceMs } = await import(`${ROOT}src/utils/rosterStatus.js`)
 const { normalizeTrainingDays, dayTypeDayNums, effectiveTrainingDays, isMondayStart, formatTrainingDays } = await import(`${ROOT}src/utils/trainingDays.js`)
 const { replaceProgramDays } = await import(`${ROOT}src/utils/replaceProgramDays.js`)
@@ -773,6 +774,34 @@ t('arm care is a program type between throwing and mobility', () => {
 t('an unknown program type still resolves to Pre-Throwing', () => {
   eq(programTypeInfo(undefined).key, 'correctives')
   eq(programTypeInfo('nonsense').key, 'correctives')
+})
+
+// The roster counts completions instead of reading them (utils/dashboardProgress).
+// Pin that it agrees with the exact figure in the plain case and that its
+// errors only ever run high, never producing a false "Behind".
+const rosterMondayStart = () => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toISOString().slice(0, 10) }
+const rosterProgram = (extra = {}) => ({
+  id: 'p1', startDate: rosterMondayStart(), weeks: [
+    { days: [{ dayNum: 1, exercises: [{ id: 'a' }, { id: 'b' }, { id: 'c', altGroup: 'g' }, { id: 'd', altGroup: 'g' }] }] },
+    { days: [{ dayNum: 1, exercises: [{ id: 'e' }, { id: 'f' }] }] },
+  ],
+})
+t('count-based roster progress matches the exact figure when nothing is ahead or doubled', () => {
+  const p = rosterProgram()
+  const comps = { p1_a: { completed: true }, p1_c: { completed: true } }
+  const exact = countProgramProgress(comps, p, 0)   // week 1 is the week in progress
+  eq(approxProgress([p], 2), Math.round(exact.done / exact.total * 100))
+})
+t('count-based roster progress never exceeds 100 and errs high, not low', () => {
+  const p = rosterProgram()
+  eq(approxProgress([p], 99), 100)
+  // both halves of an either/or pair ticked: exact says 2 of 3 slots, the count says 3
+  const exact = countProgramProgress({ p1_a: { completed: true }, p1_c: { completed: true }, p1_d: { completed: true } }, p, 0)
+  if (approxProgress([p], 3) < Math.round(exact.done / exact.total * 100)) throw new Error('count came out below the exact figure')
+})
+t('count-based roster progress is null with no program or before it starts', () => {
+  eq(approxProgress([], 5), null)
+  eq(approxProgress([{ id: 'x', startDate: '2999-01-01', weeks: [{ days: [{ exercises: [{ id: 'a' }] }] }] }], 0), null)
 })
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

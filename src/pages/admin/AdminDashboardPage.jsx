@@ -2,12 +2,11 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   getAllAthletes, getAssignedPrograms, setDataLogFlag, getAthleteGroups,
-  getCompletionsForPrograms, getFlaggedDataLogs,
+  countCompletedForPrograms, getFlaggedDataLogs,
   getLatestCompletionAt, getLatestWeightAt, getLatestDataLogAt,
 } from '../../firebase/firestore'
 import { getChatMessages, getAllChatReads } from '../../firebase/chat'
-import { buildSlots, isSlotComplete, countProgramProgress } from '../../utils/programIds'
-import { computeStreak } from '../../utils/programSchedule'
+import { approxProgress } from '../../utils/dashboardProgress'
 import Avatar from '../../components/Avatar'
 import { LayoutDashboard, Flag, Clock, TrendingDown, FileClock, MessageCircle, Zap, Scale, ChevronRight, X, RefreshCw } from 'lucide-react'
 import { format, formatDistanceToNow } from 'date-fns'
@@ -22,7 +21,7 @@ import { isInactive } from '../../utils/rosterStatus'
 // Below this elapsed-completion % an athlete shows as "Behind" — elapsed
 // meaning weeks that have actually started, not the whole program, so
 // someone in week 1 of 12 isn't penalized for weeks that haven't happened
-// yet. See athleteProgress below.
+// yet. See approxProgress (utils/dashboardProgress).
 const BEHIND_THRESHOLD = 70
 // No completion or logged entry in this many days reads as "Inactive" —
 // only applied to athletes who actually have an active program to be
@@ -41,26 +40,6 @@ const FILTERS = {
   inactive: { label: `Inactive ${INACTIVE_DAYS}+ days`, hasFeed: false, test: r => r.inactive },
   behind:   { label: 'Behind on program',     hasFeed: false, test: r => r.behind },
   drafts:   { label: 'Drafts awaiting review', hasFeed: false, test: r => r.draftCount > 0 },
-}
-
-// How much of an athlete's program is done, counted only through the week
-// they're actually on right now (see computeStreak) — not the whole
-// program, which would make week 1 of a 12-week block read as "8% done"
-// regardless of whether they're on pace.
-function athleteProgress(programs, completions) {
-  if (programs.length === 0) return null
-  const totalWeeks = Math.max(1, ...programs.map(p => p.weeks?.length || 0))
-  const { pos } = computeStreak(programs, completions, totalWeeks)
-  if (pos.notStartedYet) return null
-  let total = 0, done = 0
-  programs.forEach(p => {
-    for (let wi = 0; wi <= pos.weekIdx; wi++) {
-      const r = countProgramProgress(completions, p, wi)
-      total += r.total
-      done += r.done
-    }
-  })
-  return total ? Math.round((done / total) * 100) : null
 }
 
 // The three recency probes each come back holding at most one document — the
@@ -155,12 +134,12 @@ export default function AdminDashboardPage() {
         activeProgramsByAthlete[a.id] = allPrograms.filter(p => p.athleteId === a.id && p.active === true)
       })
 
-      const [completionsByAthlete, weightsSnaps, logsSnaps, flaggedSnaps, completionRecency, messagesSnaps] = await Promise.all([
+      const [completedCounts, weightsSnaps, logsSnaps, flaggedSnaps, completionRecency, messagesSnaps] = await Promise.all([
         // Scoped to the programs this athlete is actually on. Finished blocks
         // keep their completion docs forever, and this page has no use for
         // them — progress is only ever counted against active programs.
         Promise.all(athletes.map(a =>
-          getCompletionsForPrograms(a.id, activeProgramsByAthlete[a.id].map(p => p.id))
+          countCompletedForPrograms(a.id, activeProgramsByAthlete[a.id].map(p => p.id))
         )),
         Promise.all(athletes.map(a =>
           activeProgramsByAthlete[a.id].length > 0 ? getLatestWeightAt(a.id) : Promise.resolve(EMPTY_SNAPSHOT)
@@ -183,14 +162,13 @@ export default function AdminDashboardPage() {
         const activePrograms = activeProgramsByAthlete[athlete.id]
         const draftCount = athletePrograms.filter(p => p.active === false && !p.archived).length
 
-        const completions = completionsByAthlete[i]
-        const flaggedLogs = flaggedSnaps[i].docs.map(d => ({ id: d.id, ...d.data() }))
+                const flaggedLogs = flaggedSnaps[i].docs.map(d => ({ id: d.id, ...d.data() }))
 
         flaggedLogs.forEach(entry => {
           flaggedFeed.push({ athleteId: athlete.id, athleteName: athlete.name, entry })
         })
 
-        const pct = athleteProgress(activePrograms, completions)
+        const pct = approxProgress(activePrograms, completedCounts[i])
         const lastActivityMs = lastActivityMillis(completionRecency[i], logsSnaps[i], weightsSnaps[i])
         const inactive = isInactive(activePrograms, lastActivityMs, toMillis(athlete.createdAt), INACTIVE_DAYS)
         const behind = pct != null && pct < BEHIND_THRESHOLD

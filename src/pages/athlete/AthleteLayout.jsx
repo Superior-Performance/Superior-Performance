@@ -5,6 +5,7 @@ import {
   Flame, MessageCircle, TrendingUp, Activity, LogOut, UserCircle, ExternalLink, RefreshCw, CalendarClock,
 } from 'lucide-react'
 import Logo from '../../components/Logo'
+import OfflineBanner from '../../components/OfflineBanner'
 
 // Pull-to-refresh distance (px) needed to trigger a reload. Installed as a
 // home-screen icon, the app has no browser chrome and no reload button —
@@ -54,6 +55,9 @@ export default function AthleteLayout() {
   function handlePointerUp() {
     if (pullStartY.current == null) return
     if (pullDistance >= PULL_THRESHOLD) {
+      // A reload needs the network to fetch the page itself; offline it would
+      // replace a working app with the browser's error page.
+      if (!navigator.onLine) { setPullDistance(0); pullStartY.current = null; return }
       setRefreshing(true)
       setPullDistance(PULL_THRESHOLD)
       window.location.reload()
@@ -100,6 +104,7 @@ export default function AthleteLayout() {
           )}
         </div>
       </header>
+      <OfflineBanner />
 
       {/* Persistent Rapsodo iframe — always mounted so login session is preserved */}
       <div

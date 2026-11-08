@@ -2,7 +2,10 @@
 // Go to: https://console.firebase.google.com → Project Settings → General → Your apps → SDK setup
 import { initializeApp } from 'firebase/app'
 import { getAuth, connectAuthEmulator } from 'firebase/auth'
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore'
+import {
+  initializeFirestore, getFirestore, connectFirestoreEmulator,
+  persistentLocalCache, persistentMultipleTabManager, terminate, clearIndexedDbPersistence,
+} from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 
 const firebaseConfig = {
@@ -17,7 +20,24 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig)
 
 export const auth    = getAuth(app)
-export const db      = getFirestore(app)    // Firestore — programs, athletes, logs, chat
+// Firestore — programs, athletes, logs, chat.
+//
+// The local cache is what makes the app usable in the facility, where wifi
+// and cell signal are poor: data already seen is served from the phone, and
+// a check-in ticked with no signal is queued and sent when it returns. It
+// also saves reads on repeat opens. A browser that refuses IndexedDB (a
+// private window, some in-app browsers) falls back to the plain online-only
+// client rather than breaking the app. See clearCachedData for sign-out.
+function createDb() {
+  try {
+    return initializeFirestore(app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    })
+  } catch {
+    return getFirestore(app)
+  }
+}
+export const db      = createDb()
 export const storage = getStorage(app)      // Storage — athlete profile photos
 
 // Local QA against the Firebase emulators instead of the real project, so
@@ -28,6 +48,18 @@ if (import.meta.env.VITE_USE_EMULATORS === '1') {
   connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true })
   connectFirestoreEmulator(db, '127.0.0.1', 8080)
   console.info('Firebase: using local emulators (seeded data, not production)')
+}
+
+// What the cache holds is one athlete's data on one device, so it has to go
+// when they sign out — otherwise the next person on a shared phone could open
+// it. terminate() first because the cache can't be cleared while the client is
+// live; the caller reloads afterward so the app starts from a fresh client.
+// Best effort: another open tab keeps the cache locked, and that is fine.
+export async function clearCachedData() {
+  try {
+    await terminate(db)
+    await clearIndexedDbPersistence(db)
+  } catch { /* locked by another tab or never enabled */ }
 }
 
 export default app

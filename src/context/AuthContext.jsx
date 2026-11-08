@@ -5,7 +5,7 @@ import {
   signOut,
   createUserWithEmailAndPassword,
 } from 'firebase/auth'
-import { auth } from '../firebase/config'
+import { auth, clearCachedData } from '../firebase/config'
 import { getUser, createUser } from '../firebase/firestore'
 
 const AuthContext = createContext(null)
@@ -37,7 +37,11 @@ export function AuthProvider({ children }) {
   const login = (email, password) =>
     signInWithEmailAndPassword(auth, email, password)
 
-  const logout = () => signOut(auth)
+  const logout = async () => {
+    await signOut(auth)
+    await clearCachedData()
+    window.location.replace('/login')
+  }
 
   const register = async (email, password, name, role = 'athlete') => {
     const cred = await createUserWithEmailAndPassword(auth, email, password)
